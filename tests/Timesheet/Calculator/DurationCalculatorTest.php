@@ -20,21 +20,21 @@ use PHPUnit\Framework\TestCase;
  */
 class DurationCalculatorTest extends TestCase
 {
-    public function testCalculateWithEmptyEnd()
+    public function testCalculateWithEmptyEnd(): void
     {
         $record = new Timesheet();
         $record->setBegin(new \DateTime());
         $this->assertEquals(0, $record->getDuration());
 
         $sut = new DurationCalculator((new RoundingServiceFactory($this))->create());
-        $sut->calculate($record);
+        $sut->calculate($record, []);
         $this->assertEquals(0, $record->getDuration());
     }
 
     /**
      * @dataProvider getTestData
      */
-    public function testCalculate($rules, $start, $end, $expectedDuration)
+    public function testCalculate($rules, $start, $end, $expectedDuration): void
     {
         $record = new Timesheet();
         $record->setBegin($start);
@@ -42,7 +42,7 @@ class DurationCalculatorTest extends TestCase
         $this->assertEquals(0, $record->getDuration());
 
         $sut = new DurationCalculator((new RoundingServiceFactory($this))->create($rules));
-        $sut->calculate($record);
+        $sut->calculate($record, []);
         $this->assertEquals($expectedDuration, $record->getDuration());
     }
 
@@ -195,8 +195,8 @@ class DurationCalculatorTest extends TestCase
                         'mode' => 'default',
                     ],
                 ],
-                (clone $start)->setTime(12, 27, 00), // no diff, to test ...
-                (clone $start)->setTime(12, 27, 00), // ... that no rounding is applied
+                (clone $start)->setTime(12, 27, 0), // no diff, to test ...
+                (clone $start)->setTime(12, 27, 0), // ... that no rounding is applied
                 0
             ],
             [

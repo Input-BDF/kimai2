@@ -16,6 +16,8 @@ use App\Export\ServiceExport;
 use App\Export\Timesheet\HtmlRenderer as HtmlExporter;
 use App\Project\ProjectStatisticService;
 use App\Repository\Query\ExportQuery;
+use App\Tests\Mocks\Export\HtmlRendererFactoryMock;
+use App\Tests\Mocks\Export\PdfRendererFactoryMock;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
@@ -28,12 +30,14 @@ class ServiceExportTest extends TestCase
 {
     private function createSut(): ServiceExport
     {
-        $sut = new ServiceExport($this->createMock(EventDispatcherInterface::class));
-
-        return $sut;
+        return new ServiceExport(
+            $this->createMock(EventDispatcherInterface::class),
+            (new HtmlRendererFactoryMock($this))->create(),
+            (new PdfRendererFactoryMock($this))->create(),
+        );
     }
 
-    public function testEmptyObject()
+    public function testEmptyObject(): void
     {
         $sut = $this->createSut();
 
@@ -44,7 +48,7 @@ class ServiceExportTest extends TestCase
         self::assertNull($sut->getTimesheetExporterById('default'));
     }
 
-    public function testAddRenderer()
+    public function testAddRenderer(): void
     {
         $sut = $this->createSut();
 
@@ -60,7 +64,7 @@ class ServiceExportTest extends TestCase
         self::assertSame($renderer, $sut->getRendererById('html'));
     }
 
-    public function testAddTimesheetExporter()
+    public function testAddTimesheetExporter(): void
     {
         $sut = $this->createSut();
 
@@ -71,7 +75,7 @@ class ServiceExportTest extends TestCase
         self::assertSame($exporter, $sut->getTimesheetExporterById('print'));
     }
 
-    public function testAddExportRepository()
+    public function testAddExportRepository(): void
     {
         $sut = $this->createSut();
 

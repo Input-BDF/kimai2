@@ -9,54 +9,60 @@
 
 namespace App\Repository;
 
-use App\Entity\Activity;
 use App\Entity\Customer;
 use App\Entity\CustomerComment;
+use App\Entity\CustomerMeta;
 use App\Entity\Project;
 use App\Entity\Team;
-use App\Entity\Timesheet;
 use App\Entity\User;
-use App\Model\CustomerStatistic;
 use App\Repository\Loader\CustomerLoader;
-use App\Repository\Paginator\LoaderPaginator;
+use App\Repository\Paginator\LoaderQueryPaginator;
 use App\Repository\Paginator\PaginatorInterface;
 use App\Repository\Query\CustomerFormTypeQuery;
 use App\Repository\Query\CustomerQuery;
+use App\Repository\Query\CustomerQueryHydrate;
+use App\Utils\Pagination;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityRepository;
-use Doctrine\ORM\ORMException;
+use Doctrine\ORM\Exception\ORMException;
+use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Query;
+use Doctrine\ORM\Query\Expr\Andx;
 use Doctrine\ORM\QueryBuilder;
-use Pagerfanta\Pagerfanta;
 
 /**
- * @extends \Doctrine\ORM\EntityRepository<Customer>
+ * @extends EntityRepository<Customer>
  */
 class CustomerRepository extends EntityRepository
 {
+    use RepositorySearchTrait;
+
     /**
-     * @param mixed $id
-     * @param null $lockMode
-     * @param null $lockVersion
-     * @return Customer|null
+     * @param int[] $customerIDs
+     * @return array<Customer>
      */
-    public function find($id, $lockMode = null, $lockVersion = null): ?Customer
+    public function findByIds(array $customerIDs): array
     {
-        /** @var Customer|null $customer */
-        $customer = parent::find($id, $lockMode, $lockVersion);
-        if (null === $customer) {
-            return null;
+        $ids = array_filter(
+            array_unique($customerIDs),
+            function ($value) {
+                return $value > 0;
+            }
+        );
+
+        if (\count($ids) === 0) {
+            return [];
         }
 
-        $loader = new CustomerLoader($this->getEntityManager(), true);
-        $loader->loadResults([$customer]);
+        $qb = $this->createQueryBuilder('c');
+        $qb
+            ->where($qb->expr()->in('c.id', ':id'))
+            ->setParameter('id', $ids)
+        ;
 
-        return $customer;
+        return $this->getCustomers($this->prepareCustomerQuery($qb->getQuery()), new CustomerQuery());
     }
 
-    /**
-     * @param Customer $customer
-     * @throws ORMException
-     */
     public function saveCustomer(Customer $customer): void
     {
         $entityManager = $this->getEntityManager();
@@ -67,104 +73,38 @@ class CustomerRepository extends EntityRepository
     public function countCustomer(bool $visible = false): int
     {
         if ($visible) {
-            return $this->count(['visible' => (bool) $visible]);
+            return $this->count(['visible' => $visible]);
         }
 
         return $this->count([]);
     }
 
     /**
-     * @deprecated since 1.15 use CustomerStatisticService::getCustomerStatistics() instead - will be removed with 2.0
-     * @codeCoverageIgnore
-     *
-     * @param Customer $customer
-     * @return CustomerStatistic
-     * @throws \Doctrine\ORM\NonUniqueResultException
+     * @param array<Team> $teams
      */
-    public function getCustomerStatistics(Customer $customer): CustomerStatistic
+    public function addPermissionCriteria(QueryBuilder $qb, ?User $user = null, array $teams = []): void
     {
-        $stats = new CustomerStatistic();
-
-        $qb = $this->getEntityManager()->createQueryBuilder();
-        $qb
-            ->from(Timesheet::class, 't')
-            ->join(Project::class, 'p', Query\Expr\Join::WITH, 't.project = p.id')
-            ->addSelect('COUNT(t.id) as amount')
-            ->addSelect('t.billable as billable')
-            ->addSelect('COALESCE(SUM(t.duration), 0) as duration')
-            ->addSelect('COALESCE(SUM(t.rate), 0) as rate')
-            ->addSelect('COALESCE(SUM(t.internalRate), 0) as internal_rate')
-            ->andWhere('p.customer = :customer')
-            ->setParameter('customer', $customer)
-            ->groupBy('billable')
-        ;
-
-        $timesheetResult = $qb->getQuery()->getResult();
-
-        if (null !== $timesheetResult) {
-            $amount = 0;
-            $duration = 0;
-            $rate = 0.00;
-            $rateInternal = 0.00;
-            foreach ($timesheetResult as $resultRow) {
-                $amount += $resultRow['amount'];
-                $duration += $resultRow['duration'];
-                $rate += $resultRow['rate'];
-                $rateInternal += $resultRow['internal_rate'];
-                if ($resultRow['billable']) {
-                    $stats->setDurationBillable($resultRow['duration']);
-                    $stats->setRateBillable($resultRow['rate']);
-                    $stats->setRecordAmountBillable($resultRow['amount']);
-                }
-            }
-            $stats->setCounter($amount);
-            $stats->setRecordDuration($duration);
-            $stats->setRecordRate($rate);
-            $stats->setRecordInternalRate($rateInternal);
+        $permissions = $this->getPermissionCriteria($qb, $user, $teams);
+        if ($permissions->count() > 0) {
+            $qb->andWhere($permissions);
         }
-
-        $qb = $this->getEntityManager()->createQueryBuilder();
-        $qb
-            ->select('COUNT(a.id) as amount')
-            ->from(Activity::class, 'a')
-            ->join(Project::class, 'p', Query\Expr\Join::WITH, 'a.project = p.id')
-            ->andWhere('a.project = p.id')
-            ->andWhere('p.customer = :customer')
-            ->setParameter('customer', $customer)
-        ;
-
-        $activityResult = $qb->getQuery()->getOneOrNullResult();
-
-        if (null !== $activityResult) {
-            $stats->setActivityAmount($activityResult['amount']);
-        }
-
-        $qb = $this->getEntityManager()->createQueryBuilder();
-        $qb->select('COUNT(p.id) as amount')
-            ->from(Project::class, 'p')
-            ->andWhere('p.customer = :customer')
-            ->setParameter('customer', $customer)
-        ;
-
-        $projectResult = $qb->getQuery()->getOneOrNullResult();
-
-        if (null !== $projectResult) {
-            $stats->setProjectAmount($projectResult['amount']);
-        }
-
-        return $stats;
     }
 
-    private function addPermissionCriteria(QueryBuilder $qb, ?User $user = null, array $teams = [])
+    /**
+     * @param array<Team> $teams
+     */
+    private function getPermissionCriteria(QueryBuilder $qb, ?User $user = null, array $teams = []): Andx
     {
+        $andX = $qb->expr()->andX();
+
         // make sure that all queries without a user see all customers
         if (null === $user && empty($teams)) {
-            return;
+            return $andX;
         }
 
         // make sure that admins see all customers
         if (null !== $user && $user->canSeeAllData()) {
-            return;
+            return $andX;
         }
 
         if (null !== $user) {
@@ -172,41 +112,30 @@ class CustomerRepository extends EntityRepository
         }
 
         if (empty($teams)) {
-            $qb->andWhere('SIZE(c.teams) = 0');
+            $andX->add('SIZE(c.teams) = 0');
 
-            return;
+            return $andX;
         }
 
         $or = $qb->expr()->orX(
             'SIZE(c.teams) = 0',
             $qb->expr()->isMemberOf(':teams', 'c.teams')
         );
-        $qb->andWhere($or);
+        $andX->add($or);
 
         $ids = array_values(array_unique(array_map(function (Team $team) {
             return $team->getId();
         }, $teams)));
 
         $qb->setParameter('teams', $ids);
-    }
 
-    /**
-     * @deprecated since 1.1 - use getQueryBuilderForFormType() instead - will be removed with 2.0
-     * @codeCoverageIgnore
-     */
-    public function builderForEntityType($customer)
-    {
-        $query = new CustomerFormTypeQuery();
-        $query->addCustomer($customer);
-
-        return $this->getQueryBuilderForFormType($query);
+        return $andX;
     }
 
     /**
      * Returns a query builder that is used for CustomerType and your own 'query_builder' option.
      *
-     * @param CustomerFormTypeQuery $query
-     * @return QueryBuilder
+     * @internal
      */
     public function getQueryBuilderForFormType(CustomerFormTypeQuery $query): QueryBuilder
     {
@@ -216,33 +145,49 @@ class CustomerRepository extends EntityRepository
             ->from(Customer::class, 'c')
             ->orderBy('c.name', 'ASC');
 
-        // TODO this where and the next if($query->hasCustomers()) should go into their own $qb->expr()->orX()
-        $qb->andWhere($qb->expr()->eq('c.visible', ':visible'));
-        $qb->setParameter('visible', true, \PDO::PARAM_BOOL);
+        $mainQuery = $qb->expr()->andX();
 
-        if ($query->hasCustomers()) {
-            $qb->orWhere($qb->expr()->in('c.id', ':customer'))
-                ->setParameter('customer', $query->getCustomers());
+        $mainQuery->add($qb->expr()->eq('c.visible', ':visible'));
+        $qb->setParameter('visible', true, ParameterType::BOOLEAN);
+
+        $permissions = $this->getPermissionCriteria($qb, $query->getUser(), $query->getTeams());
+        if ($permissions->count() > 0) {
+            $mainQuery->add($permissions);
+        }
+
+        $outerQuery = $qb->expr()->orX();
+
+        // this is a risk, as a user can manipulate the query and inject IDs that would be hidden otherwise
+        if ($query->isAllowCustomerPreselect() && $query->hasCustomers()) {
+            $outerQuery->add($qb->expr()->in('c.id', ':customer'));
+            $qb->setParameter('customer', $query->getCustomers());
         }
 
         if (null !== $query->getCustomerToIgnore()) {
-            $qb->andWhere($qb->expr()->neq('c.id', ':ignored'));
+            $mainQuery = $qb->expr()->andX(
+                $mainQuery,
+                $qb->expr()->neq('c.id', ':ignored')
+            );
             $qb->setParameter('ignored', $query->getCustomerToIgnore());
         }
 
-        $this->addPermissionCriteria($qb, $query->getUser(), $query->getTeams());
+        $outerQuery->add($mainQuery);
+        $qb->andWhere($outerQuery);
 
         return $qb;
     }
 
     private function getQueryBuilderForQuery(CustomerQuery $query): QueryBuilder
     {
-        $qb = $this->getEntityManager()->createQueryBuilder();
+        $qb = $this->createQueryBuilder('c');
 
-        $qb
-            ->select('c')
-            ->from(Customer::class, 'c')
-        ;
+        if (\count($query->getCustomerIds()) > 0) {
+            $qb->andWhere($qb->expr()->in('c.id', ':id'))->setParameter('id', $query->getCustomerIds());
+        }
+
+        if ($query->getCountry() !== null) {
+            $qb->andWhere($qb->expr()->eq('c.country', ':country'))->setParameter('country', $query->getCountry());
+        }
 
         foreach ($query->getOrderGroups() as $orderBy => $order) {
             switch ($orderBy) {
@@ -257,65 +202,45 @@ class CustomerRepository extends EntityRepository
         }
 
         if ($query->isShowVisible()) {
-            $qb->andWhere($qb->expr()->eq('c.visible', ':visible'));
-            $qb->setParameter('visible', true, \PDO::PARAM_BOOL);
+            $qb->andWhere($qb->expr()->eq('c.visible', ':visible'))->setParameter('visible', true, ParameterType::BOOLEAN);
         } elseif ($query->isShowHidden()) {
-            $qb->andWhere($qb->expr()->eq('c.visible', ':visible'));
-            $qb->setParameter('visible', false, \PDO::PARAM_BOOL);
+            $qb->andWhere($qb->expr()->eq('c.visible', ':visible'))->setParameter('visible', false, ParameterType::BOOLEAN);
         }
 
         $this->addPermissionCriteria($qb, $query->getCurrentUser(), $query->getTeams());
 
-        if ($query->hasSearchTerm()) {
-            $searchAnd = $qb->expr()->andX();
-            $searchTerm = $query->getSearchTerm();
-
-            foreach ($searchTerm->getSearchFields() as $metaName => $metaValue) {
-                $qb->leftJoin('c.meta', 'meta');
-                $searchAnd->add(
-                    $qb->expr()->andX(
-                        $qb->expr()->eq('meta.name', ':metaName'),
-                        $qb->expr()->like('meta.value', ':metaValue')
-                    )
-                );
-                $qb->setParameter('metaName', $metaName);
-                $qb->setParameter('metaValue', '%' . $metaValue . '%');
-            }
-
-            if ($searchTerm->hasSearchTerm()) {
-                $searchAnd->add(
-                    $qb->expr()->orX(
-                        $qb->expr()->like('c.name', ':searchTerm'),
-                        $qb->expr()->like('c.comment', ':searchTerm'),
-                        $qb->expr()->like('c.company', ':searchTerm'),
-                        $qb->expr()->like('c.vatId', ':searchTerm'),
-                        $qb->expr()->like('c.number', ':searchTerm'),
-                        $qb->expr()->like('c.contact', ':searchTerm'),
-                        $qb->expr()->like('c.phone', ':searchTerm'),
-                        $qb->expr()->like('c.email', ':searchTerm'),
-                        $qb->expr()->like('c.address', ':searchTerm')
-                    )
-                );
-                $qb->setParameter('searchTerm', '%' . $searchTerm->getSearchTerm() . '%');
-            }
-
-            if ($searchAnd->count() > 0) {
-                $qb->andWhere($searchAnd);
-            }
-        }
+        $this->addSearchTerm($qb, $query);
 
         return $qb;
     }
 
-    public function getPagerfantaForQuery(CustomerQuery $query): Pagerfanta
+    private function getMetaFieldClass(): string
     {
-        $paginator = new Pagerfanta($this->getPaginatorForQuery($query));
-        $paginator->setMaxPerPage($query->getPageSize());
-        $paginator->setCurrentPage($query->getPage());
-
-        return $paginator;
+        return CustomerMeta::class;
     }
 
+    private function getMetaFieldName(): string
+    {
+        return 'customer';
+    }
+
+    /**
+     * @return array<string>
+     */
+    private function getSearchableFields(): array
+    {
+        return ['c.name', 'c.comment', 'c.company', 'c.vatId', 'c.number', 'c.contact', 'c.phone', 'c.email', 'c.address'];
+    }
+
+    public function getPagerfantaForQuery(CustomerQuery $query): Pagination
+    {
+        return new Pagination($this->getPaginatorForQuery($query), $query);
+    }
+
+    /**
+     * FIXME make this private and remove the widget that this currently uses
+     * @return int<0, max>
+     */
     public function countCustomersForQuery(CustomerQuery $query): int
     {
         $qb = $this->getQueryBuilderForQuery($query);
@@ -326,36 +251,84 @@ class CustomerRepository extends EntityRepository
             ->select($qb->expr()->countDistinct('c.id'))
         ;
 
-        return (int) $qb->getQuery()->getSingleScalarResult();
-    }
-
-    protected function getPaginatorForQuery(CustomerQuery $query): PaginatorInterface
-    {
-        $counter = $this->countCustomersForQuery($query);
-        $qb = $this->getQueryBuilderForQuery($query);
-
-        return new LoaderPaginator(new CustomerLoader($qb->getEntityManager()), $qb, $counter);
+        return (int) $qb->getQuery()->getSingleScalarResult(); // @phpstan-ignore-line
     }
 
     /**
-     * @param CustomerQuery $query
+     * @return PaginatorInterface<Customer>
+     */
+    private function getPaginatorForQuery(CustomerQuery $customerQuery): PaginatorInterface
+    {
+        $counter = $this->countCustomersForQuery($customerQuery);
+        $query = $this->createCustomerQuery($customerQuery);
+
+        return new LoaderQueryPaginator(new CustomerLoader($this->getEntityManager(), $customerQuery), $query, $counter);
+    }
+
+    /**
+     * @return Query<Customer>
+     */
+    private function createCustomerQuery(CustomerQuery $customerQuery): Query
+    {
+        $query = $this->getQueryBuilderForQuery($customerQuery)->getQuery();
+        $query = $this->prepareCustomerQuery($query);
+
+        foreach ($customerQuery->getHydrate() as $hydrate) {
+            switch ($hydrate) {
+                case CustomerQueryHydrate::TEAMS:
+                    // does not yet work, see https://github.com/doctrine/orm/pull/8391
+                    // $query->setFetchMode(Customer::class, 'teams', ClassMetadata::FETCH_EAGER);
+                    break;
+
+                case CustomerQueryHydrate::TEAM_MEMBER:
+                    // does not yet work, see https://github.com/doctrine/orm/issues/11254
+                    // $query->setFetchMode(Customer::class, 'teams', ClassMetadata::FETCH_EAGER);
+                    // $query->setFetchMode(Team::class, 'members', ClassMetadata::FETCH_EAGER);
+                    // $query->setFetchMode(TeamMember::class, 'user', ClassMetadata::FETCH_EAGER);
+                    break;
+            }
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param Query<Customer> $query
+     * @return Query<Customer>
+     */
+    public function prepareCustomerQuery(Query $query): Query
+    {
+        $this->getEntityManager()->getConfiguration()->setEagerFetchBatchSize(300);
+
+        $query->setFetchMode(Customer::class, 'meta', ClassMetadata::FETCH_EAGER);
+
+        return $query;
+    }
+
+    /**
      * @return Customer[]
      */
-    public function getCustomersForQuery(CustomerQuery $query): iterable
+    public function getCustomersForQuery(CustomerQuery $customerQuery): array
     {
-        // this is using the paginator internally, as it will load all joined entities into the working unit
-        // do not "optimize" to use the query directly, as it would results in hundreds of additional lazy queries
-        $paginator = $this->getPaginatorForQuery($query);
-
-        return $paginator->getAll();
+        return $this->getCustomers($this->createCustomerQuery($customerQuery), $customerQuery);
     }
 
     /**
-     * @param Customer $delete
-     * @param Customer|null $replace
-     * @throws \Doctrine\ORM\ORMException
+     * @param Query<Customer> $query
+     * @return Customer[]
      */
-    public function deleteCustomer(Customer $delete, ?Customer $replace = null)
+    public function getCustomers(Query $query, CustomerQuery $customerQuery): array
+    {
+        /** @var array<Customer> $customers */
+        $customers = $query->execute();
+
+        $loader = new CustomerLoader($this->getEntityManager(), $customerQuery);
+        $loader->loadResults($customers);
+
+        return $customers;
+    }
+
+    public function deleteCustomer(Customer $delete, ?Customer $replace = null): void
     {
         $em = $this->getEntityManager();
         $em->beginTransaction();
@@ -382,6 +355,9 @@ class CustomerRepository extends EntityRepository
         }
     }
 
+    /**
+     * @return array<CustomerComment>
+     */
     public function getComments(Customer $customer): array
     {
         $qb = $this->getEntityManager()->createQueryBuilder();
@@ -397,14 +373,14 @@ class CustomerRepository extends EntityRepository
         return $qb->getQuery()->getResult();
     }
 
-    public function saveComment(CustomerComment $comment)
+    public function saveComment(CustomerComment $comment): void
     {
         $entityManager = $this->getEntityManager();
         $entityManager->persist($comment);
         $entityManager->flush();
     }
 
-    public function deleteComment(CustomerComment $comment)
+    public function deleteComment(CustomerComment $comment): void
     {
         $entityManager = $this->getEntityManager();
         $entityManager->remove($comment);

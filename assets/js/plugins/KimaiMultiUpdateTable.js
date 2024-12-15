@@ -10,63 +10,79 @@
  */
 
 import KimaiPlugin from '../KimaiPlugin';
-import jQuery from "jquery";
 
 export default class KimaiMultiUpdateTable extends KimaiPlugin {
 
-    init() {
-        const self = this;
-        
-        jQuery('body').
-            on('change', '#multi_update_all', function(event) {
-                jQuery('.multi_update_single').prop('checked', jQuery(event.target).prop('checked'));
-                self.toggleForm();
-            })
-            .on('change', '.multi_update_single', function(event) {
-                self.toggleForm();
-            })
-            .on('change', '#multi_update_table_action', function(event) {
-                const selectedItem = jQuery('#multi_update_table_action option:selected');
-                const selectedVal = selectedItem.val();
-
-                if (selectedVal === '') {
-                    return;
-                }
-                
-                const form = jQuery('#multi_update_form form');
-                const selectedText = selectedItem.text();
-                const ids = self.getSelectedIds();
-                const question = form.attr('data-question').replace(/%action%/, selectedText).replace(/%count%/, ids.length);
-                
-                self.getContainer().getPlugin('alert').question(question, function(value) {
-                    if (value) {
-                        form.attr('action', selectedVal).submit();
-                    } else {
-                        jQuery('#multi_update_table_action').val('').trigger('change');
-                    }
-                });
-            });
-    }
-    
-    getSelectedIds()
+    init()
     {
-        let ids = [];
-        jQuery('.multi_update_single:checked').each(function(i){
-            ids[i] = $(this).val();
+        if (document.getElementsByClassName('multi_update_all').length === 0) {
+            return;
+        }
+
+        // we have to attach it to the "page-body" div, because section.content can be replaced
+        // via KimaiDatable and everything inside will be removed, including event listeners
+        const element = document.querySelector('div.page-body');
+        element.addEventListener('change', (event) => {
+            if (event.target.matches('.multi_update_all')) {
+                // the "check all" checkbox in the upper start corner of the table
+                const checked = event.target.checked;
+                const table = event.target.closest('table');
+                for (const element of table.querySelectorAll('.multi_update_single')) {
+                    element.checked = checked;
+                }
+                this._toggleForm(table);
+                event.stopPropagation();
+            } else if (event.target.matches('.multi_update_single')) {
+                // single checkboxes in front of each row
+                this._toggleForm(event.target.closest('table'));
+                event.stopPropagation();
+            }
         });
 
-        return ids;
+        element.addEventListener('click', (event) => {
+            if (event.target.matches('.multi_update_table_action')) {
+                const selectedButton = event.target;
+                const form = selectedButton.form;
+                const ids = form.querySelector('.multi_update_ids').value.split(',');
+                const question = form.dataset['question'].replace(/%action%/, selectedButton.textContent).replace(/%count%/, ids.length.toString());
+
+                /** @type {KimaiAlert} ALERT */
+                const ALERT = this.getPlugin('alert');
+                ALERT.question(question, function(value) {
+                    if (value) {
+                        form.action = selectedButton.dataset['href'];
+                        form.submit();
+                    }
+                });
+            }
+        });
     }
-    
-    toggleForm() 
+
+    /**
+     * @param {HTMLTableElement} table
+     * @private
+     */
+    _toggleForm(table)
     {
-        const ids = this.getSelectedIds();
-        jQuery('#multi_update_table_entities').val(ids.join(','));
+        const card = table.closest('div.card.data_table');
+
+        let ids = [];
+        for (const box of table.querySelectorAll('input.multi_update_single:checked')) {
+            ids.push(box.value);
+        }
+
+        card.querySelector('.multi_update_ids').value = ids.join(',');
 
         if (ids.length > 0) {
-            jQuery('#multi_update_form').show();
+            for (const element of card.querySelectorAll('.multi_update_form_hide')) {
+                element.style.setProperty('display', 'none', 'important');
+            }
+            card.querySelector('form.multi_update_form').style.display = null;//'block';
         } else {
-            jQuery('#multi_update_form').hide();
+            card.querySelector('form.multi_update_form').style.setProperty('display', 'none', 'important');
+            for (const element of card.querySelectorAll('.multi_update_form_hide')) {
+                element.style.display = null;
+            }
         }
     }
     

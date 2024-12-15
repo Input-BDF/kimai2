@@ -11,15 +11,17 @@ namespace App\Event;
 
 use App\Entity\User;
 use Symfony\Component\Mime\Email;
+use Symfony\Contracts\EventDispatcher\Event;
 
-class UserEmailEvent extends EmailEvent
+class UserEmailEvent extends Event
 {
-    private $user;
-
-    public function __construct(User $user, Email $email)
+    public function __construct(private readonly User $user, private readonly Email $email)
     {
-        parent::__construct($email);
-        $this->user = $user;
+    }
+
+    public function getEmail(): Email
+    {
+        return $this->email;
     }
 
     public function getUser(): User

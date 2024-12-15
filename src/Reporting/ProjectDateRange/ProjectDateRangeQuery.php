@@ -14,59 +14,47 @@ use App\Entity\User;
 
 final class ProjectDateRangeQuery
 {
-    /**
-     * @var \DateTime
-     */
-    private $month;
-    /**
-     * @var User|null
-     */
-    private $user;
-    /**
-     * @var Customer|null
-     */
-    private $customer;
+    private ?\DateTime $month;
+    private ?Customer $customer = null;
+    private bool $includeNoWork = false;
+    private ?string $budgetType = null;
 
-    private $includeNoBudget = false;
-    private $onlyWithRecords = false;
-
-    public function __construct(\DateTime $month, User $user)
+    public function __construct(\DateTime $month, private User $user)
     {
         $this->month = clone $month;
-        $this->user = $user;
+    }
+
+    public function isBudgetIndependent(): bool
+    {
+        return $this->budgetType === null;
     }
 
     public function isIncludeNoBudget(): bool
     {
-        return $this->includeNoBudget;
+        return $this->budgetType === 'none';
     }
 
-    public function setIncludeNoBudget(bool $includeNoBudget): void
+    public function isIncludeNoWork(): bool
     {
-        $this->includeNoBudget = $includeNoBudget;
+        return $this->includeNoWork;
     }
 
-    public function isOnlyWithRecords(): bool
+    public function setIncludeNoWork(bool $includeNoWork): void
     {
-        return $this->onlyWithRecords;
+        $this->includeNoWork = $includeNoWork;
     }
 
-    public function setOnlyWithRecords(bool $onlyWithRecords): void
-    {
-        $this->onlyWithRecords = $onlyWithRecords;
-    }
-
-    public function getUser(): ?User
+    public function getUser(): User
     {
         return $this->user;
     }
 
-    public function getMonth(): \DateTime
+    public function getMonth(): ?\DateTime
     {
         return $this->month;
     }
 
-    public function setMonth(\DateTime $month): void
+    public function setMonth(?\DateTime $month): void
     {
         $this->month = $month;
     }
@@ -79,5 +67,20 @@ final class ProjectDateRangeQuery
     public function setCustomer(?Customer $customer): void
     {
         $this->customer = $customer;
+    }
+
+    public function isBudgetTypeMonthly(): bool
+    {
+        return $this->budgetType === 'month';
+    }
+
+    public function getBudgetType(): ?string
+    {
+        return $this->budgetType;
+    }
+
+    public function setBudgetType(?string $budgetType): void
+    {
+        $this->budgetType = $budgetType;
     }
 }

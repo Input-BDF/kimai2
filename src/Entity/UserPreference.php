@@ -10,94 +10,91 @@
 namespace App\Entity;
 
 use App\Form\Type\YesNoType;
+use App\WorkingTime\Calculator\WorkingTimeCalculatorDay;
 use Doctrine\ORM\Mapping as ORM;
+use JMS\Serializer\Annotation as Serializer;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
+use Symfony\Component\Form\Extension\Core\Type\NumberType;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\Constraints as Assert;
 
-/**
- * @ORM\Entity()
- * @ORM\Table(name="kimai2_user_preferences",
- *      uniqueConstraints={
- *          @ORM\UniqueConstraint(columns={"user_id", "name"})
- *      }
- * )
- */
+#[ORM\Table(name: 'kimai2_user_preferences')]
+#[ORM\UniqueConstraint(columns: ['user_id', 'name'])]
+#[ORM\Entity]
+#[ORM\ChangeTrackingPolicy('DEFERRED_EXPLICIT')]
+#[Serializer\ExclusionPolicy('all')]
 class UserPreference
 {
     public const HOURLY_RATE = 'hourly_rate';
     public const INTERNAL_RATE = 'internal_rate';
     public const SKIN = 'skin';
-    public const LOCALE = 'language';
+    public const LANGUAGE = 'language';
+    public const LOCALE = 'locale';
     public const TIMEZONE = 'timezone';
     public const FIRST_WEEKDAY = 'first_weekday';
+    /** @deprecated since 2.22*/
+    public const WORK_HOURS_MONDAY = WorkingTimeCalculatorDay::WORK_HOURS_MONDAY;
+    /** @deprecated since 2.22*/
+    public const WORK_HOURS_TUESDAY = WorkingTimeCalculatorDay::WORK_HOURS_TUESDAY;
+    /** @deprecated since 2.22*/
+    public const WORK_HOURS_WEDNESDAY = WorkingTimeCalculatorDay::WORK_HOURS_WEDNESDAY;
+    /** @deprecated since 2.22*/
+    public const WORK_HOURS_THURSDAY = WorkingTimeCalculatorDay::WORK_HOURS_THURSDAY;
+    /** @deprecated since 2.22*/
+    public const WORK_HOURS_FRIDAY = WorkingTimeCalculatorDay::WORK_HOURS_FRIDAY;
+    /** @deprecated since 2.22*/
+    public const WORK_HOURS_SATURDAY = WorkingTimeCalculatorDay::WORK_HOURS_SATURDAY;
+    /** @deprecated since 2.22*/
+    public const WORK_HOURS_SUNDAY = WorkingTimeCalculatorDay::WORK_HOURS_SUNDAY;
+    public const PUBLIC_HOLIDAY_GROUP = 'public_holiday_group';
+    public const HOLIDAYS_PER_YEAR = 'holidays';
+    public const WORK_CONTRACT_TYPE = 'work_contract_type';
 
-    /**
-     * @var int
-     *
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(name="id", type="integer")
-     */
-    private $id;
-    /**
-     * @var User
-     *
-     * @ORM\ManyToOne(targetEntity="App\Entity\User", inversedBy="preferences")
-     * @ORM\JoinColumn(onDelete="CASCADE")
-     * @Assert\NotNull()
-     */
-    private $user;
-    /**
-     * @var string
-     *
-     * @ORM\Column(name="name", type="string", length=50, nullable=false)
-     * @Assert\NotNull()
-     * @Assert\Length(min=2, max=50, allowEmptyString=false)
-     */
-    private $name;
-    /**
-     * @var string
-     *
-     * @ORM\Column(name="value", type="string", length=255, nullable=true)
-     */
-    private $value;
-    /**
-     * @var string
-     */
-    private $type;
-    /**
-     * @var bool
-     */
-    private $enabled = true;
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(name: 'id', type: 'integer')]
+    private ?int $id = null;
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'preferences')]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[Assert\NotNull]
+    private ?User $user = null;
+    #[ORM\Column(name: 'name', type: 'string', length: 50, nullable: false)]
+    #[Assert\NotNull]
+    #[Assert\Length(min: 2, max: 50)]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    private string $name;
+    #[ORM\Column(name: 'value', type: 'string', length: 255, nullable: true)]
+    #[Assert\Length(max: 250)]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    private ?string $value;
+    private ?string $type = null;
+    private bool $enabled = true;
     /**
      * @var Constraint[]
      */
-    private $constraints = [];
+    private array $constraints = [];
     /**
      * An array of options for the form element
      * @var array
      */
-    private $options = [];
-    /**
-     * @var int
-     */
-    private $order = 1000;
-    /**
-     * @var string
-     */
-    private $section = 'default';
+    private array $options = [];
+    private int $order = 1000;
+    private string $section = 'default';
+
+    public function __construct(string $name, string|int|float|bool|null $value = null)
+    {
+        $this->name = $this->sanitizeName($name);
+        $this->value = $value;
+    }
 
     public function getId(): ?int
     {
         return $this->id;
     }
 
-    /**
-     * @param int $id
-     * @return UserPreference
-     */
     public function setId(int $id): UserPreference
     {
         $this->id = $id;
@@ -119,51 +116,66 @@ class UserPreference
 
     public function getName(): ?string
     {
+        $sanitized = $this->sanitizeName($this->name);
+
+        if ($sanitized !== $this->name) {
+            $this->name = $sanitized;
+        }
+
         return $this->name;
     }
 
-    public function setName(string $name): UserPreference
+    public function matches(string $name): bool
     {
-        $this->name = $name;
-
-        return $this;
+        return $this->sanitizeName($name) === $this->getName();
     }
 
-    /**
-     * @return mixed
-     */
-    public function getValue()
+    private function sanitizeName(?string $name): string
     {
-        switch ($this->type) {
-            case YesNoType::class:
-            case CheckboxType::class:
-                return (bool) $this->value;
-            case IntegerType::class:
-                return (int) $this->value;
-        }
+        return str_replace(['.', '-'], '_', $name);
+    }
 
-        return $this->value;
+    public function getValue(): bool|int|float|string|null
+    {
+        return match ($this->type) {
+            YesNoType::class, CheckboxType::class => (bool) $this->value,
+            IntegerType::class => (int) $this->value,
+            NumberType::class => (float) $this->value,
+            default => $this->value,
+        };
     }
 
     /**
      * Given $value will not be serialized before its stored, so it should be one of the types:
-     * integer, string or boolean
+     * integer, float, string, boolean or null
      *
      * @param mixed $value
-     * @return UserPreference
      */
     public function setValue($value): UserPreference
     {
-        $this->value = $value;
+        // unchecked checkboxes / false bool would save an empty string in the database
+        // those cannot be searched in the database
+        switch ($this->type) {
+            case YesNoType::class:
+            case CheckboxType::class:
+                if ($value === false || $value === '' || !\is_scalar($value)) {
+                    $value = 0;
+                } else {
+                    $value = 1;
+                }
+        }
+
+        if ($value === null) {
+            $this->value = $value;
+        } elseif (\is_scalar($value)) {
+            $this->value = (string) $value;
+        }
 
         return $this;
     }
 
     /**
      * Sets the form type to edit that setting.
-     *
-     * @param string $type
-     * @return UserPreference
      */
     public function setType(string $type): UserPreference
     {
@@ -218,7 +230,7 @@ class UserPreference
     /**
      * @return Constraint[]
      */
-    public function getConstraints()
+    public function getConstraints(): array
     {
         return $this->constraints;
     }

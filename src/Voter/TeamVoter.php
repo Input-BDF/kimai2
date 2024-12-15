@@ -15,6 +15,9 @@ use App\Security\RolePermissionManager;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
+/**
+ * @extends Voter<string, Team>
+ */
 final class TeamVoter extends Voter
 {
     /**
@@ -26,38 +29,26 @@ final class TeamVoter extends Voter
         'delete',
     ];
 
-    private $permissionManager;
-
-    public function __construct(RolePermissionManager $permissionManager)
+    public function __construct(private readonly RolePermissionManager $permissionManager)
     {
-        $this->permissionManager = $permissionManager;
     }
 
-    /**
-     * @param string $attribute
-     * @param Team $subject
-     * @return bool
-     */
-    protected function supports($attribute, $subject)
+    public function supportsAttribute(string $attribute): bool
     {
-        if (!($subject instanceof Team)) {
-            return false;
-        }
-
-        if (!\in_array($attribute, self::ALLOWED_ATTRIBUTES)) {
-            return false;
-        }
-
-        return true;
+        return \in_array($attribute, self::ALLOWED_ATTRIBUTES, true);
     }
 
-    /**
-     * @param string $attribute
-     * @param Team $subject
-     * @param TokenInterface $token
-     * @return bool
-     */
-    protected function voteOnAttribute($attribute, $subject, TokenInterface $token)
+    public function supportsType(string $subjectType): bool
+    {
+        return str_contains($subjectType, Team::class);
+    }
+
+    protected function supports(string $attribute, mixed $subject): bool
+    {
+        return $subject instanceof Team && $this->supportsAttribute($attribute);
+    }
+
+    protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token): bool
     {
         $user = $token->getUser();
 

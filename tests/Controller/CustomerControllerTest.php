@@ -21,30 +21,48 @@ use App\Tests\DataFixtures\TimesheetFixtures;
 use App\Tests\Mocks\CustomerTestMetaFieldSubscriberMock;
 use Doctrine\ORM\EntityManager;
 use Symfony\Component\DomCrawler\Field\ChoiceFormField;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\HttpKernel\HttpKernelBrowser;
 
 /**
  * @group integration
  */
 class CustomerControllerTest extends ControllerBaseTest
 {
-    public function testIsSecure()
+    public function testIsSecure(): void
     {
         $this->assertUrlIsSecured('/admin/customer/');
     }
 
-    public function testIsSecureForRole()
+    public function testIsSecureForRole(): void
     {
         $this->assertUrlIsSecuredForRole(User::ROLE_USER, '/admin/customer/');
     }
 
-    public function testIndexAction()
+    public function testIndexAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_TEAMLEAD);
         $this->assertAccessIsGranted($client, '/admin/customer/');
         $this->assertHasDataTable($client);
+
+        $this->assertPageActions($client, [
+            'download toolbar-action' => $this->createUrl('/admin/customer/export'),
+        ]);
     }
 
-    public function testIndexActionWithSearchTermQuery()
+    public function testIndexActionAsSuperAdmin(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_SUPER_ADMIN);
+        $this->assertAccessIsGranted($client, '/admin/customer/');
+        $this->assertHasDataTable($client);
+
+        $this->assertPageActions($client, [
+            'download toolbar-action' => $this->createUrl('/admin/customer/export'),
+            'create modal-ajax-form' => $this->createUrl('/admin/customer/create'),
+        ]);
+    }
+
+    public function testIndexActionWithSearchTermQuery(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
 
@@ -60,11 +78,16 @@ class CustomerControllerTest extends ControllerBaseTest
 
         $this->assertAccessIsGranted($client, '/admin/customer/');
 
+        $this->assertPageActions($client, [
+            'download toolbar-action' => $this->createUrl('/admin/customer/export'),
+            'create modal-ajax-form' => $this->createUrl('/admin/customer/create'),
+        ]);
+
         $form = $client->getCrawler()->filter('form.searchform')->form();
         $client->submit($form, [
             'searchTerm' => 'feature:timetracking foo',
             'visibility' => 1,
-            'pageSize' => 50,
+            'size' => 50,
             'page' => 1,
         ]);
 
@@ -73,19 +96,19 @@ class CustomerControllerTest extends ControllerBaseTest
         $this->assertDataTableRowCount($client, 'datatable_customer_admin', 5);
     }
 
-    public function testExportIsSecureForRole()
+    public function testExportIsSecureForRole(): void
     {
         $this->assertUrlIsSecuredForRole(User::ROLE_USER, '/admin/customer/export');
     }
 
-    public function testExportAction()
+    public function testExportAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_TEAMLEAD);
         $this->assertAccessIsGranted($client, '/admin/customer/export');
         $this->assertExcelExportResponse($client, 'kimai-customers_');
     }
 
-    public function testExportActionWithSearchTermQuery()
+    public function testExportActionWithSearchTermQuery(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_TEAMLEAD);
 
@@ -97,60 +120,65 @@ class CustomerControllerTest extends ControllerBaseTest
         $client->submit($form, [
             'searchTerm' => 'feature:timetracking foo',
             'visibility' => 1,
-            'pageSize' => 50,
+            'size' => 50,
             'page' => 1,
         ]);
 
         $this->assertExcelExportResponse($client, 'kimai-customers_');
     }
 
-    public function testDetailsAction()
+    public function testDetailsAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/customer/1/details');
+        $this->assertDetailsPage($client);
+    }
+
+    private function assertDetailsPage(HttpKernelBrowser $client)
+    {
         self::assertHasProgressbar($client);
 
-        $node = $client->getCrawler()->filter('div.box#customer_details_box');
+        $node = $client->getCrawler()->filter('div.card#customer_details_box');
         self::assertEquals(1, $node->count());
-        $node = $client->getCrawler()->filter('div.box#project_list_box');
+        $node = $client->getCrawler()->filter('div.card#project_list_box');
         self::assertEquals(1, $node->count());
-        $node = $client->getCrawler()->filter('div.box#time_budget_box');
+        $node = $client->getCrawler()->filter('div.card#time_budget_box');
         self::assertEquals(1, $node->count());
-        $node = $client->getCrawler()->filter('div.box#budget_box');
+        $node = $client->getCrawler()->filter('div.card#budget_box');
         self::assertEquals(1, $node->count());
-        $node = $client->getCrawler()->filter('div.box#team_listing_box');
+        $node = $client->getCrawler()->filter('div.card#team_listing_box');
         self::assertEquals(1, $node->count());
-        $node = $client->getCrawler()->filter('div.box#comments_box');
+        $node = $client->getCrawler()->filter('div.card#comments_box');
         self::assertEquals(1, $node->count());
-        $node = $client->getCrawler()->filter('div.box#team_listing_box a.btn.btn-default');
+        $node = $client->getCrawler()->filter('div.card#team_listing_box .card-actions a.btn');
         self::assertEquals(2, $node->count());
-        $node = $client->getCrawler()->filter('div.box#customer_rates_box');
+        $node = $client->getCrawler()->filter('div.card#customer_rates_box');
         self::assertEquals(1, $node->count());
     }
 
-    public function testAddRateAction()
+    public function testAddRateAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/customer/1/rate');
         $form = $client->getCrawler()->filter('form[name=customer_rate_form]')->form();
         $client->submit($form, [
             'customer_rate_form' => [
-                'user' => null,
                 'rate' => 123.45,
             ]
         ]);
         $this->assertIsRedirect($client, $this->createUrl('/admin/customer/1/details'));
         $client->followRedirect();
-        $node = $client->getCrawler()->filter('div.box#customer_rates_box');
+        $node = $client->getCrawler()->filter('div.card#customer_rates_box');
         self::assertEquals(1, $node->count());
-        $node = $client->getCrawler()->filter('div.box#customer_rates_box table.dataTable tbody tr:not(.summary)');
+        $node = $client->getCrawler()->filter('div.card#customer_rates_box table.dataTable tbody tr:not(.summary)');
         self::assertEquals(1, $node->count());
         self::assertStringContainsString('123.45', $node->text(null, true));
     }
 
-    public function testAddCommentAction()
+    public function testAddCommentAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
+
         $this->assertAccessIsGranted($client, '/admin/customer/1/details');
         $form = $client->getCrawler()->filter('form[name=customer_comment_form]')->form();
         $client->submit($form, [
@@ -160,11 +188,17 @@ class CustomerControllerTest extends ControllerBaseTest
         ]);
         $this->assertIsRedirect($client, $this->createUrl('/admin/customer/1/details'));
         $client->followRedirect();
-        $node = $client->getCrawler()->filter('div.box#comments_box .direct-chat-text');
+        $node = $client->getCrawler()->filter('div.card#comments_box .card-body');
+        self::assertStringContainsString('A beautiful and short comment **with some** markdown formatting', $node->html());
+
+        $this->setSystemConfiguration('timesheet.markdown_content', true);
+
+        $this->assertAccessIsGranted($client, '/admin/customer/1/details');
+        $node = $client->getCrawler()->filter('div.card#comments_box .direct-chat-text');
         self::assertStringContainsString('<p>A beautiful and short comment <strong>with some</strong> markdown formatting</p>', $node->html());
     }
 
-    public function testDeleteCommentAction()
+    public function testDeleteCommentAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/customer/1/details');
@@ -176,22 +210,40 @@ class CustomerControllerTest extends ControllerBaseTest
         ]);
         $this->assertIsRedirect($client, $this->createUrl('/admin/customer/1/details'));
         $client->followRedirect();
-        $node = $client->getCrawler()->filter('div.box#comments_box .direct-chat-msg');
+
+        $node = $client->getCrawler()->filter('div.card#comments_box .card-body');
         self::assertStringContainsString('Blah foo bar', $node->html());
-        $node = $client->getCrawler()->filter('div.box#comments_box .box-body a.confirmation-link');
-        self::assertStringEndsWith('/comment_delete', $node->attr('href'));
+        $node = $client->getCrawler()->filter('div.card#comments_box .card-body a.delete-comment-link');
+
+        $this->request($client, $node->attr('href'));
+        $this->assertIsRedirect($client, $this->createUrl('/admin/customer/1/details'));
+        $client->followRedirect();
+        $node = $client->getCrawler()->filter('div.card#comments_box .card-body');
+        self::assertStringContainsString('There were no comments posted yet', $node->html());
+    }
+
+    public function testDeleteCommentActionWithoutToken(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
+        $this->assertAccessIsGranted($client, '/admin/customer/1/details');
+        $form = $client->getCrawler()->filter('form[name=customer_comment_form]')->form();
+        $client->submit($form, [
+            'customer_comment_form' => [
+                'message' => 'Blah foo bar',
+            ]
+        ]);
+        $this->assertIsRedirect($client, $this->createUrl('/admin/customer/1/details'));
+        $client->followRedirect();
 
         $comments = $this->getEntityManager()->getRepository(CustomerComment::class)->findAll();
         $id = $comments[0]->getId();
 
         $this->request($client, '/admin/customer/' . $id . '/comment_delete');
-        $this->assertIsRedirect($client, $this->createUrl('/admin/customer/1/details'));
-        $client->followRedirect();
-        $node = $client->getCrawler()->filter('div.box#comments_box .box-body');
-        self::assertStringContainsString('There were no comments posted yet', $node->html());
+
+        $this->assertRouteNotFound($client);
     }
 
-    public function testPinCommentAction()
+    public function testPinCommentAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/customer/1/details');
@@ -203,49 +255,42 @@ class CustomerControllerTest extends ControllerBaseTest
         ]);
         $this->assertIsRedirect($client, $this->createUrl('/admin/customer/1/details'));
         $client->followRedirect();
-        $node = $client->getCrawler()->filter('div.box#comments_box .direct-chat-text');
+        $node = $client->getCrawler()->filter('div.card#comments_box .card-body');
         self::assertStringContainsString('Blah foo bar', $node->html());
-        $node = $client->getCrawler()->filter('div.box#comments_box .direct-chat-text a.btn.active');
+        $node = $client->getCrawler()->filter('div.card#comments_box .card-body a.pin-comment-link.active');
         self::assertEquals(0, $node->count());
-
-        $comments = $this->getEntityManager()->getRepository(CustomerComment::class)->findAll();
-        $id = $comments[0]->getId();
-
-        $this->request($client, '/admin/customer/' . $id . '/comment_pin');
+        $node = $client->getCrawler()->filter('div.card#comments_box .card-body a.pin-comment-link');
+        self::assertEquals(1, $node->count());
+        $this->request($client, $node->attr('href'));
         $this->assertIsRedirect($client, $this->createUrl('/admin/customer/1/details'));
         $client->followRedirect();
-        $node = $client->getCrawler()->filter('div.box#comments_box .box-body a.btn.active');
+        $node = $client->getCrawler()->filter('div.card#comments_box .card-body a.pin-comment-link.active');
         self::assertEquals(1, $node->count());
-        self::assertEquals($this->createUrl('/admin/customer/' . $id . '/comment_pin'), $node->attr('href'));
+        self::assertStringContainsString('/admin/customer/', $node->attr('href'));
+        self::assertStringContainsString('/comment_pin/', $node->attr('href'));
     }
 
-    public function testCreateDefaultTeamAction()
+    public function testCreateDefaultTeamAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/customer/1/details');
-        $node = $client->getCrawler()->filter('div.box#team_listing_box .box-body');
+        $node = $client->getCrawler()->filter('div.card#team_listing_box .card-body');
         self::assertStringContainsString('Visible to everyone, as no team was assigned yet.', $node->text(null, true));
 
         $this->request($client, '/admin/customer/1/create_team');
         $this->assertIsRedirect($client, $this->createUrl('/admin/customer/1/details'));
         $client->followRedirect();
-        $node = $client->getCrawler()->filter('div.box#team_listing_box .box-title');
+        $node = $client->getCrawler()->filter('div.card#team_listing_box .card-title');
         self::assertStringContainsString('Only visible to the following teams and all admins.', $node->text(null, true));
-        $node = $client->getCrawler()->filter('div.box#team_listing_box .box-body table tbody tr');
+        $node = $client->getCrawler()->filter('div.card#team_listing_box .card-body table tbody tr');
         self::assertEquals(1, $node->count());
-
-        // creating the default team a second time fails, as the name already exists
-        $this->request($client, '/admin/customer/1/create_team');
-        $this->assertIsRedirect($client, $this->createUrl('/admin/customer/1/details'));
-        $client->followRedirect();
-        $this->assertHasFlashError($client, 'Changes could not be saved: Team already existing');
     }
 
-    public function testProjectsAction()
+    public function testProjectsAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/customer/1/projects/1');
-        $node = $client->getCrawler()->filter('div.box#project_list_box .box-body table tbody tr');
+        $node = $client->getCrawler()->filter('div.card#project_list_box .card-body table tbody tr');
         self::assertEquals(1, $node->count());
 
         /** @var EntityManager $em */
@@ -259,27 +304,20 @@ class CustomerControllerTest extends ControllerBaseTest
 
         $this->assertAccessIsGranted($client, '/admin/customer/1/projects/1');
 
-        $node = $client->getCrawler()->filter('div.box#project_list_box .box-tools ul.pagination li');
+        $node = $client->getCrawler()->filter('div.card#project_list_box .card-footer ul.pagination li');
         self::assertEquals(4, $node->count());
 
-        $node = $client->getCrawler()->filter('div.box#project_list_box .box-body table tbody tr');
+        $node = $client->getCrawler()->filter('div.card#project_list_box .card-body table tbody tr');
         self::assertEquals(5, $node->count());
     }
 
-    public function testCreateAction()
+    public function testCreateAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/customer/create');
         $form = $client->getCrawler()->filter('form[name=customer_edit_form]')->form();
 
-        $kernel = self::bootKernel();
-        $container = $kernel->getContainer();
-        $defaults = $container->getParameter('kimai.defaults')['customer'];
-        $this->assertNull($defaults['timezone']);
-
         $editForm = $client->getCrawler()->filter('form[name=customer_edit_form]')->form();
-        $this->assertEquals($defaults['country'], $editForm->get('customer_edit_form[country]')->getValue());
-        $this->assertEquals($defaults['currency'], $editForm->get('customer_edit_form[currency]')->getValue());
         $this->assertEquals(date_default_timezone_get(), $editForm->get('customer_edit_form[timezone]')->getValue());
 
         $client->submit($form, [
@@ -287,24 +325,30 @@ class CustomerControllerTest extends ControllerBaseTest
                 'name' => 'Test Customer',
             ]
         ]);
-        $this->assertIsRedirect($client, '/details');
-        $client->followRedirect();
+
+        $location = $this->assertIsModalRedirect($client, '/details');
+        $this->requestPure($client, $location);
+
+        $this->assertDetailsPage($client);
         $this->assertHasFlashSuccess($client);
     }
 
-    public function testCreateActionShowsMetaFields()
+    public function testCreateActionShowsMetaFields(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
-        static::$kernel->getContainer()->get('event_dispatcher')->addSubscriber(new CustomerTestMetaFieldSubscriberMock());
+        /** @var EventDispatcher $dispatcher */
+        $dispatcher = self::getContainer()->get('event_dispatcher');
+        $dispatcher->addSubscriber(new CustomerTestMetaFieldSubscriberMock());
         $this->assertAccessIsGranted($client, '/admin/customer/create');
         $this->assertTrue($client->getResponse()->isSuccessful());
 
         $form = $client->getCrawler()->filter('form[name=customer_edit_form]')->form();
-        $this->assertTrue($form->has('customer_edit_form[metaFields][0][value]'));
-        $this->assertFalse($form->has('customer_edit_form[metaFields][1][value]'));
+        $this->assertTrue($form->has('customer_edit_form[metaFields][metatestmock][value]'));
+        $this->assertTrue($form->has('customer_edit_form[metaFields][foobar][value]'));
+        $this->assertFalse($form->has('customer_edit_form[metaFields][0][value]'));
     }
 
-    public function testEditAction()
+    public function testEditAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/customer/1/edit');
@@ -322,7 +366,7 @@ class CustomerControllerTest extends ControllerBaseTest
         $this->assertEquals('Test Customer 2', $editForm->get('customer_edit_form[name]')->getValue());
     }
 
-    public function testTeamPermissionAction()
+    public function testTeamPermissionAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $em = $this->getEntityManager();
@@ -353,7 +397,7 @@ class CustomerControllerTest extends ControllerBaseTest
         self::assertEquals(2, $customer->getTeams()->count());
     }
 
-    public function testDeleteAction()
+    public function testDeleteAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
 
@@ -380,7 +424,7 @@ class CustomerControllerTest extends ControllerBaseTest
         $this->assertFalse($client->getResponse()->isSuccessful());
     }
 
-    public function testDeleteActionWithTimesheetEntries()
+    public function testDeleteActionWithTimesheetEntries(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
 
@@ -418,7 +462,7 @@ class CustomerControllerTest extends ControllerBaseTest
         $this->assertFalse($client->getResponse()->isSuccessful());
     }
 
-    public function testDeleteActionWithTimesheetEntriesAndReplacement()
+    public function testDeleteActionWithTimesheetEntriesAndReplacement(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
 
@@ -472,7 +516,7 @@ class CustomerControllerTest extends ControllerBaseTest
     /**
      * @dataProvider getValidationTestData
      */
-    public function testValidationForCreateAction(array $formData, array $validationFields)
+    public function testValidationForCreateAction(array $formData, array $validationFields): void
     {
         $this->assertFormHasValidationError(
             User::ROLE_ADMIN,

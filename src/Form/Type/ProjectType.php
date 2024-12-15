@@ -10,44 +10,51 @@
 namespace App\Form\Type;
 
 use App\Entity\Project;
+use App\Form\Helper\CustomerHelper;
+use App\Form\Helper\ProjectHelper;
 use App\Repository\ProjectRepository;
 use App\Repository\Query\ActivityQuery;
 use App\Repository\Query\ProjectFormTypeQuery;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\FormInterface;
+use Symfony\Component\Form\FormView;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Custom form field type to select a project.
  */
-class ProjectType extends AbstractType
+final class ProjectType extends AbstractType
 {
-    /**
-     * @param Project $choiceValue
-     * @param string $key
-     * @param mixed $value
-     * @return array
-     */
-    public function choiceAttr($choiceValue, $key, $value)
+    public function __construct(
+        private readonly ProjectHelper $projectHelper,
+        private readonly CustomerHelper $customerHelper
+    )
     {
-        $customer = null;
+    }
 
-        if (!($choiceValue instanceof Project)) {
-            return [];
-        }
-
-        if (null !== $choiceValue->getCustomer()) {
-            $customer = $choiceValue->getCustomer()->getId();
-        }
-
-        return ['data-customer' => $customer];
+    public function getChoiceLabel(Project $project): string
+    {
+        return $this->projectHelper->getChoiceLabel($project);
     }
 
     /**
-     * {@inheritdoc}
+     * @param Project $project
+     * @param string $key
+     * @param mixed $value
+     * @return array<string, string|int|null>
      */
-    public function configureOptions(OptionsResolver $resolver)
+    public function getChoiceAttributes(Project $project, $key, $value): array
+    {
+        if (null !== ($customer = $project->getCustomer())) {
+            return ['data-customer' => $customer->getId(), 'data-currency' => $customer->getCurrency()];
+        }
+
+        return [];
+    }
+
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             // documentation is for NelmioApiDocBundle
@@ -55,12 +62,16 @@ class ProjectType extends AbstractType
                 'type' => 'integer',
                 'description' => 'Project ID',
             ],
-            'label' => 'label.project',
+            'label' => 'project',
             'class' => Project::class,
-            'choice_label' => 'name',
-            'choice_attr' => [$this, 'choiceAttr'],
+            'choice_label' => [$this, 'getChoiceLabel'],
+            'choice_attr' => [$this, 'getChoiceAttributes'],
             'group_by' => function (Project $project, $key, $index) {
-                return $project->getCustomer()->getName();
+                if ($project->getCustomer() === null) {
+                    return null;
+                }
+
+                return $this->customerHelper->getChoiceLabel($project->getCustomer());
             },
             'query_builder_for_user' => true,
             'activity_enabled' => false,
@@ -68,19 +79,42 @@ class ProjectType extends AbstractType
             'activity_visibility' => ActivityQuery::SHOW_VISIBLE,
             'ignore_date' => false,
             'join_customer' => false,
+            // @var Project|null
+            'ignore_project' => null,
+            // @var Customer|Customer[]|int|int[]|null
+            'customers' => null,
+            // @var Project|Project[]|int|int[]|null
+            'projects' => null,
+            // @var DateTime|null
+            'project_date_start' => null,
+            // @var DateTime|null
+            'project_date_end' => null,
         ]);
 
         $resolver->setDefault('query_builder', function (Options $options) {
             return function (ProjectRepository $repo) use ($options) {
-                $query = new ProjectFormTypeQuery();
+                $query = new ProjectFormTypeQuery($options['projects'], $options['customers']);
                 if (true === $options['query_builder_for_user']) {
                     $query->setUser($options['user']);
                 }
+
                 if (true === $options['ignore_date']) {
                     $query->setIgnoreDate(true);
+                } else {
+                    if ($options['project_date_start'] !== null) {
+                        $query->setProjectStart($options['project_date_start']);
+                    }
+                    if ($options['project_date_end'] !== null) {
+                        $query->setProjectEnd($options['project_date_end']);
+                    }
                 }
+
                 if (true === $options['join_customer']) {
                     $query->setWithCustomer(true);
+                }
+
+                if (null !== $options['ignore_project']) {
+                    $query->setProjectToIgnore($options['ignore_project']);
                 }
 
                 return $repo->getQueryBuilderForFormType($query);
@@ -103,10 +137,14 @@ class ProjectType extends AbstractType
         });
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getParent()
+    public function buildView(FormView $view, FormInterface $form, array $options): void
+    {
+        $view->vars['attr'] = array_merge($view->vars['attr'], [
+            'data-option-pattern' => $this->projectHelper->getChoicePattern(),
+        ]);
+    }
+
+    public function getParent(): string
     {
         return EntityType::class;
     }

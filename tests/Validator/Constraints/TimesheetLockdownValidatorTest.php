@@ -10,28 +10,30 @@
 namespace App\Tests\Validator\Constraints;
 
 use App\Configuration\ConfigLoaderInterface;
-use App\Configuration\SystemConfiguration;
 use App\Entity\Timesheet;
 use App\Entity\User;
+use App\Tests\Mocks\SystemConfigurationFactory;
 use App\Timesheet\LockdownService;
 use App\Validator\Constraints\TimesheetLockdown;
 use App\Validator\Constraints\TimesheetLockdownValidator;
-use Symfony\Component\Security\Core\Security;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\TimesheetLockdown
  * @covers \App\Validator\Constraints\TimesheetLockdownValidator
+ * @extends ConstraintValidatorTestCase<TimesheetLockdownValidator>
  */
 class TimesheetLockdownValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator()
+    protected function createValidator(): TimesheetLockdownValidator
     {
         return $this->createMyValidator(false, false, null, null, null);
     }
 
-    protected function createMyValidator(bool $allowOverwriteFull, bool $allowOverwriteGrace, ?string $start, ?string $end, ?string $grace)
+    protected function createMyValidator(bool $allowOverwriteFull, bool $allowOverwriteGrace, ?string $start, ?string $end, ?string $grace): TimesheetLockdownValidator
     {
         $auth = $this->createMock(Security::class);
         $auth->method('getUser')->willReturn(new User());
@@ -49,7 +51,7 @@ class TimesheetLockdownValidatorTest extends ConstraintValidatorTestCase
         );
 
         $loader = $this->createMock(ConfigLoaderInterface::class);
-        $config = new SystemConfiguration($loader, [
+        $config = SystemConfigurationFactory::create($loader, [
             'timesheet' => [
                 'rules' => [
                     'lockdown_period_start' => $start,
@@ -62,21 +64,21 @@ class TimesheetLockdownValidatorTest extends ConstraintValidatorTestCase
         return new TimesheetLockdownValidator($auth, new LockdownService($config));
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
         $this->validator->validate(new Timesheet(), new NotBlank());
     }
 
-    public function testInvalidValueThrowsException()
+    public function testInvalidValueThrowsException(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
         $this->validator->validate(new NotBlank(), new TimesheetLockdown(['message' => 'myMessage']));
     }
 
-    public function testValidatorWithoutNowConstraint()
+    public function testValidatorWithoutNowConstraint(): void
     {
         $this->validator = $this->createMyValidator(false, false, 'first day of last month', 'last day of last month', '+10 days');
         $this->validator->initialize($this->context);
@@ -91,12 +93,12 @@ class TimesheetLockdownValidatorTest extends ConstraintValidatorTestCase
         $this->validator->validate($timesheet, $constraint);
 
         $this->buildViolation('This period is locked, please choose a later date.')
-            ->atPath('property.path.begin')
+            ->atPath('property.path.begin_date')
             ->setCode(TimesheetLockdown::PERIOD_LOCKED)
             ->assertRaised();
     }
 
-    public function testValidatorWithEmptyTimesheet()
+    public function testValidatorWithEmptyTimesheet(): void
     {
         $this->validator = $this->createMyValidator(false, false, 'first day of last month', 'last day of last month', '+10 days');
         $this->validator->initialize($this->context);
@@ -107,7 +109,7 @@ class TimesheetLockdownValidatorTest extends ConstraintValidatorTestCase
         self::assertEmpty($this->context->getViolations());
     }
 
-    public function testValidatorWithoutNowStringConstraint()
+    public function testValidatorWithoutNowStringConstraint(): void
     {
         $this->validator = $this->createMyValidator(false, false, 'first day of last month', 'last day of last month', '+10 days');
         $this->validator->initialize($this->context);
@@ -123,7 +125,7 @@ class TimesheetLockdownValidatorTest extends ConstraintValidatorTestCase
         self::assertEmpty($this->context->getViolations());
     }
 
-    public function testValidatorWithEndBeforeStartPeriod()
+    public function testValidatorWithEndBeforeStartPeriod(): void
     {
         $this->validator = $this->createMyValidator(false, false, 'first day of this month', 'last day of last month', '+10 days');
         $this->validator->initialize($this->context);
@@ -142,7 +144,7 @@ class TimesheetLockdownValidatorTest extends ConstraintValidatorTestCase
     /**
      * @dataProvider getTestData
      */
-    public function testLockdown(bool $allowOverwriteFull, bool $allowOverwriteGrace, string $beginModifier, string $nowModifier, bool $isViolation)
+    public function testLockdown(bool $allowOverwriteFull, bool $allowOverwriteGrace, string $beginModifier, string $nowModifier, bool $isViolation): void
     {
         $this->validator = $this->createMyValidator($allowOverwriteFull, $allowOverwriteGrace, 'first day of last month', 'last day of last month', '+10 days');
         $this->validator->initialize($this->context);
@@ -161,7 +163,7 @@ class TimesheetLockdownValidatorTest extends ConstraintValidatorTestCase
 
         if ($isViolation) {
             $this->buildViolation('This period is locked, please choose a later date.')
-                ->atPath('property.path.begin')
+                ->atPath('property.path.begin_date')
                 ->setCode(TimesheetLockdown::PERIOD_LOCKED)
                 ->assertRaised();
         } else {
@@ -191,7 +193,7 @@ class TimesheetLockdownValidatorTest extends ConstraintValidatorTestCase
     /**
      * @dataProvider getConfigTestData
      */
-    public function testLockdownConfig(bool $allowOverwriteFull, bool $allowOverwriteGrace, ?string $lockdownBegin, ?string $lockdownEnd, ?string $grace, bool $isViolation)
+    public function testLockdownConfig(bool $allowOverwriteFull, bool $allowOverwriteGrace, ?string $lockdownBegin, ?string $lockdownEnd, ?string $grace, bool $isViolation): void
     {
         $this->validator = $this->createMyValidator($allowOverwriteFull, $allowOverwriteGrace, $lockdownBegin, $lockdownEnd, $grace);
         $this->validator->initialize($this->context);

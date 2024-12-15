@@ -17,27 +17,21 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Defines the form used to set roles for a User.
+ * @extends AbstractType<User>
  */
-class UserRolesType extends AbstractType
+final class UserRolesType extends AbstractType
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
             ->add('roles', UserRoleType::class, [
-                'label' => 'label.roles',
                 'multiple' => true,
                 'expanded' => true,
             ])
         ;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'validation_groups' => ['RolesUpdate'],

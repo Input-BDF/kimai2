@@ -10,20 +10,22 @@
 namespace App\Tests\Controller;
 
 use App\Configuration\SystemConfiguration;
+use App\Entity\User;
 use App\Tests\Configuration\TestConfigLoader;
 use App\Tests\DataFixtures\TimesheetFixtures;
+use App\Tests\Mocks\SystemConfigurationFactory;
 
 /**
  * @group integration
  */
 class CalendarControllerTest extends ControllerBaseTest
 {
-    public function testIsSecure()
+    public function testIsSecure(): void
     {
         $this->assertUrlIsSecured('/calendar/');
     }
 
-    public function testCalendarAction()
+    public function testCalendarAction(): void
     {
         $client = $this->getClientForAuthenticatedUser();
         $fixtures = new TimesheetFixtures($this->getUserByRole(), 10);
@@ -36,17 +38,23 @@ class CalendarControllerTest extends ControllerBaseTest
         $crawler = $client->getCrawler();
         $calendar = $crawler->filter('div#timesheet_calendar');
         $this->assertEquals(1, $calendar->count());
-        $dragAndDropBoxes = $crawler->filter('div.box-body.drag-and-drop-source');
+        $dragAndDropBoxes = $crawler->filter('div.card-body.drag-and-drop-source');
         $this->assertEquals(1, $dragAndDropBoxes->count());
     }
 
-    public function testCalendarActionWithGoogleSource()
+    public function testCalendarActionAsSuperAdmin(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_SUPER_ADMIN);
+        $this->assertAccessIsGranted($client, '/calendar/');
+    }
+
+    public function testCalendarActionWithGoogleSource(): void
     {
         $loader = new TestConfigLoader([]);
-        $config = new SystemConfiguration($loader, $this->getDefaultSettings());
+        $config = SystemConfigurationFactory::create($loader, $this->getDefaultSettings());
 
         $client = $this->getClientForAuthenticatedUser();
-        static::$kernel->getContainer()->set(SystemConfiguration::class, $config);
+        self::getContainer()->set(SystemConfiguration::class, $config);
         $this->request($client, '/calendar/');
         $this->assertSuccessResponse($client);
 
@@ -65,9 +73,6 @@ class CalendarControllerTest extends ControllerBaseTest
     {
         return [
             'theme' => [
-                'active_warning' => 3,
-                'box_color' => 'blue',
-                'select_type' => 'selectpicker',
                 'show_about' => true,
                 'chart' => [
                     'background_color' => '#3c8dbc',
@@ -82,8 +87,6 @@ class CalendarControllerTest extends ControllerBaseTest
                     'title' => null,
                     'translation' => null,
                 ],
-                'autocomplete_chars' => 3,
-                'tags_create' => true,
                 'calendar' => [
                     'background_color' => '#d2d6de'
                 ],

@@ -9,36 +9,35 @@
 
 namespace App\Repository;
 
+use App\Entity\ExportableItem;
 use App\Entity\Timesheet;
-use App\Invoice\InvoiceItemInterface;
 use App\Invoice\InvoiceItemRepositoryInterface;
 use App\Repository\Query\InvoiceQuery;
+use App\Repository\Query\TimesheetQueryHint;
 
 final class TimesheetInvoiceItemRepository implements InvoiceItemRepositoryInterface
 {
-    /**
-     * @var TimesheetRepository
-     */
-    private $repository;
-
-    public function __construct(TimesheetRepository $repository)
+    public function __construct(private readonly TimesheetRepository $repository)
     {
-        $this->repository = $repository;
     }
 
     /**
-     * @param InvoiceQuery $query
-     * @return InvoiceItemInterface[]
+     * @return ExportableItem[]
      */
     public function getInvoiceItemsForQuery(InvoiceQuery $query): iterable
     {
-        return $this->repository->getTimesheetsForQuery($query, true);
+        $query->addQueryHint(TimesheetQueryHint::CUSTOMER_META_FIELDS);
+        $query->addQueryHint(TimesheetQueryHint::PROJECT_META_FIELDS);
+        $query->addQueryHint(TimesheetQueryHint::ACTIVITY_META_FIELDS);
+        $query->addQueryHint(TimesheetQueryHint::USER_PREFERENCES);
+
+        return $this->repository->getTimesheetResult($query)->getResults();
     }
 
     /**
-     * @param InvoiceItemInterface[] $invoiceItems
+     * @param ExportableItem[] $invoiceItems
      */
-    public function setExported(array $invoiceItems)
+    public function setExported(array $invoiceItems): void
     {
         $timesheets = [];
 

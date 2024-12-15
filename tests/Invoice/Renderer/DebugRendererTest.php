@@ -9,11 +9,11 @@
 
 namespace App\Tests\Invoice\Renderer;
 
-use App\Entity\InvoiceDocument;
 use App\Invoice\InvoiceItem;
 use App\Invoice\InvoiceItemHydrator;
 use App\Invoice\InvoiceModel;
 use App\Invoice\InvoiceModelHydrator;
+use App\Model\InvoiceDocument;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -23,17 +23,17 @@ class DebugRendererTest extends TestCase
 
     public function getTestModel()
     {
-        yield [$this->getInvoiceModel(), '1,947.99', 5, 5, 1, 2, 2, true, [['entry.meta.foo-timesheet'], ['entry.meta.foo-timesheet2'], ['entry.meta.foo-timesheet'], ['entry.meta.foo-timesheet3']]];
+        yield [$this->getInvoiceModel(), '1,947.99', 5, 5, 1, 2, 2, true, [['entry.meta.foo-timesheet'], ['entry.meta.foo-timesheet', 'entry.meta.foo-timesheet2'], ['entry.meta.foo-timesheet'], ['entry.meta.foo-timesheet3']]];
         yield [$this->getInvoiceModelOneEntry(), '293.27', 1, 1, 0, 1, 0, false, []];
     }
 
     /**
      * @dataProvider getTestModel
      */
-    public function testRender(InvoiceModel $model, $expectedRate, $expectedRows, $expectedDescriptions, $expectedUser1, $expectedUser2, $expectedUser3, $hasProject, $metaFields = [])
+    public function testRender(InvoiceModel $model, $expectedRate, $expectedRows, $expectedDescriptions, $expectedUser1, $expectedUser2, $expectedUser3, $hasProject, $metaFields = []): void
     {
         $itemHydrator = new class() implements InvoiceItemHydrator {
-            public function setInvoiceModel(InvoiceModel $model)
+            public function setInvoiceModel(InvoiceModel $model): void
             {
             }
 
@@ -58,6 +58,9 @@ class DebugRendererTest extends TestCase
         $response = $sut->render($document, $model);
         $data = json_decode($response->getContent(), true);
 
+        $this->assertIsArray($data);
+        $this->assertIsArray($data['model']);
+
         $this->assertModelStructure($data['model'], \count($model->getQuery()->getProjects()), \count($model->getQuery()->getActivities()));
         $rows = $data['entries'];
         $this->assertEquals($expectedRows, \count($rows));
@@ -69,26 +72,34 @@ class DebugRendererTest extends TestCase
         }
 
         $begin = $model->getQuery()->getBegin();
-        self::assertEquals($begin->format('m'), $data['model']['query.month_number']);
-        self::assertEquals($begin->format('d'), $data['model']['query.day']);
-        // TODO check values or formats?
+        self::assertEquals($begin->format('m'), $data['model']['query.begin_month_number']);
+        self::assertEquals($begin->format('d'), $data['model']['query.begin_day']);
+        self::assertEquals('20.08.12', $data['model']['invoice.first']);
+        self::assertEquals('21.03.12', $data['model']['invoice.last']);
     }
 
-    protected function assertModelStructure(array $model, int $projectCounter = 0, int $activityCounter = 0)
+    protected function assertModelStructure(array $model, int $projectCounter = 0, int $activityCounter = 0): void
     {
         $keys = [
             'invoice.due_date',
+            'invoice.due_date_process',
             'invoice.date',
+            'invoice.date_process',
             'invoice.number',
             'invoice.currency',
             'invoice.currency_symbol',
             'invoice.vat',
+            'invoice.tax_hide',
             'invoice.tax',
             'invoice.language',
             'invoice.tax_nc',
             'invoice.tax_plain',
             'invoice.total_time',
             'invoice.duration_decimal',
+            'invoice.first',
+            'invoice.first_process',
+            'invoice.last',
+            'invoice.last_process',
             'invoice.total',
             'invoice.total_nc',
             'invoice.total_plain',
@@ -104,16 +115,18 @@ class DebugRendererTest extends TestCase
             'template.vat_id',
             'template.contact',
             'template.payment_details',
-            'query.begin',
             'query.day',
-            'query.end',
             'query.month',
             'query.month_number',
             'query.year',
+            'query.begin',
+            'query.begin_process',
             'query.begin_day',
             'query.begin_month',
             'query.begin_month_number',
             'query.begin_year',
+            'query.end',
+            'query.end_process',
             'query.end_day',
             'query.end_month',
             'query.end_month_number',
@@ -124,6 +137,7 @@ class DebugRendererTest extends TestCase
             'customer.contact',
             'customer.company',
             'customer.vat',
+            'customer.vat_id',
             'customer.country',
             'customer.number',
             'customer.homepage',
@@ -131,27 +145,61 @@ class DebugRendererTest extends TestCase
             'customer.email',
             'customer.fax',
             'customer.phone',
+            'customer.budget_open',
+            'customer.budget_open_plain',
+            'customer.time_budget_open',
+            'customer.time_budget_open_plain',
             'customer.mobile',
             'customer.meta.foo-customer',
+            'customer.invoice_text',
             'activity.id',
             'activity.name',
             'activity.comment',
+            'activity.number',
+            'activity.invoice_text',
             'activity.meta.foo-activity',
+            'activity.budget_open',
+            'activity.budget_open_plain',
+            'activity.time_budget_open',
+            'activity.time_budget_open_plain',
             'user.alias',
+            'user.display',
             'user.email',
             'user.name',
             'user.title',
+            'user.see_others',
             'user.meta.hello',
             'user.meta.kitty',
             'testFromModelHydrator',
         ];
 
+        if ($activityCounter === 1) {
+            $keys = array_merge($keys, [
+                'query.activity.comment',
+                'query.activity.name',
+            ]);
+        }
+
         if ($activityCounter > 1) {
             $keys = array_merge($keys, [
+                'activity.1.budget_open',
+                'activity.1.budget_open_plain',
+                'activity.1.time_budget_open',
+                'activity.1.time_budget_open_plain',
                 'activity.1.id',
                 'activity.1.name',
                 'activity.1.comment',
+                'activity.1.number',
+                'activity.1.invoice_text',
                 'activity.1.meta.foo-activity',
+            ]);
+        }
+
+        if ($projectCounter === 1) {
+            $keys = array_merge($keys, [
+                'query.project.name',
+                'query.project.comment',
+                'query.project.order_number',
             ]);
         }
 
@@ -160,6 +208,8 @@ class DebugRendererTest extends TestCase
                 'project.id',
                 'project.name',
                 'project.comment',
+                'project.number',
+                'project.invoice_text',
                 'project.order_date',
                 'project.order_number',
                 'project.meta.foo-project',
@@ -171,12 +221,19 @@ class DebugRendererTest extends TestCase
                 'project.budget_time',
                 'project.budget_time_decimal',
                 'project.budget_time_minutes',
+                'project.budget_open',
+                'project.budget_open_plain',
+                'project.time_budget_open',
+                'project.time_budget_open_plain',
             ]);
+
             if ($projectCounter > 1) {
                 $keys = array_merge($keys, [
                     'project.1.id',
                     'project.1.name',
                     'project.1.comment',
+                    'project.1.number',
+                    'project.1.invoice_text',
                     'project.1.order_date',
                     'project.1.order_number',
                     'project.1.meta.foo-project',
@@ -188,6 +245,10 @@ class DebugRendererTest extends TestCase
                     'project.1.budget_time',
                     'project.1.budget_time_decimal',
                     'project.1.budget_time_minutes',
+                    'project.1.budget_open',
+                    'project.1.budget_open_plain',
+                    'project.1.time_budget_open',
+                    'project.1.time_budget_open_plain',
                 ]);
             }
         }
@@ -199,11 +260,12 @@ class DebugRendererTest extends TestCase
         $this->assertEquals($keys, $givenKeys);
     }
 
-    protected function assertEntryStructure(array $model, array $metaFields)
+    protected function assertEntryStructure(array $model, array $metaFields): void
     {
         $keys = [
             'entry.row',
             'entry.description',
+            'entry.description_safe',
             'entry.amount',
             'entry.rate',
             'entry.rate_nc',
@@ -216,6 +278,7 @@ class DebugRendererTest extends TestCase
             'entry.total_plain',
             'entry.currency',
             'entry.duration',
+            'entry.duration_format',
             'entry.duration_decimal',
             'entry.duration_minutes',
             'entry.begin',
@@ -225,12 +288,16 @@ class DebugRendererTest extends TestCase
             'entry.end_time',
             'entry.end_timestamp',
             'entry.date',
+            'entry.date_process',
             'entry.week',
             'entry.weekyear',
             'entry.user_id',
             'entry.user_name',
+            'entry.user_display',
             'entry.user_alias',
             'entry.user_title',
+            'entry.user_preference.foo',
+            'entry.user_preference.mad',
             'entry.activity',
             'entry.activity_id',
             'entry.activity.meta.foo-activity',

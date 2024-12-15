@@ -12,41 +12,75 @@ namespace App\Repository;
 use App\Entity\Bookmark;
 use App\Entity\User;
 use Doctrine\ORM\EntityRepository;
-use Doctrine\ORM\ORMException;
 
 /**
- * @extends \Doctrine\ORM\EntityRepository<Bookmark>
+ * @extends EntityRepository<Bookmark>
  */
 class BookmarkRepository extends EntityRepository
 {
-    public function saveBookmark(Bookmark $bookmark)
+    /** @var array<string, array<string, array<string, Bookmark>>> */
+    private array $userCache = [];
+
+    public function saveBookmark(Bookmark $bookmark): void
     {
         $entityManager = $this->getEntityManager();
         $entityManager->persist($bookmark);
         $entityManager->flush();
+
+        if ($bookmark->getUser()) {
+            $this->clearCache($bookmark->getUser());
+        }
     }
 
-    public function deleteBookmark(Bookmark $bookmark)
+    private function clearCache(?User $user): void
+    {
+        if ($user === null || $user->getId() === null) {
+            return;
+        }
+
+        $key = 'user_' . $user->getId();
+        if (\array_key_exists($key, $this->userCache)) {
+            unset($this->userCache[$key]);
+        }
+    }
+
+    public function deleteBookmark(Bookmark $bookmark): void
     {
         $em = $this->getEntityManager();
-        $em->beginTransaction();
+        $em->remove($bookmark);
+        $em->flush();
 
-        try {
-            $em->remove($bookmark);
-            $em->flush();
-            $em->commit();
-        } catch (ORMException $ex) {
-            $em->rollback();
-            throw $ex;
+        if ($bookmark->getUser()) {
+            $this->clearCache($bookmark->getUser());
         }
     }
 
     public function getSearchDefaultOptions(User $user, string $name): ?Bookmark
     {
-        return $this->findOneBy([
-            'user' => $user->getId(),
-            'type' => Bookmark::SEARCH_DEFAULT,
-            'name' => substr($name, 0, 50)
-        ]);
+        return $this->findBookmark($user, Bookmark::SEARCH_DEFAULT, $name);
+    }
+
+    public function findBookmark(User $user, string $type, string $name): ?Bookmark
+    {
+        $name = mb_substr($name, 0, 50);
+        $key = 'user_' . $user->getId();
+
+        if (!\array_key_exists($key, $this->userCache)) {
+            $this->userCache[$key] = [];
+            $all = $this->findBy(['user' => $user->getId()]);
+            foreach ($all as $item) {
+                $this->userCache[$key][$item->getType()][mb_substr($item->getName() ?? '__DEFAULT__', 0, 50)] = $item;
+            }
+        }
+
+        if (!\array_key_exists($type, $this->userCache[$key])) {
+            return null;
+        }
+
+        if (!\array_key_exists($name, $this->userCache[$key][$type])) {
+            return null;
+        }
+
+        return $this->userCache[$key][$type][$name];
     }
 }

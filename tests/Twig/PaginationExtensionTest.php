@@ -10,8 +10,8 @@
 namespace App\Tests\Twig;
 
 use App\Twig\PaginationExtension;
+use App\Utils\Pagination;
 use Pagerfanta\Adapter\ArrayAdapter;
-use Pagerfanta\Pagerfanta;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Twig\TwigFunction;
@@ -21,7 +21,7 @@ use Twig\TwigFunction;
  */
 class PaginationExtensionTest extends TestCase
 {
-    private function getUrlGenerator()
+    private function getUrlGenerator(): UrlGeneratorInterface
     {
         $urlGenerator = $this->getMockBuilder(UrlGeneratorInterface::class)->getMock();
         $urlGenerator
@@ -45,9 +45,9 @@ class PaginationExtensionTest extends TestCase
         return new PaginationExtension($this->getUrlGenerator());
     }
 
-    public function testGetFunctions()
+    public function testGetFunctions(): void
     {
-        $functions = ['pagerfanta', 'pagination'];
+        $functions = ['pagination'];
         $sut = $this->getSut();
         $twigFunctions = $sut->getFunctions();
         self::assertCount(\count($functions), $twigFunctions);
@@ -59,61 +59,12 @@ class PaginationExtensionTest extends TestCase
         }
     }
 
-    /**
-     * @group legacy
-     */
-    public function testDeprecatedRenderPagerfanta()
+    public function testRenderPaginationWithoutTemplateName(): void
     {
         $sut = $this->getSut();
 
         $values = array_fill(0, 151, 'blub');
-        $pagerfanta = new Pagerfanta(new ArrayAdapter($values));
-        $result = $sut->renderPagerfanta($pagerfanta, 'twitter_bootstrap3_translated', [
-            'css_container_class' => 'pagination pagination-sm inline',
-            'routeName' => 'project_activities',
-            'routeParams' => ['id' => 137]
-        ]);
-        $this->assertPaginationHtml($result);
-    }
-
-    /**
-     * @group legacy
-     */
-    public function testDeprecatedRenderPagerfantaWithoutTemplateName()
-    {
-        $sut = $this->getSut();
-
-        $values = array_fill(0, 151, 'blub');
-        $pagerfanta = new Pagerfanta(new ArrayAdapter($values));
-        $result = $sut->renderPagerfanta($pagerfanta, [
-            'css_container_class' => 'pagination pagination-sm inline',
-            'routeName' => 'project_activities',
-            'routeParams' => ['id' => 137]
-        ]);
-        $this->assertPaginationHtml($result);
-    }
-
-    protected function assertPaginationHtml($result)
-    {
-        $expected =
-            '<ul class="pagination pagination-sm inline">' .
-            '<li class="prev disabled"><span><i class="fas fa-chevron-left"></i></span></li>' .
-            '<li class="active"><span>1 <span class="sr-only">(current)</span></span></li>' .
-            '<li><a href="project_activities?id=137&page=2">2</a></li>' .
-            '<li><a href="project_activities?id=137&page=3">3</a></li>' .
-            '<li class="disabled"><span>&hellip;</span></li>' .
-            '<li><a href="project_activities?id=137&page=16">16</a></li>' .
-            '<li class="next"><a href="project_activities?id=137&page=2" rel="next"><i class="fas fa-chevron-right"></i></a></li></ul>';
-
-        self::assertEquals($expected, $result);
-    }
-
-    public function testRenderPagination()
-    {
-        $sut = $this->getSut();
-
-        $values = array_fill(0, 151, 'blub');
-        $pagerfanta = new Pagerfanta(new ArrayAdapter($values));
+        $pagerfanta = new Pagination(new ArrayAdapter($values));
         $result = $sut->renderPagination($pagerfanta, [
             'css_container_class' => 'pagination pagination-sm inline',
             'routeName' => 'project_activities',
@@ -122,7 +73,40 @@ class PaginationExtensionTest extends TestCase
         $this->assertPaginationHtml($result);
     }
 
-    public function testRenderPaginationWithoutRouteName()
+    public function assertPaginationHtml($result): void
+    {
+        // this makes sure that we show the correct amount of pagination links!
+        $expected =
+            '<ul class="pagination pagination-sm inline">' .
+            '<li class="page-item  disabled"><span class="page-link pagination-link"><i class="fas fa-chevron-left"></i></span></li>' .
+            '<li class="page-item active"><a class="page-link pagination-link" href="project_activities?id=137&page=1">1</a></li>' .
+            '<li class="page-item"><a class="page-link pagination-link" href="project_activities?id=137&page=2">2</a></li>' .
+            '<li class="page-item"><a class="page-link pagination-link" href="project_activities?id=137&page=3">3</a></li>' .
+            '<li class="page-item"><a class="page-link pagination-link" href="project_activities?id=137&page=4">4</a></li>' .
+            '<li class="page-item"><a class="page-link pagination-link" href="project_activities?id=137&page=5">5</a></li>' .
+            '<li class="page-item disabled"><span class="page-link pagination-link">&hellip;</span></li>' .
+            '<li class="page-item"><a class="page-link pagination-link" href="project_activities?id=137&page=16">16</a></li>' .
+            '<li class="page-item"><a class="page-link pagination-link" href="project_activities?id=137&page=2" rel="next"><i class="fas fa-chevron-right"></i></a></li>' .
+            '</ul>';
+
+        self::assertEquals($expected, $result);
+    }
+
+    public function testRenderPagination(): void
+    {
+        $sut = $this->getSut();
+
+        $values = array_fill(0, 151, 'blub');
+        $pagerfanta = new Pagination(new ArrayAdapter($values));
+        $result = $sut->renderPagination($pagerfanta, [
+            'css_container_class' => 'pagination pagination-sm inline',
+            'routeName' => 'project_activities',
+            'routeParams' => ['id' => 137]
+        ]);
+        $this->assertPaginationHtml($result);
+    }
+
+    public function testRenderPaginationWithoutRouteName(): void
     {
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Pagination is missing the "routeName" option');
@@ -130,7 +114,7 @@ class PaginationExtensionTest extends TestCase
         $sut = $this->getSut();
 
         $values = array_fill(0, 151, 'blub');
-        $pagerfanta = new Pagerfanta(new ArrayAdapter($values));
+        $pagerfanta = new Pagination(new ArrayAdapter($values));
         $result = $sut->renderPagination($pagerfanta, [
             'css_container_class' => 'pagination pagination-sm inline',
             'routeParams' => ['id' => 137]

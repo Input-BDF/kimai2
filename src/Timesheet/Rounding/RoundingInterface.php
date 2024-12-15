@@ -10,32 +10,19 @@
 namespace App\Timesheet\Rounding;
 
 use App\Entity\Timesheet;
+use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 /**
  * Apply rounding rules to the given timesheet.
  */
+#[AutoconfigureTag]
 interface RoundingInterface
 {
-    /**
-     * @param Timesheet $record
-     * @param int $minutes
-     */
-    public function roundBegin(Timesheet $record, $minutes);
+    public function roundBegin(Timesheet $record, int $minutes): void;
 
-    /**
-     * @param Timesheet $record
-     * @param int $minutes
-     */
-    public function roundEnd(Timesheet $record, $minutes);
+    public function roundEnd(Timesheet $record, int $minutes): void;
 
-    /**
-     * @param Timesheet $record
-     * @param int $minutes
-     */
-    public function roundDuration(Timesheet $record, $minutes);
+    public function roundDuration(Timesheet $record, int $minutes): void;
 
-    /**
-     * @return string
-     */
     public function getId(): string;
 }

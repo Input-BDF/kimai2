@@ -16,15 +16,13 @@ use App\Entity\Customer;
  */
 final class CustomerFormTypeQuery extends BaseFormTypeQuery
 {
-    /**
-     * @var Customer|null
-     */
-    private $customerToIgnore;
+    private ?Customer $customerToIgnore = null;
+    private bool $allowCustomerPreselect = false;
 
     /**
-     * @param Customer|int|null $customer
+     * @param Customer|array<Customer>|int|null $customer
      */
-    public function __construct($customer = null)
+    public function __construct(Customer|array|int|null $customer = null)
     {
         if (null !== $customer) {
             if (!\is_array($customer)) {
@@ -32,6 +30,16 @@ final class CustomerFormTypeQuery extends BaseFormTypeQuery
             }
             $this->setCustomers($customer);
         }
+    }
+
+    public function isAllowCustomerPreselect(): bool
+    {
+        return $this->allowCustomerPreselect;
+    }
+
+    public function setAllowCustomerPreselect(bool $allowCustomerPreselect): void
+    {
+        $this->allowCustomerPreselect = $allowCustomerPreselect;
     }
 
     /**

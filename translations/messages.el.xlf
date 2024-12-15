@@ -1,1244 +1,1266 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="UTF-8"?>
 <xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
   <file source-language="en" target-language="el" datatype="plaintext" original="messages.en.xlf">
     <body>
-      <!--
-              Global template keys
-            -->
-      <trans-unit id="time_tracking">
-        <source>time_tracking</source>
-        <target>Παρακολούθηση Χρόνου</target>
+      <trans-unit id="N7mikjJ" resname="time_tracking" xml:space="preserve">
+        <source>Time Tracking</source>
+        <target state="translated">Παρακολούθηση Χρόνου</target>
       </trans-unit>
-      <trans-unit id="yes">
+      <trans-unit id="inmIkP6" resname="yes">
         <source>yes</source>
         <target>Ναι</target>
       </trans-unit>
-      <trans-unit id="no">
+      <trans-unit id="k5Apjz_" resname="no">
         <source>no</source>
         <target>Όχι</target>
       </trans-unit>
-      <trans-unit id="both">
+      <trans-unit id=".3dyBTq" resname="both">
         <source>both</source>
         <target>Και τα δύο</target>
       </trans-unit>
-      <trans-unit id="This is a mandatory field">
+      <trans-unit id="KLIuHvt" resname="This is a mandatory field">
         <source>This is a mandatory field</source>
         <target>Υποχρεωτικό</target>
       </trans-unit>
-      <trans-unit id="create">
+      <trans-unit id="_ohHsMM" resname="create">
         <source>create</source>
         <target>Δημιουργία</target>
       </trans-unit>
-      <trans-unit id="confirm.delete">
+      <trans-unit id="DYHuW58" resname="confirm.delete">
         <source>confirm.delete</source>
         <target>Θέλετε πραγματικά να το διαγράψετε;</target>
       </trans-unit>
-      <trans-unit id="admin_entity.delete_confirm">
+      <trans-unit id="vDd3alC" resname="admin_entity.delete_confirm">
         <source>admin_entity.delete_confirm</source>
         <target>Αυτά τα δεδομένα επίσης θα διαγραφούν! Εναλλακτικά, μπορείτε να επιλέξετε μία καταχώρηση όπου όλα τα δεδομένα θα μεταφερθούν:</target>
       </trans-unit>
-      <trans-unit id="delete.not_in_use">
+      <trans-unit id="COyxNde" resname="delete.not_in_use">
         <source>delete.not_in_use</source>
         <target>Αυτό το στοιχείο μπορεί να διαγραφεί με ασφάλεια.</target>
       </trans-unit>
-      <trans-unit id="cancel">
+      <trans-unit id="I3TZF5S" resname="cancel">
         <source>cancel</source>
         <target>Ακύρωση</target>
       </trans-unit>
-      <trans-unit id="confirm">
+      <trans-unit id="PyZ8KrQ" resname="confirm">
         <source>confirm</source>
         <target>Επιβεβαίωση</target>
       </trans-unit>
-      <trans-unit id="upload">
+      <trans-unit id=".0CFrRV" resname="upload">
         <source>upload</source>
         <target>Μεταφόρτωση</target>
       </trans-unit>
-      <trans-unit id="search">
+      <trans-unit id="JBkykGe" resname="search">
         <source>search</source>
         <target>Αναζήτηση</target>
       </trans-unit>
-      <trans-unit id="label.searchTerm">
-        <source>label.searchTerm</source>
+      <trans-unit id="8W_TZI0" resname="searchTerm">
+        <source>searchTerm</source>
         <target>Όρος αναζήτησης</target>
       </trans-unit>
-      <trans-unit id="label.set_as_default">
-        <source>label.set_as_default</source>
+      <trans-unit id="CiA4s9E" resname="set_as_default">
+        <source>set_as_default</source>
         <target>Αποθήκευση ρύθμισης αναζήτησης στα αγαπημένα</target>
       </trans-unit>
-      <trans-unit id="label.remove_default">
-        <source>label.remove_default</source>
+      <trans-unit id="DUDrvjk" resname="remove_default">
+        <source>remove_default</source>
         <target>Διαγραφή αναζήτησης από τα αγαπημένα</target>
       </trans-unit>
-      <trans-unit id="label.asc">
-        <source>label.asc</source>
+      <trans-unit id="1o0.9vf" resname="asc">
+        <source>asc</source>
         <target>Αύξουσα</target>
       </trans-unit>
-      <trans-unit id="label.desc">
-        <source>label.desc</source>
+      <trans-unit id="l4ZOh4." resname="desc">
+        <source>desc</source>
         <target>Φθίνουσα</target>
       </trans-unit>
-      <trans-unit id="label.orderBy">
-        <source>label.orderBy</source>
+      <trans-unit id="VSo_gmO" resname="orderBy">
+        <source>orderBy</source>
         <target>Αναδιάταξη με</target>
       </trans-unit>
-      <trans-unit id="my.profile">
+      <trans-unit id="hBNESu6" resname="my.profile">
         <source>my.profile</source>
         <target>Το προφίλ μου</target>
       </trans-unit>
-      <trans-unit id="update_multiple">
+      <trans-unit id="J258iS6" resname="update_multiple" xml:space="preserve">
         <source>update_multiple</source>
-        <target>%action% %count% καταχωρήσεων;</target>
+        <target state="needs-translation">%action% %count% καταχωρήσεων;</target>
       </trans-unit>
-      <trans-unit id="attachments">
+      <trans-unit id="OTDmccn" resname="attachments">
         <source>attachments</source>
         <target>Αρχεία</target>
       </trans-unit>
-      <trans-unit id="file">
+      <trans-unit id="O5w1jzb" resname="file">
         <source>file</source>
         <target>Αρχείο</target>
       </trans-unit>
-      <trans-unit id="rates.empty">
+      <trans-unit id="0M_Gylq" resname="rates.empty">
         <source>rates.empty</source>
         <target>Οι ωριαίες χρεώσεις δεν έχουν ρυθμιστεί ακόμη.</target>
       </trans-unit>
-      <trans-unit id="rates.title">
+      <trans-unit id="mflwMcX" resname="rates.title">
         <source>rates.title</source>
         <target>Χρεώσεις</target>
       </trans-unit>
-      <trans-unit id="sum.total">
+      <trans-unit id="zFfl7jw" resname="sum.total">
         <source>sum.total</source>
         <target>Σύνολο</target>
       </trans-unit>
-      <trans-unit id="modal.dirty">
+      <trans-unit id="XP5zkiN" resname="modal.dirty">
         <source>modal.dirty</source>
         <target>Η φόρμα έχει μεταβληθεί. Παρακαλούμε πατήστε "Αποθήκευση" για να αποθηκεύσετε τις αλλαγές ή "Κλείσιμο" για να τις ακυρώσετε.</target>
       </trans-unit>
-      <!--
-              Login / Security
-            -->
-      <trans-unit id="label.password">
-        <source>label.password</source>
-        <target>Διαπιστευτήριο</target>
+      <trans-unit id="XohImNo" resname="password">
+        <source>Password</source>
+        <target state="translated">Διαπιστευτήριο</target>
       </trans-unit>
-      <trans-unit id="label.password_repeat">
-        <source>label.password_repeat</source>
+      <trans-unit id="hLEZkoC" resname="password_repeat">
+        <source>password_repeat</source>
         <target>Επανάληψη διαπιστευτηρίου</target>
       </trans-unit>
-      <trans-unit id="label.logout">
-        <source>label.logout</source>
+      <trans-unit id="ACcM9j_" resname="logout">
+        <source>logout</source>
         <target>Αποσύνδεση</target>
       </trans-unit>
-      <trans-unit id="label.user_profile">
-        <source>label.user_profile</source>
+      <trans-unit id="_x2He8M" resname="user_profile">
+        <source>user_profile</source>
         <target>Το προφίλ μου</target>
       </trans-unit>
-      <trans-unit id="label.api_token">
-        <source>label.api_token</source>
+      <trans-unit id="T4nAM7X" resname="api_token">
+        <source>api_token</source>
         <target>Διαπιστευτήριο API</target>
       </trans-unit>
-      <trans-unit id="label.api_token_repeat">
-        <source>label.api_token_repeat</source>
+      <trans-unit id="aq59Sk8" resname="api_token_repeat">
+        <source>api_token_repeat</source>
         <target>Επανάληψη διαπιστευτηρίου API</target>
       </trans-unit>
-      <trans-unit id="login_required">
+      <trans-unit id=".372.o7" resname="login_required">
         <source>login_required</source>
         <target>Ληγμένη συνεδρία. Ανακατεύθυνση στην οθόνη σύνδεσης;</target>
       </trans-unit>
-      <!--
-              Menu / Navbar items
-            -->
-      <trans-unit id="menu.homepage">
+      <trans-unit id="UoOv6mx" resname="menu.homepage">
         <source>menu.homepage</source>
         <target>Συνοπτικός πίνακας</target>
       </trans-unit>
-      <trans-unit id="menu.admin">
+      <trans-unit id="wvvYSw_" resname="menu.admin">
         <source>menu.admin</source>
         <target>Διαχείριση</target>
       </trans-unit>
-      <trans-unit id="menu.system">
+      <trans-unit id="6OKwCUB" resname="menu.system">
         <source>menu.system</source>
         <target>Σύστημα</target>
       </trans-unit>
-      <trans-unit id="menu.logout">
+      <trans-unit id="wBTFKFR" resname="menu.logout">
         <source>menu.logout</source>
         <target>Αποσύνδεση</target>
       </trans-unit>
-      <trans-unit id="menu.timesheet">
-        <source>menu.timesheet</source>
+      <trans-unit id="ebTjBb9" resname="my_times">
+        <source>my_times</source>
         <target>Οι ώρες μου</target>
       </trans-unit>
-      <trans-unit id="menu.invoice">
-        <source>menu.invoice</source>
-        <target>Τιμολόγια</target>
-      </trans-unit>
-      <trans-unit id="menu.export">
-        <source>menu.export</source>
-        <target>Εξαγωγή</target>
-      </trans-unit>
-      <trans-unit id="menu.reporting">
+      <trans-unit id="ypVQO7o" resname="menu.reporting">
         <source>menu.reporting</source>
         <target>Πληροφόρηση</target>
       </trans-unit>
-      <trans-unit id="menu.admin_timesheet">
-        <source>menu.admin_timesheet</source>
-        <target>Δελτία απασχόλησης</target>
+      <trans-unit id="yxQop43" resname="all_times">
+        <source>all_times</source>
+        <target>Χρονοδιαγράμματα</target>
       </trans-unit>
-      <trans-unit id="menu.admin_customer">
-        <source>menu.admin_customer</source>
+      <trans-unit id="IeshU90" resname="customers">
+        <source>customers</source>
         <target>Πελάτες</target>
       </trans-unit>
-      <trans-unit id="menu.admin_project">
-        <source>menu.admin_project</source>
-        <target>Εργασίες</target>
+      <trans-unit id="JXfA9Ve" resname="projects">
+        <source>projects</source>
+        <target>Έργα</target>
       </trans-unit>
-      <trans-unit id="menu.admin_activity">
-        <source>menu.admin_activity</source>
+      <trans-unit id="YkyVVAY" resname="activities">
+        <source>activities</source>
         <target>Δραστηριότητες</target>
       </trans-unit>
-      <trans-unit id="menu.admin_user">
-        <source>menu.admin_user</source>
+      <trans-unit id="fftM9nd" resname="users">
+        <source>users</source>
         <target>Χρήστες</target>
       </trans-unit>
-      <trans-unit id="menu.admin_team">
-        <source>menu.admin_team</source>
+      <trans-unit id="_t.2z4V" resname="teams">
+        <source>teams</source>
         <target>Ομάδες</target>
       </trans-unit>
-      <trans-unit id="menu.plugin">
+      <trans-unit id="hOZxcaK" resname="menu.plugin">
         <source>menu.plugin</source>
         <target>Πρόσθετα</target>
       </trans-unit>
-      <trans-unit id="menu.system_configuration">
+      <trans-unit id="IXtkHRw" resname="menu.system_configuration">
         <source>menu.system_configuration</source>
         <target>Ρυθμίσεις</target>
       </trans-unit>
-      <trans-unit id="menu.tags">
-        <source>menu.tags</source>
+      <trans-unit id="l4wviUE" resname="tags">
+        <source>tags</source>
         <target>Ετικέτες</target>
       </trans-unit>
-      <trans-unit id="menu.doctor">
-        <source>menu.doctor</source>
+      <trans-unit id="JGaf9IK" resname="Doctor">
+        <source>Doctor</source>
         <target>Διαγνώσεις</target>
       </trans-unit>
-      <!--
-              Error templates
-            -->
-      <trans-unit id="error.no_entries_found">
+      <trans-unit id="Vz3Igj3" resname="error.no_entries_found">
         <source>error.no_entries_found</source>
         <target>Δεν βρέθηκαν καταχωρήσεις με βάση τα επιλεγμένα φίλτρα.</target>
       </trans-unit>
-      <trans-unit id="error.no_comments_found">
+      <trans-unit id="hlu4iX5" resname="error.no_comments_found">
         <source>error.no_comments_found</source>
         <target>Δεν υπάρχουν δημοσιευμένα σχόλια ακόμη.</target>
       </trans-unit>
-      <!--
-              General labels
-            -->
-      <trans-unit id="label.date">
-        <source>label.date</source>
+      <trans-unit id="DodjLNR" resname="date">
+        <source>date</source>
         <target>Ημερομηνία</target>
       </trans-unit>
-      <trans-unit id="label.starttime">
-        <source>label.starttime</source>
+      <trans-unit id="BHk4pZ3" resname="starttime">
+        <source>starttime</source>
         <target>Εκκίνηση</target>
       </trans-unit>
-      <trans-unit id="label.endtime">
-        <source>label.endtime</source>
+      <trans-unit id="eI_tMbq" resname="endtime">
+        <source>endtime</source>
         <target>Τερματισμός</target>
       </trans-unit>
-      <trans-unit id="label.duration">
-        <source>label.duration</source>
+      <trans-unit id="yqea9Nt" resname="duration">
+        <source>duration</source>
         <target>Διάρκεια</target>
       </trans-unit>
-      <trans-unit id="label.user">
-        <source>label.user</source>
+      <trans-unit id="BPiZbad" resname="user">
+        <source>user</source>
         <target>Χρήστης</target>
       </trans-unit>
-      <trans-unit id="label.username">
-        <source>label.username</source>
+      <trans-unit id="FveKfWM" resname="username">
+        <source>username</source>
         <target>Όνομα χρήστη</target>
       </trans-unit>
-      <trans-unit id="label.description">
-        <source>label.description</source>
-        <target>Περιγραφή</target>
+      <trans-unit id="yQRveje" resname="description">
+        <source>Description</source>
+        <target state="translated">Περιγραφή</target>
       </trans-unit>
-      <trans-unit id="label.name">
-        <source>label.name</source>
+      <trans-unit id="gqNTf.D" resname="name">
+        <source>name</source>
         <target>Όνομα</target>
       </trans-unit>
-      <trans-unit id="label.comment">
-        <source>label.comment</source>
+      <trans-unit id="xEuy.VF" resname="comment">
+        <source>comment</source>
         <target>Σχόλιο</target>
       </trans-unit>
-      <trans-unit id="label.id">
-        <source>label.id</source>
+      <trans-unit id="pWFFJwz" resname="id">
+        <source>id</source>
         <target>ID</target>
       </trans-unit>
-      <trans-unit id="label.visible">
-        <source>label.visible</source>
+      <trans-unit id="1C7xSXk" resname="visible">
+        <source>visible</source>
         <target>Ορατή</target>
       </trans-unit>
-      <trans-unit id="label.budget">
-        <source>label.budget</source>
+      <trans-unit id="CvlqjtY" resname="budget">
+        <source>budget</source>
         <target>Προϋπολογισμός</target>
       </trans-unit>
-      <trans-unit id="label.timeBudget">
-        <source>label.timeBudget</source>
-        <target>Χρονικός Προϋπολογισμός</target>
+      <trans-unit id="qbD0dHa" resname="timeBudget" xml:space="preserve">
+        <source>timeBudget</source>
+        <target state="needs-translation">Χρονικός Προϋπολογισμός</target>
       </trans-unit>
-      <trans-unit id="label.activity">
-        <source>label.activity</source>
+      <trans-unit id="BlGGO.X" resname="activity">
+        <source>activity</source>
         <target>Δραστηριότητα</target>
       </trans-unit>
-      <trans-unit id="label.project">
-        <source>label.project</source>
+      <trans-unit id="JEIQ5IQ" resname="project">
+        <source>project</source>
         <target>Εργασία</target>
       </trans-unit>
-      <trans-unit id="label.tag">
-        <source>label.tag</source>
+      <trans-unit id="KhBzpuZ" resname="tag">
+        <source>tag</source>
         <target>Ετικέτα</target>
       </trans-unit>
-      <trans-unit id="label.tags">
-        <source>label.tags</source>
-        <target>Ετικέτες</target>
-      </trans-unit>
-      <trans-unit id="label.hourlyRate">
-        <source>label.hourlyRate</source>
+      <trans-unit id="E_bHhGR" resname="hourlyRate">
+        <source>hourlyRate</source>
         <target>Ωρομίσθιο</target>
       </trans-unit>
-      <trans-unit id="label.hourly_rate">
-        <source>label.hourly_rate</source>
-        <target>Ωρομίσθιο</target>
-      </trans-unit>
-      <trans-unit id="label.skin">
-        <source>label.skin</source>
-        <target>Εμφάνιση: Χρωμάτων</target>
-      </trans-unit>
-      <trans-unit id="label.theme.layout">
-        <source>label.theme.layout</source>
+      <trans-unit id="HcWuW2g" resname="layout">
+        <source>layout</source>
         <target>Εμφάνιση: διάταξη</target>
       </trans-unit>
-      <trans-unit id="label.hours">
-        <source>label.hours</source>
+      <trans-unit id="QEMUsfS" resname="hours">
+        <source>hours</source>
         <target>Ώρες</target>
       </trans-unit>
-      <trans-unit id="label.rate">
-        <source>label.rate</source>
+      <trans-unit id="xUl3nXn" resname="rate">
+        <source>rate</source>
         <target>Χρέωση</target>
       </trans-unit>
-      <trans-unit id="help.rate">
+      <trans-unit id="djL6LMC" resname="help.rate">
         <source>help.rate</source>
         <target>Ωρομίσθια χρέωση που θα πιστωθεί</target>
       </trans-unit>
-      <trans-unit id="label.rate_internal">
-        <source>label.rate_internal</source>
+      <trans-unit id="5ofAsOs" resname="internalRate">
+        <source>internalRate</source>
         <target>Εσωτερική Χρέωση</target>
       </trans-unit>
-      <trans-unit id="help.rate_internal">
-        <source>help.rate_internal</source>
+      <trans-unit id="Cxv_0wG" resname="help.internalRate">
+        <source>help.internalRate</source>
         <target>Εσωτερικές χρεώσεις (εάν δεν έχει προσδιοριστεί το πεδίο, η κανονική χρέωση εφαρμόζεται)</target>
       </trans-unit>
-      <trans-unit id="label.recalculate_rates">
-        <source>label.recalculate_rates</source>
+      <trans-unit id="Qc5nsFn" resname="recalculate_rates">
+        <source>recalculate_rates</source>
         <target>Επανυπολογισμός χρεώσεων</target>
       </trans-unit>
-      <trans-unit id="label.language">
-        <source>label.language</source>
+      <trans-unit id="pO8wS6Q" resname="language">
+        <source>language</source>
         <target>Γλώσσα</target>
       </trans-unit>
-      <trans-unit id="label.customer">
-        <source>label.customer</source>
+      <trans-unit id="tsRYY4d" resname="customer">
+        <source>customer</source>
         <target>Πελάτης</target>
       </trans-unit>
-      <trans-unit id="label.email">
-        <source>label.email</source>
+      <trans-unit id="giREF.l" resname="email">
+        <source>email</source>
         <target>Ηλεκτρονική διεύθυνση</target>
       </trans-unit>
-      <trans-unit id="label.team">
-        <source>label.team</source>
+      <trans-unit id="yosi0Nu" resname="team">
+        <source>team</source>
         <target>Ομάδα</target>
       </trans-unit>
-      <trans-unit id="label.teamlead">
-        <source>label.teamlead</source>
+      <trans-unit id="evFI7nW" resname="teamlead">
+        <source>teamlead</source>
         <target>Επικεφαλής ομάδας</target>
       </trans-unit>
-      <trans-unit id="label.create_more">
-        <source>label.create_more</source>
-        <target>Δημιουργία περαιτέρω καταχωρήσεων</target>
-      </trans-unit>
-      <trans-unit id="placeholder.type_message">
+      <trans-unit id="LIOnolg" resname="placeholder.type_message">
         <source>placeholder.type_message</source>
         <target>Πληκτρολογήσετε το μήνυμα σας…</target>
       </trans-unit>
-      <trans-unit id="label.billable">
-        <source>label.billable</source>
+      <trans-unit id="aVwNQcX" resname="billable">
+        <source>billable</source>
         <target>Τιμολογήσιμο</target>
       </trans-unit>
-      <!--
-              Buttons & Actions
-            -->
-      <trans-unit id="label.actions">
-        <source>label.actions</source>
+      <trans-unit id="Kw3N1AA" resname="actions">
+        <source>actions</source>
         <target>Ενέργειες</target>
       </trans-unit>
-      <trans-unit id="action.edit">
+      <trans-unit id="ovKkXwU" resname="action.edit">
         <source>action.edit</source>
         <target>Τροποποίηση</target>
       </trans-unit>
-      <trans-unit id="action.delete">
+      <trans-unit id="YZdZVQP" resname="delete">
         <source>action.delete</source>
         <target>Διαγραφή</target>
       </trans-unit>
-      <trans-unit id="action.save">
+      <trans-unit id="HLtdhYw" resname="action.save">
         <source>action.save</source>
         <target>Αποθήκευση</target>
       </trans-unit>
-      <trans-unit id="action.save_all">
-        <source>action.save_all</source>
-        <target>Αποθήκευση όλων</target>
-      </trans-unit>
-      <trans-unit id="action.reset">
+      <trans-unit id="tKZKI2Z" resname="action.reset">
         <source>action.reset</source>
         <target>Αρχικοποίηση</target>
       </trans-unit>
-      <trans-unit id="action.back">
-        <source>action.back</source>
-        <target>Πίσω</target>
-      </trans-unit>
-      <trans-unit id="action.close">
+      <trans-unit id="wCazS.X" resname="action.close">
         <source>action.close</source>
         <target>Κλείσιμο</target>
       </trans-unit>
-      <!--
-              Dashboard
-            -->
-      <trans-unit id="dashboard.title">
+      <trans-unit id="3bqLM8Q" resname="dashboard.title">
         <source>dashboard.title</source>
         <target>Συνοπτικός πίνακας</target>
       </trans-unit>
-      <trans-unit id="dashboard.subtitle">
-        <source>dashboard.subtitle</source>
-        <target>Καλώς ορίσατε!</target>
-      </trans-unit>
-      <trans-unit id="dashboard.all">
-        <source>dashboard.all</source>
-        <target>Όλοι οι χρήστες</target>
-      </trans-unit>
-      <!--
-              Widgets
-            -->
-      <trans-unit id="more.info.link">
-        <source>more.info.link</source>
-        <target>Περισσότερες πληροφορίες</target>
-      </trans-unit>
-      <trans-unit id="label.toggle_dropdown">
-        <source>label.toggle_dropdown</source>
+      <trans-unit id="muzkQpM" resname="toggle_dropdown">
+        <source>toggle_dropdown</source>
         <target>Εμφάνιση μενού</target>
       </trans-unit>
-      <trans-unit id="label.my_teams">
-        <source>label.my_teams</source>
+      <trans-unit id="L05Qw2x" resname="my_teams">
+        <source>my_teams</source>
         <target>Οι ομάδες μου</target>
       </trans-unit>
-      <trans-unit id="label.my_team_projects">
-        <source>label.my_team_projects</source>
-        <target>Ομαδικές Εργασίες &amp; προϋπολογισμοί</target>
+      <trans-unit id="Ia0kvPi" resname="my_team_projects">
+        <source>my_team_projects</source>
+        <target>Τα έργα μου</target>
       </trans-unit>
-      <trans-unit id="label.progress">
-        <source>label.progress</source>
+      <trans-unit id="tfkKlua" resname="progress">
+        <source>progress</source>
         <target>Πρόοδος</target>
       </trans-unit>
-      <trans-unit id="label.plus_more">
-        <source>label.plus_more</source>
-        <target>+%count% παραπάνω</target>
-      </trans-unit>
-      <!--
-              Timesheet
-            -->
-      <trans-unit id="timesheet.title">
+      <trans-unit id="VXj0Y3h" resname="timesheet.title">
         <source>timesheet.title</source>
         <target>Οι ώρες μου</target>
       </trans-unit>
-      <trans-unit id="timesheet.edit">
+      <trans-unit id="dwEVXUR" resname="timesheet.edit">
         <source>timesheet.edit</source>
         <target>Επεξεργασία εγγραφής</target>
       </trans-unit>
-      <trans-unit id="label.begin">
-        <source>label.begin</source>
+      <trans-unit id="5vB9Q7X" resname="begin">
+        <source>begin</source>
         <target>Από</target>
       </trans-unit>
-      <trans-unit id="label.end">
-        <source>label.end</source>
+      <trans-unit id="Nh5I0DC" resname="end">
+        <source>end</source>
         <target>Σε</target>
       </trans-unit>
-      <trans-unit id="label.daterange">
-        <source>label.daterange</source>
+      <trans-unit id="iNOVZRh" resname="daterange">
+        <source>daterange</source>
         <target>Χρονικό εύρος</target>
       </trans-unit>
-      <trans-unit id="modal.columns.title">
+      <trans-unit id="UbnqJLn" resname="modal.columns.title">
         <source>modal.columns.title</source>
         <target>Αλλαγή ορατότητας στηλών</target>
       </trans-unit>
-      <trans-unit id="modal.columns.description">
-        <source>modal.columns.description</source>
-        <target>Κατά την αποθήκευση, οι μη επιλεγμένες στήλες θα αποκρυφτούν, αυτή ή ρύθμιση θα αποθηκευτεί σε ένα cookie του προγράμματος περιήγησης. Εάν διαγράψετε τα cookies, οι ρυθμίσεις θα επαναφερθούν στις προεπιλεγμένες.</target>
-      </trans-unit>
-      <trans-unit id="label.fixedRate">
-        <source>label.fixedRate</source>
+      <trans-unit id="_0tuMNE" resname="fixedRate">
+        <source>fixedRate</source>
         <target>Σταθερή χρέωση</target>
       </trans-unit>
-      <trans-unit id="help.fixedRate">
+      <trans-unit id="b43sCwO" resname="help.fixedRate">
         <source>help.fixedRate</source>
         <target>Κάθε εγγραφή θα έχει την ίδια τιμή, ανεξάρτητα από τη διάρκειά της</target>
       </trans-unit>
-      <trans-unit id="label.color">
-        <source>label.color</source>
+      <trans-unit id="dChNncv" resname="color">
+        <source>color</source>
         <target>Χρώμα</target>
       </trans-unit>
-      <trans-unit id="label.replaceTags">
-        <source>label.replaceTags</source>
-        <target>Αντικατάσταση ετικετών</target>
+      <trans-unit id="erN3h3b" resname="replace">
+        <source>replace</source>
+        <target>Αντικατάσταση</target>
       </trans-unit>
-      <trans-unit id="label.appendTags">
-        <source>label.appendTags</source>
-        <target>Προσθήκη ετικετών</target>
+      <trans-unit id="rlJLVNm" resname="append">
+        <source>append</source>
+        <target>Προσάρτηση</target>
       </trans-unit>
-      <!--
-              User profile
-            -->
-      <trans-unit id="profile.title">
+      <trans-unit id="1_wnK76" resname="profile.title">
         <source>profile.title</source>
         <target>Προφίλ χρήστη</target>
       </trans-unit>
-      <trans-unit id="profile.about_me">
+      <trans-unit id="HWKJZ0T" resname="profile.about_me">
         <source>profile.about_me</source>
         <target>Σχετικά με μένα</target>
       </trans-unit>
-      <trans-unit id="profile.first_entry">
+      <trans-unit id="Fm.kwVn" resname="profile.first_entry" xml:space="preserve">
         <source>profile.first_entry</source>
-        <target>Εργάζεται από τότε</target>
+        <target state="needs-translation">Εργάζεται από τότε</target>
       </trans-unit>
-      <trans-unit id="profile.registration_date">
+      <trans-unit id="1c0EQaz" resname="profile.registration_date">
         <source>profile.registration_date</source>
         <target>Εγγεγραμμένος στις</target>
       </trans-unit>
-      <trans-unit id="profile.settings">
+      <trans-unit id="xEYQXPy" resname="profile.settings">
         <source>profile.settings</source>
         <target>Προφίλ</target>
       </trans-unit>
-      <trans-unit id="profile.password">
+      <trans-unit id="A6TLLQa" resname="profile.password">
         <source>profile.password</source>
         <target>Κωδικός πρόσβασης</target>
       </trans-unit>
-      <trans-unit id="profile.api-token">
+      <trans-unit id="Z34ZpjK" resname="profile.api-token">
         <source>profile.api-token</source>
         <target>API</target>
       </trans-unit>
-      <trans-unit id="profile.roles">
+      <trans-unit id="ygtTz8." resname="profile.roles">
         <source>profile.roles</source>
         <target>Ρόλοι</target>
       </trans-unit>
-      <trans-unit id="profile.teams">
-        <source>profile.teams</source>
-        <target>Ομάδες</target>
-      </trans-unit>
-      <trans-unit id="profile.preferences">
+      <trans-unit id="MQKiG33" resname="profile.preferences">
         <source>profile.preferences</source>
         <target>Προτιμήσεις</target>
       </trans-unit>
-      <trans-unit id="label.theme.collapsed_sidebar">
-        <source>label.theme.collapsed_sidebar</source>
-        <target>Ελαχιστοποιήση της αριστερής πλευρικής γραμμής</target>
-      </trans-unit>
-      <trans-unit id="label.calendar.initial_view">
-        <source>label.calendar.initial_view</source>
+      <trans-unit id="j4Kd9N1" resname="calendar_initial_view">
+        <source>calendar_initial_view</source>
         <target>Αρχική προβολή ημερολογίου</target>
       </trans-unit>
-      <trans-unit id="label.login.initial_view">
-        <source>label.login.initial_view</source>
+      <trans-unit id="H.IqJTQ" resname="login_initial_view">
+        <source>login_initial_view</source>
         <target>Αρχική προβολή ύστερα από την σύνδεση</target>
       </trans-unit>
-      <trans-unit id="label.lastLogin">
-        <source>label.lastLogin</source>
+      <trans-unit id="gRIArHS" resname="lastLogin">
+        <source>lastLogin</source>
         <target>Τελευταία σύνδεση</target>
       </trans-unit>
-      <!-- Options for user-preference label.calendar.initial_view -->
-      <trans-unit id="month">
+      <trans-unit id="pcfRcZ4" resname="month">
         <source>month</source>
         <target>Μήνας</target>
       </trans-unit>
-      <trans-unit id="agendaWeek">
+      <trans-unit id="Irm6dfx" resname="agendaWeek">
         <source>agendaWeek</source>
         <target>Εβδομάδα</target>
       </trans-unit>
-      <trans-unit id="agendaDay">
+      <trans-unit id="Q0Zip02" resname="agendaDay">
         <source>agendaDay</source>
         <target>Ημέρα</target>
       </trans-unit>
-      <trans-unit id="label.timesheet.daily_stats">
-        <source>label.timesheet.daily_stats</source>
+      <trans-unit id="r49TNAg" resname="daily_stats">
+        <source>daily_stats</source>
         <target>Εμφάνιση ημερήσιων στατιστικών στο δελτίο απασχόλησης</target>
       </trans-unit>
-      <trans-unit id="label.timesheet.export_decimal">
-        <source>label.timesheet.export_decimal</source>
+      <trans-unit id="dherSTU" resname="export_decimal">
+        <source>export_decimal</source>
         <target>Παρουσίασε την διάρκεια σε δεκαδική μορφή κατά την εξαγωγή</target>
       </trans-unit>
-      <trans-unit id="theme.update_browser_title">
-        <source>theme.update_browser_title</source>
+      <trans-unit id="7zptTeh" resname="update_browser_title">
+        <source>update_browser_title</source>
         <target>Ενημέρωση τίτλου προγράμματος περιήγησης</target>
       </trans-unit>
-      <!--
-              User timesheet calendar
-            -->
-      <trans-unit id="calendar.title">
-        <source>calendar.title</source>
+      <trans-unit id="UVJ5Die" resname="calendar">
+        <source>calendar</source>
         <target>Ημερολόγιο</target>
       </trans-unit>
-      <trans-unit id="calendar.drag_and_drop.delete">
-        <source>calendar.drag_and_drop.delete</source>
-        <target>Εάν θέλετε να διαγράψετε μια καταχώριση, πρέπει να την σύρετε στο αντίστοιχο κουμπί.</target>
-      </trans-unit>
-      <!--
-              Admin: Timesheet
-            -->
-      <trans-unit id="admin_timesheet.title">
-        <source>admin_timesheet.title</source>
-        <target>Δελτία απασχόλησης</target>
-      </trans-unit>
-      <!--
-              Admin: Projects
-            -->
-      <trans-unit id="admin_project.title">
-        <source>admin_project.title</source>
-        <target>Εργασίες</target>
-      </trans-unit>
-      <trans-unit id="label.project_start">
-        <source>label.project_start</source>
+      <trans-unit id="Xyjr.V." resname="project_start">
+        <source>project_start</source>
         <target>Εκκίνηση έργου</target>
       </trans-unit>
-      <trans-unit id="label.project_end">
-        <source>label.project_end</source>
+      <trans-unit id="TBWoUYf" resname="project_end">
+        <source>project_end</source>
         <target>Τερματισμός έργου</target>
       </trans-unit>
-      <!--
-              Admin: Activity
-            -->
-      <trans-unit id="admin_activity.title">
-        <source>admin_activity.title</source>
-        <target>Δραστηριότητες</target>
-      </trans-unit>
-      <!--
-              Admin: Customer
-            -->
-      <trans-unit id="admin_customer.title">
-        <source>admin_customer.title</source>
-        <target>Πελάτης</target>
-      </trans-unit>
-      <trans-unit id="label.number">
-        <source>label.number</source>
+      <trans-unit id="EohvnQA" resname="number">
+        <source>number</source>
         <target>Λογαριασμός</target>
       </trans-unit>
-      <trans-unit id="label.company">
-        <source>label.company</source>
+      <trans-unit id="8WjM3ZF" resname="company">
+        <source>company</source>
         <target>Όνομα εταιρίας</target>
       </trans-unit>
-      <trans-unit id="label.vat">
-        <source>label.vat</source>
+      <trans-unit id="fFErSLq" resname="vat">
+        <source>vat</source>
         <target>Φόρος(ΦΠΑ)</target>
       </trans-unit>
-      <trans-unit id="label.vat_id">
-        <source>label.vat_id</source>
+      <trans-unit id="EJDS9HY" resname="vat_id">
+        <source>vat_id</source>
         <target>Α.Φ.Μ</target>
       </trans-unit>
-      <trans-unit id="label.tax_rate">
-        <source>label.tax_rate</source>
+      <trans-unit id="qX_CKtU" resname="tax_rate">
+        <source>tax_rate</source>
         <target>Τιμή Φόρου (Φ.Π.Α)</target>
       </trans-unit>
-      <trans-unit id="label.contact">
-        <source>label.contact</source>
-        <target>Επικοινωνία</target>
+      <trans-unit id="CT59X9u" resname="contact">
+        <source>Contact</source>
+        <target state="translated">Επικοινωνία</target>
       </trans-unit>
-      <trans-unit id="label.address">
-        <source>label.address</source>
+      <trans-unit id="2Ayb_RD" resname="address">
+        <source>address</source>
         <target>Διεύθυνση</target>
       </trans-unit>
-      <trans-unit id="label.country">
-        <source>label.country</source>
+      <trans-unit id="r.ZOT9U" resname="country">
+        <source>country</source>
         <target>Χώρα</target>
       </trans-unit>
-      <trans-unit id="label.phone">
-        <source>label.phone</source>
+      <trans-unit id="RVadpX9" resname="phone">
+        <source>phone</source>
         <target>Τηλέφωνο</target>
       </trans-unit>
-      <trans-unit id="label.fax">
-        <source>label.fax</source>
+      <trans-unit id="SvTiF8B" resname="fax">
+        <source>fax</source>
         <target>Φαξ</target>
       </trans-unit>
-      <trans-unit id="label.mobile">
-        <source>label.mobile</source>
+      <trans-unit id="1STBoIE" resname="mobile">
+        <source>mobile</source>
         <target>Κινητό</target>
       </trans-unit>
-      <trans-unit id="label.homepage">
-        <source>label.homepage</source>
+      <trans-unit id="pcWhXux" resname="homepage">
+        <source>homepage</source>
         <target>Αρχική σελίδα</target>
       </trans-unit>
-      <trans-unit id="label.timezone">
-        <source>label.timezone</source>
+      <trans-unit id="OWLt7pw" resname="timezone">
+        <source>timezone</source>
         <target>Ζώνη ώρας</target>
       </trans-unit>
-      <trans-unit id="label.currency">
-        <source>label.currency</source>
+      <trans-unit id="Rm5bnNV" resname="currency">
+        <source>currency</source>
         <target>Νόμισμα</target>
       </trans-unit>
-      <!--
-              Admin: Users
-            -->
-      <trans-unit id="admin_user.title">
-        <source>admin_user.title</source>
-        <target>Χρήστης</target>
-      </trans-unit>
-      <trans-unit id="label.alias">
-        <source>label.alias</source>
+      <trans-unit id="GgpqNso" resname="alias">
+        <source>alias</source>
         <target>Όνομα</target>
       </trans-unit>
-      <trans-unit id="label.title">
-        <source>label.title</source>
+      <trans-unit id="qvIyBkY" resname="title">
+        <source>title</source>
         <target>Τίτλος</target>
       </trans-unit>
-      <trans-unit id="label.avatar">
-        <source>label.avatar</source>
+      <trans-unit id="h7voece" resname="avatar">
+        <source>avatar</source>
         <target>Εικόνα προφίλ</target>
       </trans-unit>
-      <trans-unit id="label.active">
-        <source>label.active</source>
+      <trans-unit id="loeWEWU" resname="active">
+        <source>active</source>
         <target>Ενεργό</target>
       </trans-unit>
-      <trans-unit id="label.roles">
-        <source>label.roles</source>
+      <trans-unit id="Zs9VE7N" resname="roles">
+        <source>roles</source>
         <target>Ρόλος</target>
       </trans-unit>
-      <trans-unit id="user_permissions.title">
+      <trans-unit id="ZlZ20pG" resname="user_permissions.title">
         <source>user_permissions.title</source>
         <target>Δικαιώματα χρήστη</target>
       </trans-unit>
-      <trans-unit id="user_role.title">
+      <trans-unit id="G.GEdlk" resname="user_role.title">
         <source>user_role.title</source>
         <target>Ρόλος χρήστη</target>
       </trans-unit>
-      <trans-unit id="Allowed character: A-Z and _">
+      <trans-unit id="E7G60OF" resname="Allowed character: A-Z and _">
         <source>Allowed character: A-Z and _</source>
         <target>Επιτρεπόμενοι λατινικοί χαρακτήρες: A-Z και _</target>
       </trans-unit>
-      <!--
-              Admin: Plugins
-            -->
-      <trans-unit id="label.version">
-        <source>label.version</source>
+      <trans-unit id="XKTzhQz" resname="version">
+        <source>version</source>
         <target>Έκδοση</target>
       </trans-unit>
-      <trans-unit id="label.required_version">
-        <source>label.required_version</source>
-        <target>Συμβατό με</target>
-      </trans-unit>
-      <!--
-              ROLES
-            -->
-      <trans-unit id="ROLE_SUPER_ADMIN">
+      <trans-unit id="WRuKTcz" resname="ROLE_SUPER_ADMIN">
         <source>ROLE_SUPER_ADMIN</source>
         <target>Διαχειριστής συστήματος</target>
       </trans-unit>
-      <trans-unit id="ROLE_ADMIN">
+      <trans-unit id="718iPw6" resname="ROLE_ADMIN">
         <source>ROLE_ADMIN</source>
         <target>Διαχειριστής</target>
       </trans-unit>
-      <trans-unit id="ROLE_TEAMLEAD">
+      <trans-unit id="yttGLAB" resname="ROLE_TEAMLEAD">
         <source>ROLE_TEAMLEAD</source>
         <target>Επικεφαλής ομάδας</target>
       </trans-unit>
-      <trans-unit id="ROLE_USER">
+      <trans-unit id="rvO5ZXf" resname="ROLE_USER">
         <source>ROLE_USER</source>
         <target>Χρήστης</target>
       </trans-unit>
-      <!--
-              Statistics data for Dashboard & Users profile
-            -->
-      <trans-unit id="stats.workingTimeToday">
+      <trans-unit id="lfSTZGe" resname="stats.workingTimeToday">
         <source>stats.workingTimeToday</source>
         <target>Σήμερα, %day%</target>
       </trans-unit>
-      <trans-unit id="stats.workingTimeWeek">
+      <trans-unit id="XdYs3I8" resname="stats.workingTimeWeek">
         <source>stats.workingTimeWeek</source>
         <target>Ημερολογιακή εβδομάδα %week%</target>
       </trans-unit>
-      <trans-unit id="stats.workingTimeMonth">
+      <trans-unit id="JIKNAYP" resname="stats.workingTimeMonth">
         <source>stats.workingTimeMonth</source>
         <target>%month% %year%</target>
       </trans-unit>
-      <trans-unit id="stats.workingTimeYear">
+      <trans-unit id="JnUFsNi" resname="stats.workingTimeYear">
         <source>stats.workingTimeYear</source>
         <target>Πλήρες έτος %year%</target>
       </trans-unit>
-      <trans-unit id="stats.durationToday">
+      <trans-unit id="TdBJBAl" resname="stats.durationToday">
         <source>stats.durationToday</source>
         <target>Σημερινές ώρες εργασίας</target>
       </trans-unit>
-      <trans-unit id="stats.durationWeek">
+      <trans-unit id="XhKalZH" resname="stats.durationWeek">
         <source>stats.durationWeek</source>
         <target>Ώρες εργασίας τρέχουσας εβδομάδας</target>
       </trans-unit>
-      <trans-unit id="stats.durationMonth">
+      <trans-unit id="uaOwf_P" resname="stats.durationMonth">
         <source>stats.durationMonth</source>
         <target>Ώρες εργασίας τρέχοντος μηνός</target>
       </trans-unit>
-      <trans-unit id="stats.durationYear">
+      <trans-unit id="WqF84KR" resname="stats.durationYear">
         <source>stats.durationYear</source>
         <target>Ώρες εργασίας τρέχοντος έτους</target>
       </trans-unit>
-      <trans-unit id="stats.durationTotal">
+      <trans-unit id="YtvPnl1" resname="stats.durationTotal">
         <source>stats.durationTotal</source>
         <target>Συνολικές ώρες εργασίας</target>
       </trans-unit>
-      <trans-unit id="stats.yourWorkingHours">
+      <trans-unit id="IFOLMgp" resname="stats.yourWorkingHours">
         <source>stats.yourWorkingHours</source>
         <target>Οι δικές μου ώρες εργασίας</target>
       </trans-unit>
-      <trans-unit id="stats.amountToday">
+      <trans-unit id="023M9Ta" resname="stats.amountToday">
         <source>stats.amountToday</source>
         <target>Σημερινά έσοδα</target>
       </trans-unit>
-      <trans-unit id="stats.amountWeek">
+      <trans-unit id="xnJvYAE" resname="stats.amountWeek">
         <source>stats.amountWeek</source>
         <target>Έσοδα τρέχουσας εβδομάδας</target>
       </trans-unit>
-      <trans-unit id="stats.amountMonth">
+      <trans-unit id="ulr3reE" resname="stats.amountMonth">
         <source>stats.amountMonth</source>
         <target>Έσοδα τρέχοντος μηνός</target>
       </trans-unit>
-      <trans-unit id="stats.amountYear">
+      <trans-unit id="bQZyZaO" resname="stats.amountYear">
         <source>stats.amountYear</source>
         <target>Έσοδα τρέχοντος έτους</target>
       </trans-unit>
-      <trans-unit id="stats.amountTotal">
+      <trans-unit id="Z0fz23v" resname="stats.amountTotal">
         <source>stats.amountTotal</source>
         <target>Συνολικά έσοδα</target>
       </trans-unit>
-      <trans-unit id="stats.userActiveToday">
-        <source>stats.userActiveToday</source>
+      <trans-unit id="HzICegM" resname="stats.activeUsersToday">
+        <source>stats.activeUsersToday</source>
         <target>Ενεργοί χρήστες σήμερα</target>
       </trans-unit>
-      <trans-unit id="stats.userActiveWeek">
-        <source>stats.userActiveWeek</source>
+      <trans-unit id="7oP64Kh" resname="stats.activeUsersWeek">
+        <source>stats.activeUsersWeek</source>
         <target>Ενεργοί χρήστες τρέχουσας εβδομάδας</target>
       </trans-unit>
-      <trans-unit id="stats.userActiveMonth">
-        <source>stats.userActiveMonth</source>
+      <trans-unit id="40xQ.Qt" resname="stats.activeUsersMonth">
+        <source>stats.activeUsersMonth</source>
         <target>Ενεργοί χρήστες τρέχοντος μηνός</target>
       </trans-unit>
-      <trans-unit id="stats.userActiveYear">
-        <source>stats.userActiveYear</source>
+      <trans-unit id="lGuZo7g" resname="stats.activeUsersYear">
+        <source>stats.activeUsersYear</source>
         <target>Ενεργοί χρήστες τρέχοντος έτους</target>
       </trans-unit>
-      <trans-unit id="stats.userActiveTotal">
-        <source>stats.userActiveTotal</source>
+      <trans-unit id="8FFVmiv" resname="stats.activeUsersTotal">
+        <source>stats.activeUsersTotal</source>
         <target>Ενεργοί χρήστες έκτοτε</target>
       </trans-unit>
-      <trans-unit id="stats.activeRecordings">
+      <trans-unit id="lEW82ex" resname="stats.activeRecordings">
         <source>stats.activeRecordings</source>
         <target>Ενεργές εγγραφές</target>
       </trans-unit>
-      <trans-unit id="stats.userTotal">
+      <trans-unit id="t5eIWp8" resname="stats.userTotal">
         <source>stats.userTotal</source>
         <target>Χρήστες</target>
       </trans-unit>
-      <trans-unit id="stats.activityTotal">
+      <trans-unit id="Bor.76M" resname="stats.activityTotal">
         <source>stats.activityTotal</source>
         <target>Δραστηριότητες</target>
       </trans-unit>
-      <trans-unit id="stats.projectTotal">
+      <trans-unit id="67uSaR3" resname="stats.projectTotal">
         <source>stats.projectTotal</source>
-        <target>Εργασίες</target>
+        <target>Έργα</target>
       </trans-unit>
-      <trans-unit id="stats.customerTotal">
+      <trans-unit id="tnD6aPj" resname="stats.customerTotal">
         <source>stats.customerTotal</source>
         <target>Πελάτες</target>
       </trans-unit>
-      <trans-unit id="stats.percentUsed">
+      <trans-unit id="unC5MXv" resname="stats.percentUsed">
         <source>stats.percentUsed</source>
         <target>%percent%% χρησιμοποιείται</target>
       </trans-unit>
-      <trans-unit id="stats.percentUsedLeft">
+      <trans-unit id="HkjvwLc" resname="stats.percentUsedLeft">
         <source>stats.percentUsedLeft</source>
         <target>%percent%% χρησιμοποιείται (%left% είναι ακόμα ενεργά)</target>
       </trans-unit>
-      <!--
-              Invoice
-            -->
-      <trans-unit id="admin_invoice_template.title">
+      <trans-unit id="Oq.KtC6" resname="admin_invoice_template.title">
         <source>admin_invoice_template.title</source>
         <target>Πρότυπο τιμολογίου</target>
       </trans-unit>
-      <trans-unit id="invoice.title">
-        <source>invoice.title</source>
+      <trans-unit id="SR2r1Cs" resname="invoices">
+        <source>invoices</source>
         <target>Τιμολόγια</target>
       </trans-unit>
-      <trans-unit id="invoice.filter">
+      <trans-unit id="ov4OQOh" resname="invoice.filter">
         <source>invoice.filter</source>
         <target>Φίλτρα στα δεδομένα τιμολογίων</target>
       </trans-unit>
-      <trans-unit id="button.preview">
-        <source>button.preview</source>
+      <trans-unit id="WXXPG7p" resname="preview">
+        <source>preview</source>
         <target>Προ-επισκόπηση</target>
       </trans-unit>
-      <trans-unit id="button.preview_print">
-        <source>button.preview_print</source>
-        <target>Προ-επισκόπηση εκτύπωσης</target>
-      </trans-unit>
-      <trans-unit id="button.print">
+      <trans-unit id="X70dwP8" resname="button.print">
         <source>button.print</source>
         <target>Εκτύπωση</target>
       </trans-unit>
-      <trans-unit id="button.csv">
+      <trans-unit id="W_TXvSi" resname="button.csv">
         <source>button.csv</source>
         <target>CSV</target>
       </trans-unit>
-      <trans-unit id="button.xlsx">
+      <trans-unit id="vC2IsaP" resname="button.xlsx">
         <source>button.xlsx</source>
         <target>Excel</target>
       </trans-unit>
-      <trans-unit id="button.pdf">
+      <trans-unit id="aAa5uRR" resname="button.pdf">
         <source>button.pdf</source>
         <target>PDF</target>
       </trans-unit>
-      <trans-unit id="button.ods">
+      <trans-unit id="ulYFDIo" resname="button.ods">
         <source>button.ods</source>
         <target>ODS</target>
       </trans-unit>
-      <trans-unit id="invoice_print">
+      <trans-unit id="zPcx3O_" resname="invoice_print">
         <source>invoice_print</source>
         <target>Τιμολόγιο</target>
       </trans-unit>
-      <trans-unit id="label.mark_as_exported">
-        <source>label.mark_as_exported</source>
+      <trans-unit id="dicW36D" resname="mark_as_exported">
+        <source>mark_as_exported</source>
         <target>Επισήμανση ως εξαγμένο</target>
       </trans-unit>
-      <trans-unit id="label.template">
-        <source>label.template</source>
+      <trans-unit id="XN4PEpj" resname="template">
+        <source>template</source>
         <target>Πρότυπο</target>
       </trans-unit>
-      <trans-unit id="label.due_days">
-        <source>label.due_days</source>
+      <trans-unit id="ohNu8DK" resname="due_days">
+        <source>due_days</source>
         <target>Διορία πληρωμής σε ημέρες</target>
       </trans-unit>
-      <trans-unit id="invoice.due_days">
+      <trans-unit id="rAJrxSK" resname="invoice.due_days">
         <source>invoice.due_days</source>
         <target>Διορία πληρωμής</target>
       </trans-unit>
-      <trans-unit id="invoice.payment_date">
+      <trans-unit id="Xij3oQl" resname="invoice.payment_date">
         <source>invoice.payment_date</source>
         <target>Ημερομηνία πληρωμής</target>
       </trans-unit>
-      <trans-unit id="invoice.from">
+      <trans-unit id="4XKFnWh" resname="invoice.from">
         <source>invoice.from</source>
         <target>Από</target>
       </trans-unit>
-      <trans-unit id="invoice.to">
+      <trans-unit id="hx7vsMA" resname="invoice.to">
         <source>invoice.to</source>
         <target>Στον</target>
       </trans-unit>
-      <trans-unit id="invoice.number">
+      <trans-unit id="x_W5sV4" resname="invoice.number">
         <source>invoice.number</source>
         <target>Αριθμός τιμολογίου</target>
       </trans-unit>
-      <trans-unit id="invoice.subtotal">
+      <trans-unit id="86KyrKO" resname="invoice.subtotal">
         <source>invoice.subtotal</source>
         <target>Υποσύνολο</target>
       </trans-unit>
-      <trans-unit id="invoice.tax">
+      <trans-unit id="EO57yXg" resname="invoice.tax">
         <source>invoice.tax</source>
         <target>Φόρος (Φ.Π.Α.)</target>
       </trans-unit>
-      <trans-unit id="invoice.total">
+      <trans-unit id="N68vyvo" resname="invoice.total">
         <source>invoice.total</source>
         <target>Σύνολο</target>
       </trans-unit>
-      <trans-unit id="invoice.service_date">
+      <trans-unit id="TPzFWUs" resname="invoice.service_date">
         <source>invoice.service_date</source>
         <target>Ημερομηνία υπηρεσιών</target>
       </trans-unit>
-      <trans-unit id="label.amount">
-        <source>label.amount</source>
+      <trans-unit id="zzjZXJx" resname="amount">
+        <source>amount</source>
         <target>Ποσότητα</target>
       </trans-unit>
-      <trans-unit id="label.total_rate">
-        <source>label.total_rate</source>
+      <trans-unit id="BAkWQqr" resname="total_rate">
+        <source>total_rate</source>
         <target>Συνολικό ποσό</target>
       </trans-unit>
-      <trans-unit id="label.unit_price">
-        <source>label.unit_price</source>
+      <trans-unit id="IoKfYkz" resname="unit_price">
+        <source>unit_price</source>
         <target>Τιμή μονάδας</target>
       </trans-unit>
-      <trans-unit id="label.payment_terms">
-        <source>label.payment_terms</source>
+      <trans-unit id="033t0aO" resname="payment_terms">
+        <source>payment_terms</source>
         <target>Όροι πληρωμής</target>
       </trans-unit>
-      <trans-unit id="invoice.signature_user">
+      <trans-unit id="9p2KQag" resname="invoice.signature_user">
         <source>invoice.signature_user</source>
         <target>Επιβεβαίωση: Ημερομηνία / Όνομα συμβούλου / Υπογραφή</target>
       </trans-unit>
-      <trans-unit id="invoice.signature_customer">
+      <trans-unit id="Q9ykNhO" resname="invoice.signature_customer">
         <source>invoice.signature_customer</source>
         <target>Επιβεβαίωση: Ημερομηνία / Όνομα πελάτη / Υπογραφή</target>
       </trans-unit>
-      <trans-unit id="invoice.total_working_time">
+      <trans-unit id="c3d6p33" resname="invoice.total_working_time">
         <source>invoice.total_working_time</source>
         <target>Συνολική διάρκεια</target>
       </trans-unit>
-      <trans-unit id="label.orderNumber">
-        <source>label.orderNumber</source>
+      <trans-unit id="3tegKgk" resname="orderNumber">
+        <source>orderNumber</source>
         <target>Αριθμός παραγγελίας</target>
       </trans-unit>
-      <trans-unit id="label.orderDate">
-        <source>label.orderDate</source>
+      <trans-unit id="tCNBGKG" resname="orderDate">
+        <source>orderDate</source>
         <target>Ημερομηνία παραγγελίας</target>
       </trans-unit>
-      <trans-unit id="label.invoice_tax_number">
-        <source>label.invoice_tax_number</source>
+      <trans-unit id="WMJwy8r" resname="invoice_tax_number">
+        <source>invoice_tax_number</source>
         <target>Αριθ. ΦΠΑ:</target>
       </trans-unit>
-      <trans-unit id="label.invoice_bank_account">
-        <source>label.invoice_bank_account</source>
+      <trans-unit id="lswYe8s" resname="invoice_bank_account">
+        <source>invoice_bank_account</source>
         <target>Τραπεζικός λογαριασμός</target>
       </trans-unit>
-      <trans-unit id="label.decimalDuration">
-        <source>label.decimalDuration</source>
-        <target>Εμφάνιση διάρκειας ως δεκαδικό αριθμό</target>
-      </trans-unit>
-      <trans-unit id="label.status">
-        <source>label.status</source>
+      <trans-unit id="BzwWNMS" resname="status">
+        <source>status</source>
         <target>Κατάσταση</target>
       </trans-unit>
-      <trans-unit id="status.new">
+      <trans-unit id="X_NRsed" resname="status.new">
         <source>status.new</source>
         <target>Νέο</target>
       </trans-unit>
-      <trans-unit id="status.pending">
+      <trans-unit id="Uvo1CbP" resname="status.pending">
         <source>status.pending</source>
         <target>Εκκρεμεί</target>
       </trans-unit>
-      <trans-unit id="status.paid">
+      <trans-unit id="PHJwR4w" resname="status.paid">
         <source>status.paid</source>
         <target>Εξοφλήθηκε</target>
       </trans-unit>
-      <trans-unit id="preview.skipped_rows">
+      <trans-unit id="crrlEUA" resname="preview.skipped_rows">
         <source>preview.skipped_rows</source>
         <target>Παράλειψη προ-επισκόπησης %rows% και περισσότερων γραμμών …</target>
       </trans-unit>
-      <!--
-              Export
-            -->
-      <trans-unit id="export.title">
-        <source>export.title</source>
+      <trans-unit id="1GruCMx" resname="export">
+        <source>export</source>
         <target>Εξαγωγή</target>
       </trans-unit>
-      <trans-unit id="export.subtitle">
-        <source>export.subtitle</source>
-        <target>Εξαγωγή ωρολογίου προγράμματος σε διάφορες μορφές</target>
-      </trans-unit>
-      <trans-unit id="export.filter">
+      <trans-unit id="iwWaUoa" resname="export.filter">
         <source>export.filter</source>
         <target>Φίλτρα για τα δεδομένα προς εξαγωγή</target>
       </trans-unit>
-      <trans-unit id="export.period">
+      <trans-unit id="vjmoQGo" resname="export.period">
         <source>export.period</source>
         <target>Περίοδος</target>
       </trans-unit>
-      <trans-unit id="export.document_title">
+      <trans-unit id="3CQ7A2m" resname="export.document_title">
         <source>export.document_title</source>
         <target>Εξαγωγή φύλλων ωρολογίου προγράμματος</target>
       </trans-unit>
-      <trans-unit id="export.full_list">
+      <trans-unit id="d5wyWRD" resname="export.full_list">
         <source>export.full_list</source>
         <target>Πλήρης λίστα</target>
       </trans-unit>
-      <trans-unit id="export.summary">
+      <trans-unit id="N778uJ6" resname="export.summary">
         <source>export.summary</source>
         <target>Περίληψη</target>
       </trans-unit>
-      <trans-unit id="export.page_of">
+      <trans-unit id="ElDyzrx" resname="export.page_of">
         <source>export.page_of</source>
         <target>Σελίδα %page% από %pages%</target>
       </trans-unit>
-      <trans-unit id="export.date_copyright">
+      <trans-unit id="vKY0tof" resname="export.date_copyright">
         <source>export.date_copyright</source>
         <target>Δημιουργήθηκε την %date% με το %kimai%</target>
       </trans-unit>
-      <!--
-             Navbar - recent entries and activities
-            -->
-      <trans-unit id="active.entries">
+      <trans-unit id="OxdYMR3" resname="active.entries">
         <source>active.entries</source>
         <target>Οι ενεργές μετρήσεις του χρόνου σας</target>
       </trans-unit>
-      <trans-unit id="timesheet.all">
-        <source>timesheet.all</source>
-        <target>Εμφάνιση όλων των εγγραφών</target>
-      </trans-unit>
-      <trans-unit id="recent.activities">
+      <trans-unit id="WVU_S.A" resname="recent.activities">
         <source>recent.activities</source>
         <target>Επανεκκινήστε μία από τις τελευταίες σας δραστηριότητες</target>
       </trans-unit>
-      <trans-unit id="recent.activities.format">
-        <source>recent.activities.format</source>
-        <target>%activity% του %project% για τον %customer%</target>
-      </trans-unit>
-      <trans-unit id="timesheet.start">
+      <trans-unit id="dTHY7Mw" resname="timesheet.start">
         <source>timesheet.start</source>
-        <target>Δημιουργήστε νέα εγγραφή ωρών</target>
+        <target state="needs-translation">Δημιουργήστε νέα εγγραφή ωρών</target>
       </trans-unit>
-      <!--
-              TOOLBARS
-            -->
-      <trans-unit id="label.pageSize">
-        <source>label.pageSize</source>
+      <trans-unit id="igCkqAP" resname="pageSize">
+        <source>pageSize</source>
         <target>Μέγεθος σελίδας</target>
       </trans-unit>
-      <trans-unit id="label.entryState">
-        <source>label.entryState</source>
+      <trans-unit id="cjgNYUB" resname="entryState">
+        <source>entryState</source>
         <target>Εγγραφές</target>
       </trans-unit>
-      <trans-unit id="label.exported">
-        <source>label.exported</source>
+      <trans-unit id="Qn2ouiL" resname="exported">
+        <source>exported</source>
         <target>Εξήχθησαν</target>
       </trans-unit>
-      <trans-unit id="entryState.exported">
+      <trans-unit id="_DDecAV" resname="entryState.exported">
         <source>entryState.exported</source>
         <target>Εκκαθαρίστηκε</target>
       </trans-unit>
-      <trans-unit id="entryState.not_exported">
+      <trans-unit id="ccCiXyR" resname="entryState.not_exported">
         <source>entryState.not_exported</source>
         <target>Ανοικτό</target>
       </trans-unit>
-      <trans-unit id="entryState.all">
-        <source>entryState.all</source>
+      <trans-unit id="XvXvA2S" resname="all">
+        <source>all</source>
         <target>Όλες</target>
       </trans-unit>
-      <trans-unit id="entryState.running">
+      <trans-unit id="xm7mqoK" resname="entryState.running">
         <source>entryState.running</source>
         <target>Ενεργές</target>
       </trans-unit>
-      <trans-unit id="entryState.stopped">
+      <trans-unit id="spHpd_I" resname="entryState.stopped">
         <source>entryState.stopped</source>
         <target>Σταματημένες</target>
       </trans-unit>
-      <trans-unit id="export.clear_all">
+      <trans-unit id="BhsaLxX" resname="export.clear_all">
         <source>export.clear_all</source>
         <target>Επισήμανση όλων των εμφανιζόμενων εγγραφών ως ανοιχτών;</target>
       </trans-unit>
-      <trans-unit id="export.mark_all">
+      <trans-unit id="qtjPKUT" resname="export.mark_all">
         <source>export.mark_all</source>
         <target>Επισήμανση όλων των εμφανιζόμενων εγγραφών ως εκκαθαρισμένων;</target>
       </trans-unit>
-      <trans-unit id="label.globalsOnly">
-        <source>label.globalsOnly</source>
+      <trans-unit id="NNsA8i2" resname="globalsOnly">
+        <source>globalsOnly</source>
         <target>Μόνο καθολικά</target>
       </trans-unit>
-      <trans-unit id="label.batch_meta_fields">
-        <source>label.batch_meta_fields</source>
+      <trans-unit id="8BPmHPa" resname="batch_meta_fields">
+        <source>batch_meta_fields</source>
         <target>Πρόσθετα πεδία</target>
       </trans-unit>
-      <trans-unit id="help.batch_meta_fields">
+      <trans-unit id="9Wt8Pp_" resname="help.batch_meta_fields">
         <source>help.batch_meta_fields</source>
         <target>Τα πεδία που πρέπει να ενημερωθούν, πρέπει πρώτα να ενεργοποιηθούν κάνοντας κλικ στο σχετικό κουτάκι.</target>
       </trans-unit>
-      <trans-unit id="label.includeNoWork">
-        <source>label.includeNoWork</source>
+      <trans-unit id="L27KvC9" resname="includeNoWork">
+        <source>includeNoWork</source>
         <target>Εμφάνιση καταχωρήσεων χωρίς κρατήσεις</target>
       </trans-unit>
-      <trans-unit id="label.includeNoBudget">
-        <source>label.includeNoBudget</source>
+      <trans-unit id="L0hRlcf" resname="includeNoBudget">
+        <source>includeNoBudget</source>
         <target>Εμφάνιση καταχωρήσεων χωρίς προϋπολογισμό</target>
       </trans-unit>
-      <trans-unit id="label.not_exported">
-        <source>label.not_exported</source>
+      <trans-unit id="2dm.ZWM" resname="not_exported">
+        <source>not_exported</source>
         <target>Μη Εξαχθείσα</target>
       </trans-unit>
-      <trans-unit id="label.not_invoiced">
-        <source>label.not_invoiced</source>
+      <trans-unit id="o0yOFHL" resname="not_invoiced">
+        <source>not_invoiced</source>
         <target>Δεν χρεώθηκε</target>
       </trans-unit>
-      <trans-unit id="label.last_record_before">
-        <source>label.last_record_before</source>
+      <trans-unit id="vpqPF8v" resname="last_record_before">
+        <source>last_record_before</source>
         <target>Δεν υπάρχει ώρα κράτησης από</target>
       </trans-unit>
-      <trans-unit id="label.last_record">
-        <source>label.last_record</source>
+      <trans-unit id="_YiKaOT" resname="last_record">
+        <source>last_record</source>
         <target>Τελευταία καταχώρηση</target>
       </trans-unit>
-      <trans-unit id="stats.userActiveFinancialYear">
-        <source>stats.userActiveFinancialYear</source>
+      <trans-unit id="_Pym9RO" resname="stats.activeUsersFinancialYear">
+        <source>stats.activeUsersFinancialYear</source>
         <target>Ενεργοί χρήστες κατά το τρέχον οικονομικό έτος</target>
       </trans-unit>
-      <trans-unit id="stats.amountFinancialYear">
+      <trans-unit id="wuUWovn" resname="stats.amountFinancialYear">
         <source>stats.amountFinancialYear</source>
         <target>Έσοδα τρέχοντος οικονομικού έτους</target>
       </trans-unit>
-      <trans-unit id="stats.durationFinancialYear">
+      <trans-unit id="xkugSAA" resname="stats.durationFinancialYear">
         <source>stats.durationFinancialYear</source>
-        <target>Ωράριο εργασίας κατά το τρέχον οικονομικό έτος</target>
+        <target>Ώρες εργασίας κατά το τρέχον οικονομικό έτος</target>
       </trans-unit>
-      <trans-unit id="stats.revenue">
-        <source>stats.revenue</source>
+      <trans-unit id="Nx9_QiO" resname="revenue">
+        <source>revenue</source>
         <target>Εισπράξεις</target>
       </trans-unit>
-      <trans-unit id="stats.workingTime">
-        <source>stats.workingTime</source>
+      <trans-unit id="BXBFJP8" resname="stats.workingTime" xml:space="preserve">
+        <source>Working hours</source>
         <target>Χρόνος εργασίας</target>
       </trans-unit>
-      <trans-unit id="stats.workingTimeFinancialYear">
+      <trans-unit id="HWB4OGJ" resname="stats.workingTimeFinancialYear">
         <source>stats.workingTimeFinancialYear</source>
         <target>Οικονομικό έτος</target>
       </trans-unit>
-      <trans-unit id="label.account_number">
-        <source>label.account_number</source>
+      <trans-unit id="KH2hgil" resname="account_number">
+        <source>account_number</source>
         <target>Αριθμός στελεχών</target>
       </trans-unit>
-      <trans-unit id="error.too_many_entries">
+      <trans-unit id="XQ2.pq2" resname="error.too_many_entries">
         <source>error.too_many_entries</source>
         <target>Το αίτημα δεν μπορεί να επεξεργαστεί, βρέθηκαν πάρα πολλά αποτελέσματα.</target>
       </trans-unit>
-      <trans-unit id="resetting.check_email">
-        <source>resetting.check_email</source>
-        <target>Ένα ηλεκτρονικό μήνυμα έχει αποσταλεί. Περιέχει το σύνδεσμο που πρέπει να ακολουθήσετε για να επαναφέρετε τον κωδικό σας. Σημείωση: Μπορείτε να ζητήσετε νέο κωδικό μία φορά εντός %tokenLifetime% ωρών. Εάν δεν λάβετε το ηλεκτρονικό μήνυμα ελέγξετε τον φάκελο με τα ανεπιθύμητα μηνύματα η προσπαθήστε ξανά.</target>
+      <trans-unit id="_cY.wHP" resname="resetting.check_email" xml:space="preserve">
+        <source>An email has been sent with a link to reset your password. Note: You can only request a new password once every %tokenLifetime% hours. If you don't receive the email, please check your spam folder or try again.</source>
+        <target state="needs-translation">Ένα ηλεκτρονικό μήνυμα έχει αποσταλεί. Περιέχει το σύνδεσμο που πρέπει να ακολουθήσετε για να επαναφέρετε τον κωδικό σας. Σημείωση: Μπορείτε να ζητήσετε νέο κωδικό μία φορά εντός %tokenLifetime% ωρών. Εάν δεν λάβετε το ηλεκτρονικό μήνυμα ελέγξετε τον φάκελο με τα ανεπιθύμητα μηνύματα η προσπαθήστε ξανά.</target>
       </trans-unit>
-      <trans-unit id="registration.check_email">
+      <trans-unit id=".ndupSK" resname="registration.check_email">
         <source>registration.check_email</source>
         <target>Ένα ηλεκτρονικό μήνυμα έχει αποσταλεί στην διεύθυνση %email%. Περιέχει τον σύνδεσμο ενεργοποίησης που πρέπει να ακολουθήσετε για να ενεργοποιήσετε τον λογαριασμό σας.</target>
       </trans-unit>
-      <trans-unit id="delete_warning.short_stats">
+      <trans-unit id="tvV0NhL" resname="delete_warning.short_stats">
         <source>delete_warning.short_stats</source>
         <target>Προς το παρόν %records% καταγραφές χρόνου εργασίας υπάρχουν, που συνοψίζονται σε συνολική διάρκεια από %duration%.</target>
       </trans-unit>
-      <trans-unit id="label.budgetType_month">
-        <source>label.budgetType_month</source>
+      <trans-unit id="wYqyL6A" resname="budgetType_month">
+        <source>budgetType_month</source>
         <target>Μηνιαία</target>
       </trans-unit>
-      <trans-unit id="label.budgetType">
-        <source>label.budgetType</source>
+      <trans-unit id="4Ndj7Xo" resname="budgetType">
+        <source>budgetType</source>
         <target>Τύπος-Προϋπολογισμού</target>
       </trans-unit>
-      <trans-unit id="stats.percentUsedLeft_month">
+      <trans-unit id="vWJPpYU" resname="stats.percentUsedLeft_month">
         <source>stats.percentUsedLeft_month</source>
         <target>%percent%% χρησιμοποιείται (%left% είναι ακόμα ενεργά αυτό τον μήνα)</target>
       </trans-unit>
-      <trans-unit id="stats.percentUsed_month">
+      <trans-unit id="xN7MfSA" resname="stats.percentUsed_month">
         <source>stats.percentUsed_month</source>
         <target>%percent%% χρησιμοποιήθηκε αυτόν το μήνα</target>
       </trans-unit>
-      <trans-unit id="team.add_user.help">
+      <trans-unit id="tp.gIrE" resname="team.add_user.help">
         <source>team.add_user.help</source>
         <target>Προσθήκη ενός νέου χρήστη στην ομάδα επιλέγοντάς τον από την λίστα. Έπειτα μπορείτε να αποφασίσετε εάν ο χρήστης πρέπει να οριστεί ως αρχηγός ομάδας.</target>
       </trans-unit>
-      <trans-unit id="add_user.label">
+      <trans-unit id="Zif614Q" resname="add_user.label">
         <source>add_user.label</source>
         <target>Προσθήκη χρήστη</target>
+      </trans-unit>
+      <trans-unit id="W92QGbY" resname="export.warn_result_amount">
+        <source>export.warn_result_amount</source>
+        <target>Η αναζήτηση σας αντιστοιχεί σε %count% αποτελέσματα. Εάν η εξαγωγή αποτυγχάνει, πρέπει να ορίσετε συγκεκριμένα κριτήρια για την αναζήτησή σας.</target>
+      </trans-unit>
+      <trans-unit id="EwPAaws" resname="type">
+        <source>type</source>
+        <target>Τύπος</target>
+      </trans-unit>
+      <trans-unit id="KukrzcT" resname="includeBudgetType_full">
+        <source>includeBudgetType_full</source>
+        <target>Εμφάνιση καταχωρήσεων με "κύκλου ζωής" προϋπολογισμών</target>
+      </trans-unit>
+      <trans-unit id="dnQEYoJ" resname="budgetType_full">
+        <source>budgetType_full</source>
+        <target>Κύκλου ζωής</target>
+      </trans-unit>
+      <trans-unit id="ViUuILv" resname="includeBudgetType_month">
+        <source>includeBudgetType_month</source>
+        <target>Εμφάνιση καταχωρήσεων με "Μηνιαίο" προϋπολογισμό</target>
+      </trans-unit>
+      <trans-unit id="jdbtx6z" resname="action.add">
+        <source>action.add</source>
+        <target>Προσθήκη</target>
+      </trans-unit>
+      <trans-unit id="yNWIi5U" resname="default_value_new">
+        <source>default_value_new</source>
+        <target>Προεπιλεγμένες τιμές για νέες καταχωρήσεις</target>
+      </trans-unit>
+      <trans-unit id="f8oNzSP" resname="quick_entry.title">
+        <source>quick_entry.title</source>
+        <target>Εβδομαδιαίες ώρες εργασίας</target>
+      </trans-unit>
+      <trans-unit id="gT9W2pZ" resname="status.canceled">
+        <source>status.canceled</source>
+        <target>Ακυρώθηκε</target>
+      </trans-unit>
+      <trans-unit id="HPhRbtc" resname="stats.workingTimeWeekShort">
+        <source>stats.workingTimeWeekShort</source>
+        <target>Εμβδομάδα %week%</target>
+      </trans-unit>
+      <trans-unit id="C2TGff0" resname="error.directory_protected">
+        <source>error.directory_protected</source>
+        <target>Ο φάκελος «%dir%» έχει προστασία εγγραφής.</target>
+      </trans-unit>
+      <trans-unit id="IPHM4iP" resname="updated_at">
+        <source>Updated at</source>
+        <target>Ενημερώθηκε την</target>
+      </trans-unit>
+      <trans-unit id="GzWKgBk" resname="error.directory_missing">
+        <source>The directory “%dir%” does not exist and could not be created.</source>
+        <target>Ο φάκελος «%dir%» δεν υπάρχει και δεν μπόρεσε να δημιουργηθεί.</target>
+      </trans-unit>
+      <trans-unit id="nlwMf5w" resname="invoice_document.max_reached">
+        <source>invoice_document.max_reached</source>
+        <target>Επιτεύχθη τo μέγιστο όριο %max% των τιμολογίων. Μπορείτε να προσθέσετε περισότερρα εφόσον αφαιρέσεται κάποιο.</target>
+      </trans-unit>
+      <trans-unit id="fVA3M2x" resname="choice_pattern">
+        <source>Display of entries in selection lists</source>
+        <target state="translated">Προβολή των καταχωρίσεων στις λίστες επιλογών</target>
+      </trans-unit>
+      <trans-unit id="U_D.NIy" resname="automatic">
+        <source>automatic</source>
+        <target>Αυτόματα</target>
+      </trans-unit>
+      <trans-unit id="3Clo55j" resname="about.title">
+        <source>about.title</source>
+        <target>Σχετικά με το Kimai</target>
+      </trans-unit>
+      <trans-unit id="OJ.wI1U" resname="invoiceText">
+        <source>invoiceText</source>
+        <target state="translated">Κείμενο Τιμολογίου</target>
+      </trans-unit>
+      <trans-unit id="HNFpvnH" resname="globalActivities">
+        <source>globalActivities</source>
+        <target state="translated">Επέτρεψε καθολικές ενέργειες</target>
+      </trans-unit>
+      <trans-unit id="EGpYQvx" resname="help">
+        <source>help</source>
+        <target>Τεκμηρίωση</target>
+      </trans-unit>
+      <trans-unit id="oYYDCG5" resname="support">
+        <source>support</source>
+        <target>Υποστήριξη</target>
+      </trans-unit>
+      <trans-unit id="mz4ieCN" resname="donate">
+        <source>donate</source>
+        <target>Δωρίστε</target>
+      </trans-unit>
+      <trans-unit id="cR5DD88" resname="invoice_number_generator.date">
+        <source>invoice_number_generator.date</source>
+        <target state="translated">Ημερομηνία</target>
+      </trans-unit>
+      <trans-unit id="Qh1X4Vu" resname="invoice_number_generator.default">
+        <source>invoice_number_generator.default</source>
+        <target state="translated">Διαμορφωμένη Μορφή</target>
+      </trans-unit>
+      <trans-unit id="UI6nPeP" resname="invoice_number_generator">
+        <source>invoice_number_generator</source>
+        <target state="translated">Γεννήτρια Αριθμού Απόδειξης</target>
+      </trans-unit>
+      <trans-unit id="bEXLcqN" resname="stop">
+        <source>stop</source>
+        <target>Διακοπή</target>
+      </trans-unit>
+      <trans-unit id="PEgjRvN" resname="back">
+        <source>back</source>
+        <target>Πίσω</target>
+      </trans-unit>
+      <trans-unit id="JiEhxTc" resname="edit">
+        <source>edit</source>
+        <target>Τροποποίηση</target>
+      </trans-unit>
+      <trans-unit id="4G2jBDS" resname="trash">
+        <source>trash</source>
+        <target>Διαγραφή</target>
+      </trans-unit>
+      <trans-unit id="hF6RgxM" resname="report">
+        <source>report</source>
+        <target>Αναφορά</target>
+      </trans-unit>
+      <trans-unit id="JeK2sQZ" resname="repeat">
+        <source>repeat</source>
+        <target>Εκκίνηση ξανά</target>
+      </trans-unit>
+      <trans-unit id="J0sRBY_" resname="profile-stats">
+        <source>profile-stats</source>
+        <target>Προφίλ</target>
+      </trans-unit>
+      <trans-unit id="zeD7Dew" resname="settings">
+        <source>settings</source>
+        <target>Προτιμήσεις</target>
+      </trans-unit>
+      <trans-unit id="anCjtwe" resname="timesheet.filter">
+        <source>Filter timesheets</source>
+        <target>Φιλτράρισμα χρονοδιαγραμμάτων</target>
+      </trans-unit>
+      <trans-unit id="xY9_cU2" resname="customer.filter">
+        <source>Filter customers</source>
+        <target>Φίλτρο πελατών</target>
+      </trans-unit>
+      <trans-unit id="UFgOnc6" resname="project.filter">
+        <source>Filter projects</source>
+        <target>Φίλτρο έργων</target>
+      </trans-unit>
+      <trans-unit id="5G3QNHA" resname="activity.filter">
+        <source>Filter activities</source>
+        <target>Φίλτρο δραστηριοτήτων</target>
+      </trans-unit>
+      <trans-unit id="b1pgNOd" resname="copy">
+        <source>copy</source>
+        <target>Δημιουργία αντίγραφου</target>
+      </trans-unit>
+      <trans-unit id="TqFAWIF" resname="home">
+        <source>home</source>
+        <target>Αρχική σελίδα</target>
+      </trans-unit>
+      <trans-unit id="PBlIO2x" resname="create-project">
+        <source>create-project</source>
+        <target>Δημιουργία έργου</target>
+      </trans-unit>
+      <trans-unit id="UbouFOs" resname="create-activity">
+        <source>create-activity</source>
+        <target>Δημιουργία δραστηριότητας</target>
+      </trans-unit>
+      <trans-unit id="QR1nvcR" resname="create-timesheet">
+        <source>create-timesheet</source>
+        <target>Δημιουργία χρονοδιαγράμματος</target>
+      </trans-unit>
+      <trans-unit id="Qh5mV5Q" resname="create-timesheet-multiuser">
+        <source>create-timesheet-multiuser</source>
+        <target>Για πολλαπλούς χρήστες</target>
+      </trans-unit>
+      <trans-unit id="T_PN1AT" resname="permissions">
+        <source>permissions</source>
+        <target>Δικαιώματα ομάδας</target>
+      </trans-unit>
+      <trans-unit id="Qf.Yt2r" resname="details">
+        <source>details</source>
+        <target>Εμφάνιση</target>
+      </trans-unit>
+      <trans-unit id="aP9j_4L" resname="download">
+        <source>download</source>
+        <target state="translated">Λήψη</target>
+      </trans-unit>
+      <trans-unit id="hHIeqOW" resname="invoice.pending">
+        <source>invoice.pending</source>
+        <target>Αναμονή της είσπραξης</target>
+      </trans-unit>
+      <trans-unit id="9M4b2ZN" resname="invoice.paid">
+        <source>invoice.paid</source>
+        <target>Τιμολόγιο εξοφλήθη</target>
+      </trans-unit>
+      <trans-unit id="38M3a4J" resname="filter">
+        <source>filter</source>
+        <target>Φιλτράρισμα δεδομένων</target>
+      </trans-unit>
+      <trans-unit id="SEyZupT" resname="invoice.cancel">
+        <source>invoice.cancel</source>
+        <target>Ακύρωση τιμολογίου</target>
       </trans-unit>
     </body>
   </file>

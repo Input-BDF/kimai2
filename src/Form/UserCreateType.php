@@ -9,7 +9,9 @@
 
 namespace App\Form;
 
-use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
+use App\Form\Type\TeamType;
+use App\Form\Type\UserRoleType;
+use App\Form\Type\YesNoType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\RepeatedType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -20,44 +22,64 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  */
 class UserCreateType extends UserEditType
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder
-            ->add('username', null, [
-                'label' => 'label.username',
-                'required' => true,
-                'attr' => [
-                    'autofocus' => 'autofocus'
-                ],
-            ])
-            ->add('plainPassword', RepeatedType::class, [
-                'required' => true,
-                'type' => PasswordType::class,
-                'first_options' => ['label' => 'label.password', 'attr' => ['autocomplete' => 'new-password']],
-                'second_options' => ['label' => 'label.password_repeat', 'attr' => ['autocomplete' => 'new-password']],
-            ]);
+        $builder->add('username', null, [
+            'label' => 'username',
+            'required' => true,
+            'attr' => [
+                'autofocus' => 'autofocus'
+            ],
+        ]);
+
+        $builder->add('plainPassword', RepeatedType::class, [
+            'required' => true,
+            'type' => PasswordType::class,
+            'first_options' => [
+                'label' => 'password',
+                'attr' => ['autocomplete' => 'new-password'],
+                'block_prefix' => 'secret'
+            ],
+            'second_options' => [
+                'label' => 'password_repeat',
+                'attr' => ['autocomplete' => 'new-password'],
+                'block_prefix' => 'secret'
+            ],
+        ]);
 
         parent::buildForm($builder, $options);
 
-        if ($options['include_add_more'] === true) {
-            $builder->add('create_more', CheckboxType::class, [
-                'label' => 'label.create_more',
+        if ($options['include_teams'] === true) {
+            $builder->add('teams', TeamType::class, [
+                'multiple' => true,
+                'expanded' => false,
                 'required' => false,
-                'mapped' => false,
             ]);
         }
+
+        if ($options['include_roles'] === true) {
+            $builder->add('roles', UserRoleType::class, [
+                'multiple' => true,
+                'expanded' => false,
+                'required' => false,
+            ]);
+        }
+
+        $builder->add('requiresPasswordReset', YesNoType::class, [
+            'label' => 'force_password_change',
+            'help' => 'force_password_change_help',
+            'required' => false,
+        ]);
     }
 
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         parent::configureOptions($resolver);
 
         $resolver->setDefaults([
             'validation_groups' => ['UserCreate', 'Registration'],
-            'include_add_more' => false,
+            'include_roles' => false,
+            'include_teams' => false,
         ]);
     }
 }

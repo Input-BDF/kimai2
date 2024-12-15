@@ -16,57 +16,76 @@ use App\Entity\User;
  */
 class ConfigurationControllerTest extends APIControllerBaseTest
 {
-    public function testIsI18nSecure()
-    {
-        $this->assertUrlIsSecured('/api/config/i18n');
-    }
-
-    public function testGetI18n()
-    {
-        $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
-        $this->assertAccessIsGranted($client, '/api/config/i18n', 'GET');
-        $result = json_decode($client->getResponse()->getContent(), true);
-
-        $this->assertIsArray($result);
-        $this->assertNotEmpty($result);
-        $this->assertEquals(8, \count($result));
-        $this->assertI18nStructure($result);
-    }
-
-    protected function assertI18nStructure(array $result)
-    {
-        $expectedKeys = ['date', 'dateTime', 'duration', 'formDate', 'formDateTime', 'is24hours', 'time', 'now'];
-        $actual = array_keys($result);
-        sort($actual);
-        sort($expectedKeys);
-
-        $this->assertEquals($expectedKeys, $actual, 'Config structure does not match');
-    }
-
-    public function testIsTimesheetSecure()
+    public function testIsTimesheetSecure(): void
     {
         $this->assertUrlIsSecured('/api/config/timesheet');
     }
 
-    public function testGetTimesheet()
+    public function testGetTimesheet(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->assertAccessIsGranted($client, '/api/config/timesheet', 'GET');
-        $result = json_decode($client->getResponse()->getContent(), true);
+        $content = $client->getResponse()->getContent();
+        $this->assertIsString($content);
+        $result = json_decode($content, true);
 
         $this->assertIsArray($result);
         $this->assertNotEmpty($result);
-        $this->assertEquals(6, \count($result));
-        $this->assertTimesheetStructure($result);
-    }
-
-    protected function assertTimesheetStructure(array $result)
-    {
-        $expectedKeys = ['activeEntriesHardLimit', 'activeEntriesSoftLimit', 'defaultBeginTime', 'isAllowFutureTimes', 'isAllowOverlapping', 'trackingMode'];
+        $expectedKeys = ['activeEntriesHardLimit', 'defaultBeginTime', 'isAllowFutureTimes', 'isAllowOverlapping', 'trackingMode'];
+        $this->assertCount(\count($expectedKeys), $result);
         $actual = array_keys($result);
         sort($actual);
         sort($expectedKeys);
 
         $this->assertEquals($expectedKeys, $actual, 'Config structure does not match');
+    }
+
+    public function testIsColorsSecure(): void
+    {
+        $this->assertUrlIsSecured('/api/config/colors');
+    }
+
+    public function testGetColors(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
+        $this->assertAccessIsGranted($client, '/api/config/colors', 'GET');
+        $content = $client->getResponse()->getContent();
+        $this->assertIsString($content);
+        $actual = json_decode($content, true);
+
+        $this->assertIsArray($actual);
+        $this->assertNotEmpty($actual);
+        $expected = [
+            'Silver' => '#c0c0c0',
+            'Gray' => '#808080',
+            'Black' => '#000000',
+            'Maroon' => '#800000',
+            'Brown' => '#a52a2a',
+            'Red' => '#ff0000',
+            'Orange' => '#ffa500',
+            'Gold' => '#ffd700',
+            'Yellow' => '#ffff00',
+            'Peach' => '#ffdab9',
+            'Khaki' => '#f0e68c',
+            'Olive' => '#808000',
+            'Lime' => '#00ff00',
+            'Jelly' => '#9acd32',
+            'Green' => '#008000',
+            'Teal' => '#008080',
+            'Aqua' => '#00ffff',
+            'LightBlue' => '#add8e6',
+            'DeepSky' => '#00bfff',
+            'Dodger' => '#1e90ff',
+            'Blue' => '#0000ff',
+            'Navy' => '#000080',
+            'Purple' => '#800080',
+            'Fuchsia' => '#ff00ff',
+            'Violet' => '#ee82ee',
+            'Rose' => '#ffe4e1',
+            'Lavender' => '#E6E6FA',
+        ];
+        $this->assertCount(\count($expected), $actual);
+
+        $this->assertEquals($expected, $actual, 'Color structure does not match');
     }
 }

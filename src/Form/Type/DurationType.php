@@ -21,59 +21,64 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 /**
  * Custom form field type to handle duration strings.
  */
-class DurationType extends AbstractType
+final class DurationType extends AbstractType
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
-            'label' => 'label.duration',
+            'label' => 'duration',
             'constraints' => [new DurationConstraint()],
             'preset_hours' => null,
             'preset_minutes' => null,
+            'toggle' => false,
+            'max_hours' => 24,
+            'icon' => 'clock',
         ]);
+        $resolver->setAllowedTypes('max_hours', 'int');
     }
 
-    public function buildView(FormView $view, FormInterface $form, array $options)
+    public function buildView(FormView $view, FormInterface $form, array $options): void
     {
-        if ($options['preset_hours'] === null || $options['preset_minutes'] === null) {
-            return;
+        $class = 'duration-input';
+        if (isset($view->vars['attr']['class'])) {
+            $class .= ' ' . $view->vars['attr']['class'];
         }
+        $view->vars['attr']['class'] = $class;
+        $view->vars['toggle'] = $options['toggle'];
 
-        $intervalMinutes = (int) $options['preset_minutes'];
-        $maxHours = (int) $options['preset_hours'];
+        if ($options['preset_hours'] !== null && $options['preset_minutes'] !== null) {
+            $intervalMinutes = (int) $options['preset_minutes'];
+            $maxHours = (int) $options['preset_hours'];
 
-        if ($intervalMinutes < 1 || $maxHours < 1) {
-            return;
+            if ($intervalMinutes < 1 || $maxHours < 1) {
+                return;
+            }
+
+            // we track times for humans and no entry should ever be that long
+            if (\is_int($options['max_hours']) && $maxHours > $options['max_hours']) {
+                $maxHours = $options['max_hours'];
+            }
+
+            $maxMinutes = $maxHours * 60;
+            $presets = [];
+
+            for ($minutes = $intervalMinutes; $minutes <= $maxMinutes; $minutes += $intervalMinutes) {
+                $h = (int) ($minutes / 60);
+                $m = $minutes % 60;
+                $interval = new \DateInterval('PT' . $h . 'H' . $m . 'M');
+                $presets[] = $interval->format('%h:%I');
+            }
+
+            $view->vars['duration_presets'] = $presets;
         }
-
-        $maxMinutes = $maxHours * 60;
-        $presets = [];
-
-        for ($minutes = $intervalMinutes; $minutes <= $maxMinutes; $minutes += $intervalMinutes) {
-            $h = (int) ($minutes / 60);
-            $m = $minutes % 60;
-            $interval = new \DateInterval('PT' . $h . 'H' . $m . 'M');
-            $presets[] = $interval->format('%h:%I');
-        }
-
-        $view->vars['duration_presets'] = $presets;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder->addModelTransformer(new DurationStringToSecondsTransformer());
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getParent()
+    public function getParent(): string
     {
         return TextType::class;
     }

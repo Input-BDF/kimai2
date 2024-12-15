@@ -1,23 +1,19 @@
-{% extends app.request.xmlHttpRequest ? 'form.html.twig' : 'base.html.twig' %}
-{% import "customer/actions.html.twig" as actions %}
-
-{% block page_title %}{{ 'admin_customer.title'|trans }}{% endblock %}
-{% block page_actions %}{{ actions.customer(customer, 'edit') }}{% endblock %}
+{% extends kimai_context.modalRequest ? 'form.html.twig' : 'base.html.twig' %}
 
 {% block main %}
-    {% set formEditTemplate = app.request.xmlHttpRequest ? 'default/_form_modal.html.twig' : 'default/_form.html.twig' %}
+    {% set formEditTemplate = kimai_context.modalRequest ? 'default/_form_modal.html.twig' : 'default/_form.html.twig' %}
     {% set formOptions = {
-        'title': (customer.id is null ? 'create'|trans : 'edit'|trans({}, 'actions')),
+        'title': (customer.id is null ? 'create'|trans : 'edit'|trans),
         'form': form,
         'back': path('admin_customer')
     } %}
     {% embed formEditTemplate with formOptions %}
         {% block form_body %}
             <div class="row">
-                <div class="col-md-10">
+                <div class="col-md-9">
                     {{ form_row(form.name) }}
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-3">
                     {{ form_row(form.color) }}
                 </div>
             </div>
@@ -67,26 +63,54 @@
                     {{ form_row(form.fax) }}
                 </div>
             </div>
-            {% if form.budget is defined %}
+            {% if form.budgetType is defined %}
                 <div class="row">
-                    <div class="col-md-4">
-                        {{ form_row(form.budget) }}
-                    </div>
-                    <div class="col-md-4">
-                        {{ form_row(form.timeBudget) }}
-                    </div>
+                    {% if form.budget is defined %}
+                        <div class="col-md-4">
+                            {{ form_row(form.budget) }}
+                        </div>
+                    {% endif %}
+                    {% if form.timeBudget is defined %}
+                        <div class="col-md-4">
+                            {{ form_row(form.timeBudget) }}
+                        </div>
+                    {% endif %}
                     <div class="col-md-4">
                         {{ form_row(form.budgetType) }}
                     </div>
                 </div>
             {% endif %}
-            {{ form_row(form.visible) }}
-            {% if form.metaFields is defined and form.metaFields is not empty %}
-                {% for meta in form.metaFields|sort((a, b) => a.vars.data.order <=> b.vars.data.order) %}
-                    {{ form_row(meta) }}
-                {% endfor %}
+            {% if form.teams is defined %}
+            <div class="row">
+                <div class="col-12">
+                    {{ form_row(form.teams) }}
+                </div>
+            </div>
             {% endif %}
-            {{ form_widget(form) }}
+            <div class="row">
+                <div class="col-md-6">
+                    {{ form_row(form.visible) }}
+                </div>
+                <div class="col-md-6">
+                    {{ form_row(form.billable) }}
+                </div>
+            </div>
+            {% if form.metaFields is defined and form.metaFields is not empty %}
+                {{ form_row(form.metaFields) }}
+            {% endif %}
+            {% embed '@theme/embeds/collapsible.html.twig' with {id: 'customer_invoice_settings'} %}
+                {% import "macros/widgets.html.twig" as widgets %}
+                {% block title %}{{ 'invoices'|trans }}{% endblock %}
+                {% block body %}
+                    {% if form.invoiceTemplate is defined %}
+                        {{ form_row(form.invoiceTemplate) }}
+                    {% endif %}
+                    {% if form.invoiceText is defined %}
+                        {{ form_row(form.invoiceText) }}
+                    {% endif %}
+                {% endblock %}
+            {% endembed %}
+            {{ form_rest(form) }}
         {% endblock %}
     {% endembed %}
 {% endblock %}

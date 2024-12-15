@@ -18,9 +18,9 @@ use PHPUnit\Framework\TestCase;
  */
 class CustomerMetaDefinitionEventTest extends TestCase
 {
-    public function testGetterAndSetter()
+    public function testGetterAndSetter(): void
     {
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $sut = new CustomerMetaDefinitionEvent($customer);
         $this->assertSame($customer, $sut->getEntity());
     }

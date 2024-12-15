@@ -16,11 +16,13 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\DateTimeFormat
  * @covers \App\Validator\Constraints\DateTimeFormatValidator
+ * @extends ConstraintValidatorTestCase<DateTimeFormatValidator>
  */
 class DateTimeFormatValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator()
+    protected function createValidator(): DateTimeFormatValidator
     {
         return new DateTimeFormatValidator();
     }
@@ -37,7 +39,7 @@ class DateTimeFormatValidatorTest extends ConstraintValidatorTestCase
         ];
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
@@ -48,7 +50,7 @@ class DateTimeFormatValidatorTest extends ConstraintValidatorTestCase
      * @dataProvider getValidData
      * @param string $input
      */
-    public function testConstraintWithValidData($input)
+    public function testConstraintWithValidData($input): void
     {
         $constraint = new DateTimeFormat();
         $this->validator->validate($input, $constraint);
@@ -70,15 +72,13 @@ class DateTimeFormatValidatorTest extends ConstraintValidatorTestCase
      * @dataProvider getInvalidData
      * @param mixed $input
      */
-    public function testValidationError($input)
+    public function testValidationError($input): void
     {
         $constraint = new DateTimeFormat();
 
         $this->validator->validate($input, $constraint);
 
-        $expectedFormat = \is_string($input) ? '"' . $input . '"' : $input;
-
-        $this->buildViolation('The given value is not a valid datetime format.')
+        $this->buildViolation('This value is not a valid datetime.')
             ->setCode(DateTimeFormat::INVALID_FORMAT)
             ->assertRaised();
     }

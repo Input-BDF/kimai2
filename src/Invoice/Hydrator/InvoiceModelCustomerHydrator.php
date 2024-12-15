@@ -9,11 +9,18 @@
 
 namespace App\Invoice\Hydrator;
 
+use App\Customer\CustomerStatisticService;
 use App\Invoice\InvoiceModel;
 use App\Invoice\InvoiceModelHydrator;
 
-class InvoiceModelCustomerHydrator implements InvoiceModelHydrator
+final class InvoiceModelCustomerHydrator implements InvoiceModelHydrator
 {
+    use BudgetHydratorTrait;
+
+    public function __construct(private CustomerStatisticService $customerStatisticService)
+    {
+    }
+
     public function hydrate(InvoiceModel $model): array
     {
         $customer = $model->getCustomer();
@@ -22,29 +29,30 @@ class InvoiceModelCustomerHydrator implements InvoiceModelHydrator
             return [];
         }
 
-        $formatter = $model->getFormatter();
-        $currency = $model->getCurrency();
-
         $values = [
             'customer.id' => $customer->getId(),
-            'customer.address' => $customer->getAddress(),
-            'customer.name' => $customer->getName(),
-            'customer.contact' => $customer->getContact(),
-            'customer.company' => $customer->getCompany(),
-            'customer.vat' => $customer->getVatId(),
-            'customer.number' => $customer->getNumber(),
+            'customer.address' => $customer->getAddress() ?? '',
+            'customer.name' => $customer->getName() ?? '',
+            'customer.contact' => $customer->getContact() ?? '',
+            'customer.company' => $customer->getCompany() ?? '',
+            'customer.vat' => $customer->getVatId() ?? '', // deprecated since 2.0.15
+            'customer.vat_id' => $customer->getVatId() ?? '',
+            'customer.number' => $customer->getNumber() ?? '',
             'customer.country' => $customer->getCountry(),
-            'customer.homepage' => $customer->getHomepage(),
-            'customer.comment' => $customer->getComment(),
-            'customer.email' => $customer->getEmail(),
-            'customer.fax' => $customer->getFax(),
-            'customer.phone' => $customer->getPhone(),
-            'customer.mobile' => $customer->getMobile(),
-            // budget
-            // remaining budget?
-            // time-budget
-            // remaining time-budget?
+            'customer.homepage' => $customer->getHomepage() ?? '',
+            'customer.comment' => $customer->getComment() ?? '',
+            'customer.email' => $customer->getEmail() ?? '',
+            'customer.fax' => $customer->getFax() ?? '',
+            'customer.phone' => $customer->getPhone() ?? '',
+            'customer.mobile' => $customer->getMobile() ?? '',
+            'customer.invoice_text' => $customer->getInvoiceText() ?? '',
         ];
+
+        /** @var \DateTime $end */
+        $end = $model->getQuery()->getEnd();
+        $statistic = $this->customerStatisticService->getBudgetStatisticModel($customer, $end);
+
+        $values = array_merge($values, $this->getBudgetValues('customer.', $statistic, $model));
 
         foreach ($customer->getMetaFields() as $metaField) {
             $values = array_merge($values, [

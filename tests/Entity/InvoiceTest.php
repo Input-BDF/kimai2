@@ -14,6 +14,7 @@ use App\Entity\ActivityMeta;
 use App\Entity\Customer;
 use App\Entity\CustomerMeta;
 use App\Entity\Invoice;
+use App\Entity\InvoiceMeta;
 use App\Entity\InvoiceTemplate;
 use App\Entity\Project;
 use App\Entity\ProjectMeta;
@@ -26,6 +27,7 @@ use App\Invoice\NumberGenerator\DateNumberGenerator;
 use App\Repository\InvoiceRepository;
 use App\Repository\Query\InvoiceQuery;
 use App\Tests\Invoice\DebugFormatter;
+use App\Tests\Mocks\InvoiceModelFactoryFactory;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -33,7 +35,7 @@ use PHPUnit\Framework\TestCase;
  */
 class InvoiceTest extends TestCase
 {
-    public function testDefaultValues()
+    public function testDefaultValues(): void
     {
         $sut = new Invoice();
         self::assertNull($sut->getCreatedAt());
@@ -53,9 +55,19 @@ class InvoiceTest extends TestCase
         self::assertFalse($sut->isPaid());
         self::assertFalse($sut->isOverdue());
         self::assertNull($sut->getPaymentDate());
+        self::assertNull($sut->getComment());
     }
 
-    public function testSetterAndGetter()
+    public function testSetInvalidStatus(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unknown invoice status');
+
+        $sut = new Invoice();
+        $sut->setStatus('foo');
+    }
+
+    public function testSetterAndGetter(): void
     {
         $date = new \DateTime('-2 months');
         $sut = new Invoice();
@@ -64,17 +76,35 @@ class InvoiceTest extends TestCase
         self::assertFalse($sut->isNew());
         self::assertTrue($sut->isPending());
         self::assertFalse($sut->isPaid());
+        self::assertFalse($sut->isCanceled());
+        self::assertEquals(Invoice::STATUS_PENDING, $sut->getStatus());
 
         $sut->setIsPaid();
         self::assertFalse($sut->isNew());
         self::assertFalse($sut->isPending());
         self::assertTrue($sut->isPaid());
+        self::assertFalse($sut->isCanceled());
+        self::assertEquals(Invoice::STATUS_PAID, $sut->getStatus());
+
+        $sut->setStatus(Invoice::STATUS_PENDING);
+        self::assertTrue($sut->isPending());
+        self::assertEquals(Invoice::STATUS_PENDING, $sut->getStatus());
+
+        $sut->setIsCanceled();
+        self::assertFalse($sut->isNew());
+        self::assertFalse($sut->isPending());
+        self::assertFalse($sut->isPaid());
+        self::assertFalse($sut->isOverdue());
+        self::assertTrue($sut->isCanceled());
+        self::assertEquals(Invoice::STATUS_CANCELED, $sut->getStatus());
 
         $sut->setIsNew();
         self::assertTrue($sut->isNew());
         self::assertFalse($sut->isPending());
         self::assertFalse($sut->isPaid());
         self::assertFalse($sut->isOverdue());
+        self::assertFalse($sut->isCanceled());
+        self::assertEquals(Invoice::STATUS_NEW, $sut->getStatus());
 
         $paymentDate = new \DateTime();
         $sut->setPaymentDate($paymentDate);
@@ -101,20 +131,22 @@ class InvoiceTest extends TestCase
         self::assertEquals(348.99, $sut->getTotal());
         self::assertNotNull($sut->getUser());
         self::assertEquals(19, $sut->getVat());
+
+        $sut->setComment('foo bar');
+        self::assertEquals('foo bar', $sut->getComment());
     }
 
     protected function getInvoiceModel(\DateTime $created): InvoiceModel
     {
         $user = new User();
-        $user->setUsername('one-user');
+        $user->setUserIdentifier('one-user');
         $user->setTitle('user title');
         $user->setAlias('genious alias');
         $user->setEmail('fantastic@four');
-        $user->addPreference((new UserPreference())->setName('kitty')->setValue('kat'));
-        $user->addPreference((new UserPreference())->setName('hello')->setValue('world'));
+        $user->addPreference(new UserPreference('kitty', 'kat'));
+        $user->addPreference(new UserPreference('hello', 'world'));
 
-        $customer = new Customer();
-        $customer->setName('customer,with/special#name');
+        $customer = new Customer('customer,with/special#name');
         $customer->setCurrency('USD');
         $customer->setMetaField((new CustomerMeta())->setName('foo-customer')->setValue('bar-customer')->setIsVisible(true));
         $customer->setVatId('kjuo8967');
@@ -154,15 +186,12 @@ class InvoiceTest extends TestCase
         $entries = [$timesheet];
 
         $query = new InvoiceQuery();
-        $query->setActivity($activity);
+        $query->addActivity($activity);
         $query->setBegin(new \DateTime());
         $query->setEnd(new \DateTime());
 
-        $model = new InvoiceModel(new DebugFormatter());
-        $model->setCustomer($customer);
-        $model->setTemplate($template);
+        $model = (new InvoiceModelFactoryFactory($this))->create()->createModel(new DebugFormatter(), $customer, $template, $query);
         $model->addEntries($entries);
-        $model->setQuery($query);
         $model->setUser($user);
         $model->setInvoiceDate($created);
 
@@ -188,5 +217,57 @@ class InvoiceTest extends TestCase
             ->willReturn(false);
 
         return new DateNumberGenerator($repository);
+    }
+
+    public function testClone(): void
+    {
+        $sut = new Invoice();
+        $sut->setComment('foo kajsdhgf aksjdhfg');
+        $sut->setFilename('1234567890');
+
+        $meta = new InvoiceMeta();
+        $meta->setName('blabla');
+        $meta->setValue('1234567890');
+        $meta->setIsVisible(false);
+        $meta->setIsRequired(true);
+        $sut->setMetaField($meta);
+
+        $clone = clone $sut;
+
+        foreach ($sut->getMetaFields() as $metaField) {
+            $cloneMeta = $clone->getMetaField($metaField->getName());
+            self::assertEquals($cloneMeta->getValue(), $metaField->getValue());
+        }
+        self::assertEquals('1234567890', $clone->getInvoiceFilename());
+        self::assertEquals('foo kajsdhgf aksjdhfg', $clone->getComment());
+    }
+
+    public function testMetaFields(): void
+    {
+        $sut = new Invoice();
+
+        $meta = new InvoiceMeta();
+        $meta->setName('foo')->setValue('bar2')->setType('test');
+        self::assertInstanceOf(Invoice::class, $sut->setMetaField($meta));
+        self::assertEquals(1, $sut->getMetaFields()->count());
+        $result = $sut->getMetaField('foo');
+        self::assertSame($result, $meta);
+        self::assertEquals('test', $result->getType());
+        self::assertEquals('bar2', $result->getValue());
+
+        $meta2 = new InvoiceMeta();
+        $meta2->setName('foo')->setValue('bar')->setType('test2');
+        self::assertInstanceOf(Invoice::class, $sut->setMetaField($meta2));
+        self::assertEquals(1, $sut->getMetaFields()->count());
+        self::assertCount(0, $sut->getVisibleMetaFields());
+
+        $result = $sut->getMetaField('foo');
+        self::assertSame($result, $meta);
+        self::assertEquals('test2', $result->getType());
+
+        $sut->setMetaField((new InvoiceMeta())->setName('blub')->setIsVisible(true));
+        $sut->setMetaField((new InvoiceMeta())->setName('blab')->setIsVisible(true));
+        self::assertEquals(3, $sut->getMetaFields()->count());
+        self::assertCount(2, $sut->getVisibleMetaFields());
     }
 }

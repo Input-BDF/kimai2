@@ -10,10 +10,12 @@
 namespace App\Tests\Export\Timesheet;
 
 use App\Export\Timesheet\PDFRenderer;
+use App\Pdf\HtmlToPdfConverter;
+use App\Pdf\MPdfConverter;
 use App\Project\ProjectStatisticService;
-use App\Utils\HtmlToPdfConverter;
-use App\Utils\MPdfConverter;
+use App\Tests\Mocks\FileHelperFactory;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Twig\Environment;
 
 /**
@@ -24,7 +26,7 @@ use Twig\Environment;
  */
 class PdfRendererTest extends AbstractRendererTest
 {
-    public function testConfiguration()
+    public function testConfiguration(): void
     {
         $sut = new PDFRenderer(
             $this->createMock(Environment::class),
@@ -33,16 +35,19 @@ class PdfRendererTest extends AbstractRendererTest
         );
 
         $this->assertEquals('pdf', $sut->getId());
+        $this->assertEquals('pdf', $sut->getTitle());
     }
 
-    public function testRender()
+    public function testRender(): void
     {
         $kernel = self::bootKernel();
         /** @var Environment $twig */
-        $twig = $kernel->getContainer()->get('twig');
-        $stack = $kernel->getContainer()->get('request_stack');
+        $twig = self::getContainer()->get('twig');
+        /** @var RequestStack $stack */
+        $stack = self::getContainer()->get('request_stack');
+        /** @var string $cacheDir */
         $cacheDir = $kernel->getContainer()->getParameter('kernel.cache_dir');
-        $converter = new MPdfConverter($cacheDir);
+        $converter = new MPdfConverter((new FileHelperFactory($this))->create(), $cacheDir);
         $request = new Request();
         $request->setLocale('en');
         $stack->push($request);
@@ -51,8 +56,9 @@ class PdfRendererTest extends AbstractRendererTest
 
         $response = $this->render($sut);
 
+        $prefix = date('Ymd');
         $this->assertEquals('application/pdf', $response->headers->get('Content-Type'));
-        $this->assertEquals('attachment; filename=kimai-export.pdf', $response->headers->get('Content-Disposition'));
+        $this->assertEquals('attachment; filename=' . $prefix . '-Customer_Name-project_name.pdf', $response->headers->get('Content-Disposition'));
 
         $this->assertNotEmpty($response->getContent());
     }

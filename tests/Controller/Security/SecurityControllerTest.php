@@ -9,7 +9,12 @@
 
 namespace App\Tests\Controller\Security;
 
+use App\Configuration\SamlConfiguration;
+use App\Configuration\SystemConfiguration;
 use App\Controller\Security\SecurityController;
+use App\DataFixtures\UserFixtures;
+use App\Entity\User;
+use App\Tests\Configuration\TestConfigLoader;
 use App\Tests\Controller\ControllerBaseTest;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
@@ -21,7 +26,7 @@ use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
  */
 class SecurityControllerTest extends ControllerBaseTest
 {
-    public function testRootUrlIsRedirectedToLogin()
+    public function testRootUrlIsRedirectedToLogin(): void
     {
         $client = self::createClient();
         $client->request('GET', '/');
@@ -31,7 +36,7 @@ class SecurityControllerTest extends ControllerBaseTest
         $this->assertIsRedirect($client, $this->createUrl('/login'));
     }
 
-    public function testLoginPageIsRendered()
+    public function testLoginPageIsRendered(): void
     {
         $client = self::createClient();
         $this->request($client, '/login');
@@ -41,17 +46,16 @@ class SecurityControllerTest extends ControllerBaseTest
 
         $content = $response->getContent();
         $this->assertStringContainsString('<title>Kimai – Time Tracking</title>', $content);
-        $this->assertStringContainsString('<form action="/en/login_check" method="post">', $content);
-        $this->assertStringContainsString('<input type="text" name="_username"', $content);
-        $this->assertStringContainsString('<input name="_password" type="password"', $content);
-        $this->assertStringContainsString('<input id="remember_me" name="_remember_me" type="checkbox"', $content);
-        $this->assertStringContainsString('">Login</button>', $content);
+        $this->assertStringContainsString('<form action="/en/login_check" method="post"', $content);
+        $this->assertStringContainsString('<input autocomplete="username" type="text" id="username" name="_username"', $content);
+        $this->assertStringContainsString('<input autocomplete="new-password" id="password" name="_password" type="password"', $content);
+        $this->assertStringContainsString('">Log in</button>', $content);
         $this->assertStringContainsString('<input type="hidden" name="_csrf_token" value="', $content);
         $this->assertStringNotContainsString('<a href="/en/register/"', $content);
         $this->assertStringNotContainsString('Register a new account', $content);
     }
 
-    public function testLoginPositive()
+    public function testLoginPositive(): void
     {
         $client = self::createClient();
         $this->request($client, '/login');
@@ -60,8 +64,8 @@ class SecurityControllerTest extends ControllerBaseTest
 
         $form = $client->getCrawler()->filter('body form')->form();
         $client->submit($form, [
-            '_username' => 'susan_super',
-            '_password' => 'kitten'
+            '_username' => UserFixtures::USERNAME_SUPER_ADMIN,
+            '_password' => UserFixtures::DEFAULT_PASSWORD
         ]);
 
         $this->assertIsRedirect($client); // redirect to root URL
@@ -76,7 +80,22 @@ class SecurityControllerTest extends ControllerBaseTest
         $this->assertTrue($client->getResponse()->isSuccessful());
     }
 
-    public function testLoginNegative()
+    public function testLoginAlreadyLoggedIn(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_TEAMLEAD);
+
+        $this->request($client, '/login');
+
+        $this->assertIsRedirect($client, '/homepage'); // redirect to homepage
+        $client->followRedirect();
+
+        $this->assertIsRedirect($client, '/timesheet/'); // redirect to configured start page
+        $client->followRedirect();
+
+        $this->assertTrue($client->getResponse()->isSuccessful());
+    }
+
+    public function testLoginNegative(): void
     {
         $client = self::createClient();
         $this->request($client, '/login');
@@ -93,28 +112,32 @@ class SecurityControllerTest extends ControllerBaseTest
         $client->followRedirect();
 
         $this->assertTrue($client->getResponse()->isSuccessful());
-        self::assertStringContainsString('<div class="alert alert-danger">Invalid credentials.</div>', $client->getResponse()->getContent());
+        self::assertStringContainsString('<div class="alert alert-important alert-danger">Invalid credentials.</div>', $client->getResponse()->getContent());
     }
 
-    public function testCheckAction()
+    public function testCheckAction(): void
     {
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('You must configure the check path to be handled by the firewall using form_login in your security firewall configuration.');
 
-        $client = self::createClient(); // just to bootstrap the container
+        self::createClient(); // just to bootstrap the container
         $csrf = $this->createMock(CsrfTokenManagerInterface::class);
-        $sut = new SecurityController($csrf);
+        $systemConfig = new SystemConfiguration(new TestConfigLoader([]), ['saml' => ['activate' => true]]);
+        $samlConfig = new SamlConfiguration($systemConfig);
+        $sut = new SecurityController($csrf, $samlConfig);
         $sut->checkAction();
     }
 
-    public function testLogoutAction()
+    public function testLogoutAction(): void
     {
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('You must activate the logout in your security firewall configuration.');
 
-        $client = self::createClient(); // just to bootstrap the container
+        self::createClient(); // just to bootstrap the container
         $csrf = $this->createMock(CsrfTokenManagerInterface::class);
-        $sut = new SecurityController($csrf);
+        $systemConfig = new SystemConfiguration(new TestConfigLoader([]), ['saml' => ['activate' => true]]);
+        $samlConfig = new SamlConfiguration($systemConfig);
+        $sut = new SecurityController($csrf, $samlConfig);
         $sut->logoutAction();
     }
 }

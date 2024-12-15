@@ -12,47 +12,38 @@ namespace App\Tests\Controller;
 use App\Entity\User;
 use App\Entity\UserPreference;
 use App\Form\Type\InitialViewType;
-use App\Form\Type\LanguageType;
 
 /**
  * @group integration
  */
 class HomepageControllerTest extends ControllerBaseTest
 {
-    public function testIsSecure()
+    public function testIsSecure(): void
     {
         $this->assertUrlIsSecured('/homepage');
     }
 
-    public function testIndexAction()
+    public function testIndexAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->request($client, '/homepage');
         $this->assertIsRedirect($client, '/en/timesheet/');
     }
 
-    public function testIndexActionWithChangedPreferences()
+    public function testIndexActionWithChangedPreferences(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
 
         $em = $this->getEntityManager();
         $user = $this->getUserByRole(User::ROLE_USER);
 
-        $pref = (new UserPreference())
-            ->setName('login.initial_view')
-            ->setValue('my_profile')
+        $pref = (new UserPreference('login_initial_view', 'my_profile'))
             ->setType(InitialViewType::class);
 
-        $user->addPreference($pref);
-
-        $pref = (new UserPreference())
-            ->setName('language')
-            ->setValue('ar')
-            ->setType(LanguageType::class);
-
-        $user->addPreference($pref);
-
         $em->persist($pref);
+        $user->addPreference($pref);
+        $user->setLanguage('ar');
+        $em->flush();
 
         $this->request($client, '/homepage');
         $this->assertIsRedirect($client, '/ar/profile/');

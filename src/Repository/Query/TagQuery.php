@@ -11,12 +11,15 @@ namespace App\Repository\Query;
 
 class TagQuery extends BaseQuery
 {
-    public const TAG_ORDER_ALLOWED = ['id', 'name', 'amount'];
+    use VisibilityTrait;
+
+    public const TAG_ORDER_ALLOWED = ['name', 'amount'];
 
     public function __construct()
     {
         $this->setDefaults([
             'orderBy' => 'name',
+            'visibility' => VisibilityInterface::SHOW_VISIBLE,
         ]);
     }
 }

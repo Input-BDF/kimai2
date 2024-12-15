@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
  */
 class CustomerRateTest extends TestCase
 {
-    public function testDefaultValues()
+    public function testDefaultValues(): void
     {
         $sut = new CustomerRate();
         self::assertNull($sut->getId());
@@ -32,7 +32,7 @@ class CustomerRateTest extends TestCase
         self::assertFalse($sut->isFixed());
     }
 
-    public function testSetterAndGetter()
+    public function testSetterAndGetter(): void
     {
         $sut = new CustomerRate();
 
@@ -49,14 +49,13 @@ class CustomerRateTest extends TestCase
 
         $user = new User();
         $user->setAlias('foo');
-        $user->setUsername('bar');
+        $user->setUserIdentifier('bar');
         self::assertInstanceOf(CustomerRate::class, $sut->setUser($user));
         self::assertSame($user, $sut->getUser());
         $sut->setUser(null);
         self::assertNull($sut->getUser());
 
-        $entity = new Customer();
-        $entity->setName('foo');
+        $entity = new Customer('foo');
         self::assertInstanceOf(CustomerRate::class, $sut->setCustomer($entity));
         self::assertSame($entity, $sut->getCustomer());
     }

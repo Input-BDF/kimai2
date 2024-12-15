@@ -9,35 +9,36 @@
 
 namespace App\Tests\Widget\Type;
 
-use App\Widget\Type\AbstractWidgetType;
-use App\Widget\Type\More;
-use App\Widget\Type\SimpleWidget;
-
 /**
- * @covers \App\Widget\Type\More
- * @covers \App\Widget\Type\SimpleWidget
+ * @covers \App\Tests\Widget\Type\More
  */
 class MoreTest extends AbstractWidgetTypeTest
 {
-    public function createSut(): AbstractWidgetType
+    public function createSut(): More
     {
         return new More();
     }
 
     public function getDefaultOptions(): array
     {
-        return ['dataType' => 'int'];
+        return [];
     }
 
-    public function testExtendsSimpleWidget()
-    {
-        $sut = $this->createSut();
-        self::assertInstanceOf(SimpleWidget::class, $sut);
-    }
-
-    public function testTemplateName()
+    public function testTemplateName(): void
     {
         $sut = new More();
         self::assertEquals('widget/widget-more.html.twig', $sut->getTemplateName());
+    }
+
+    public function testData(): void
+    {
+        $sut = $this->createSut();
+
+        $sut->setData('slkudfhalksjdhfkljsahdf');
+        self::assertEquals('slkudfhalksjdhfkljsahdf', $sut->getData());
+
+        $data = new \stdClass();
+        $sut->setData($data);
+        self::assertSame($data, $sut->getData());
     }
 }

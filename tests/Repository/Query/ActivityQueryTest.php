@@ -10,7 +10,6 @@
 namespace App\Tests\Repository\Query;
 
 use App\Repository\Query\ActivityQuery;
-use App\Repository\Query\VisibilityInterface;
 
 /**
  * @covers \App\Repository\Query\ActivityQuery
@@ -18,16 +17,13 @@ use App\Repository\Query\VisibilityInterface;
  */
 class ActivityQueryTest extends BaseQueryTest
 {
-    public function testQuery()
+    public function testQuery(): void
     {
         $sut = new ActivityQuery();
 
         $this->assertBaseQuery($sut, 'name');
-        $this->assertInstanceOf(VisibilityInterface::class, $sut);
-
         $this->assertCustomer($sut);
         $this->assertProject($sut);
-
         $this->assertResetByFormError(new ActivityQuery(), 'name');
     }
 }

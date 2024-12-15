@@ -10,23 +10,37 @@
 namespace App\Form\Type;
 
 use App\Entity\Customer;
+use App\Form\Helper\CustomerHelper;
 use App\Repository\CustomerRepository;
 use App\Repository\Query\CustomerFormTypeQuery;
 use App\Repository\Query\ProjectQuery;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\FormInterface;
+use Symfony\Component\Form\FormView;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Custom form field type to select a customer.
  */
-class CustomerType extends AbstractType
+final class CustomerType extends AbstractType
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function __construct(private CustomerHelper $customerHelper)
+    {
+    }
+
+    public function getChoiceLabel(Customer $customer): string
+    {
+        return $this->customerHelper->getChoiceLabel($customer);
+    }
+
+    public function getChoiceAttributes(Customer $customer, $key, $value): array
+    {
+        return ['data-currency' => $customer->getCurrency()];
+    }
+
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             // documentation is for NelmioApiDocBundle
@@ -34,23 +48,38 @@ class CustomerType extends AbstractType
                 'type' => 'integer',
                 'description' => 'Customer ID',
             ],
-            'label' => 'label.customer',
+            'label' => 'customer',
             'class' => Customer::class,
-            'choice_label' => 'name',
+            'choice_label' => [$this, 'getChoiceLabel'],
+            'choice_attr' => [$this, 'getChoiceAttributes'],
             'query_builder_for_user' => true,
             'project_enabled' => false,
             'project_select' => 'project',
-            'start_date_param' => '%begin%',
-            'end_date_param' => '%end%',
+            'start_date_param' => '%begin_date%',
+            'end_date_param' => '%end_date%',
             'ignore_date' => false,
             'project_visibility' => ProjectQuery::SHOW_VISIBLE,
+            // @var Customer|null
+            'ignore_customer' => null,
+            // @var Customer|Customer[]|null
+            'customers' => null,
+            'pre_select_customer' => false,
         ]);
 
         $resolver->setDefault('query_builder', function (Options $options) {
             return function (CustomerRepository $repo) use ($options) {
-                $query = new CustomerFormTypeQuery();
+                $query = new CustomerFormTypeQuery($options['customers']);
+
+                if (true === $options['pre_select_customer']) {
+                    $query->setAllowCustomerPreselect(true);
+                }
+
                 if (true === $options['query_builder_for_user']) {
                     $query->setUser($options['user']);
+                }
+
+                if (null !== $options['ignore_customer']) {
+                    $query->setCustomerToIgnore($options['ignore_customer']);
                 }
 
                 return $repo->getQueryBuilderForFormType($query);
@@ -79,6 +108,7 @@ class CustomerType extends AbstractType
                 }
 
                 return [
+                    'reload' => 'get_customers',
                     'select' => $options['project_select'],
                     'route' => 'get_projects',
                     'route_params' => $routeParams,
@@ -90,10 +120,14 @@ class CustomerType extends AbstractType
         });
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getParent()
+    public function buildView(FormView $view, FormInterface $form, array $options): void
+    {
+        $view->vars['attr'] = array_merge($view->vars['attr'], [
+            'data-option-pattern' => $this->customerHelper->getChoicePattern(),
+        ]);
+    }
+
+    public function getParent(): string
     {
         return EntityType::class;
     }

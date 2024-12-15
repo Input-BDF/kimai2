@@ -10,6 +10,7 @@
 namespace App\Tests\Command;
 
 use App\Command\InstallCommand;
+use Doctrine\Bundle\DoctrineBundle\Registry;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -19,24 +20,23 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  */
 class InstallCommandTest extends KernelTestCase
 {
-    /**
-     * @var Application
-     */
-    protected $application;
+    private Application $application;
 
     protected function setUp(): void
     {
+        parent::setUp();
         $kernel = self::bootKernel();
         $this->application = new Application($kernel);
         $container = self::$kernel->getContainer();
+        /** @var Registry $doctrine */
+        $doctrine = $container->get('doctrine');
 
         $this->application->add(new InstallCommand(
-            $container->getParameter('kernel.project_dir'),
-            $container->get('doctrine')->getConnection()
+            $doctrine->getConnection() // @phpstan-ignore argument.type
         ));
     }
 
-    public function testCommandName()
+    public function testCommandName(): void
     {
         $command = $this->application->find('kimai:install');
         self::assertInstanceOf(InstallCommand::class, $command);

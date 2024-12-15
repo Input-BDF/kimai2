@@ -9,54 +9,54 @@
 
 namespace App\Tests\Widget\Type;
 
-use App\Configuration\SystemConfiguration;
+use App\Entity\User;
 use App\Repository\TimesheetRepository;
+use App\Tests\Mocks\SystemConfigurationFactory;
+use App\Widget\Type\AbstractCounterYear;
 use App\Widget\Type\AbstractWidgetType;
-use App\Widget\Type\CounterYear;
-use App\Widget\Type\SimpleStatisticChart;
 use App\Widget\Type\UserAmountYear;
+use App\Widget\WidgetInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * @covers \App\Widget\Type\UserAmountYear
- * @covers \App\Widget\Type\CounterYear
+ * @covers \App\Widget\Type\AbstractCounterYear
  */
 class UserAmountYearTest extends AbstractWidgetTypeTest
 {
+    protected function assertDefaultData(AbstractWidgetType $sut): void
+    {
+        self::assertEquals([], $sut->getData());
+    }
+
     /**
-     * @return CounterYear
+     * @return AbstractCounterYear
      */
     public function createSut(): AbstractWidgetType
     {
         $repository = $this->createMock(TimesheetRepository::class);
-        $configuration = $this->createMock(SystemConfiguration::class);
+        $configuration = SystemConfigurationFactory::createStub();
+        $dispatcher = $this->createMock(EventDispatcherInterface::class);
 
-        return new UserAmountYear($repository, $configuration);
+        $widget = new UserAmountYear($repository, $configuration, $dispatcher);
+        $widget->setUser(new User());
+
+        return $widget;
     }
 
     public function getDefaultOptions(): array
     {
         return [
-            'dataType' => 'money',
             'icon' => 'money',
-            'color' => 'yellow',
+            'color' => WidgetInterface::COLOR_YEAR,
         ];
     }
 
-    public function testData()
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cannot set data on instances of SimpleStatisticChart');
-
-        $sut = $this->createSut();
-        self::assertInstanceOf(SimpleStatisticChart::class, $sut);
-        $sut->setData(10);
-    }
-
-    public function testSettings()
+    public function testSettings(): void
     {
         $sut = $this->createSut();
 
-        self::assertEquals('widget/widget-counter.html.twig', $sut->getTemplateName());
-        self::assertEquals('userAmountYear', $sut->getId());
+        self::assertEquals('widget/widget-counter-money.html.twig', $sut->getTemplateName());
+        self::assertEquals('UserAmountYear', $sut->getId());
     }
 }

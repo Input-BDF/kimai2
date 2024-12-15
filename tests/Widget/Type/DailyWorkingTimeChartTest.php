@@ -9,25 +9,19 @@
 
 namespace App\Tests\Widget\Type;
 
-use App\Entity\Activity;
-use App\Entity\Project;
 use App\Entity\User;
-use App\Model\Statistic\Day;
 use App\Repository\TimesheetRepository;
-use App\Widget\Type\AbstractWidgetType;
 use App\Widget\Type\DailyWorkingTimeChart;
-use App\Widget\Type\SimpleWidget;
 use PHPUnit\Framework\TestCase;
 
 /**
  * @covers \App\Widget\Type\DailyWorkingTimeChart
- * @covers \App\Widget\Type\SimpleWidget
  * @covers \App\Widget\Type\AbstractWidgetType
  * @covers \App\Repository\TimesheetRepository
  */
 class DailyWorkingTimeChartTest extends TestCase
 {
-    public function createSut(): AbstractWidgetType
+    public function createSut(): DailyWorkingTimeChart
     {
         $repository = $this->createMock(TimesheetRepository::class);
 
@@ -37,114 +31,33 @@ class DailyWorkingTimeChartTest extends TestCase
         return $sut;
     }
 
-    public function testExtendsSimpleWidget()
+    public function testDefaultValues(): void
     {
         $sut = $this->createSut();
-        self::assertInstanceOf(SimpleWidget::class, $sut);
-    }
-
-    public function testDefaultValues()
-    {
-        $sut = $this->createSut();
-        self::assertInstanceOf(AbstractWidgetType::class, $sut);
         self::assertEquals('DailyWorkingTimeChart', $sut->getId());
         self::assertEquals('stats.yourWorkingHours', $sut->getTitle());
-        self::assertNull($sut->getOption('begin', 'xxx'));
-        self::assertNull($sut->getOption('end', 'xxx'));
-        self::assertEquals('', $sut->getOption('color', 'xxx'));
-        self::assertInstanceOf(User::class, $sut->getOption('user', 'xxx'));
-        self::assertEquals('bar', $sut->getOption('type', 'xxx'));
+        $options = $sut->getOptions();
+        self::assertNull($options['begin']);
+        self::assertNull($options['end']);
+        self::assertEquals('', $options['color']);
     }
 
-    public function testFluentInterface()
-    {
-        $sut = $this->createSut();
-        self::assertInstanceOf(AbstractWidgetType::class, $sut->setOptions([]));
-        self::assertInstanceOf(AbstractWidgetType::class, $sut->setId(''));
-        self::assertInstanceOf(AbstractWidgetType::class, $sut->setTitle(''));
-        self::assertInstanceOf(AbstractWidgetType::class, $sut->setData(''));
-    }
-
-    public function testSetter()
+    public function testSetter(): void
     {
         $sut = $this->createSut();
 
         // options
         $sut->setOption('föööö', 'trääääää');
-        self::assertEquals('trääääää', $sut->getOption('föööö', 'tröööö'));
-
-        // check default values
-        self::assertEquals('xxxxx', $sut->getOption('blub', 'xxxxx'));
-        self::assertEquals('xxxxx', $sut->getOption('dataType', 'xxxxx'));
-
-        $sut->setOptions(['blub' => 'blab', 'dataType' => 'money']);
-        // check option still exists
-        self::assertEquals('trääääää', $sut->getOption('föööö', 'tröööö'));
-        // check options are now existing
-        self::assertEquals('blab', $sut->getOption('blub', 'xxxxx'));
-        self::assertEquals('money', $sut->getOption('dataType', 'xxxxx'));
-
-        // id
-        $sut->setId('cvbnmyx');
-        self::assertEquals('cvbnmyx', $sut->getId());
+        self::assertEquals('trääääää', $sut->getOptions()['föööö']);
     }
 
-    public function testGetOptions()
+    public function testGetOptions(): void
     {
         $sut = $this->createSut();
 
         $options = $sut->getOptions(['type' => 'xxx']);
+        self::assertIsString($options['id']);
         self::assertStringStartsWith('DailyWorkingTimeChart_', $options['id']);
-        self::assertEquals('bar', $options['type']);
-    }
-
-    public function testGetData()
-    {
-        $activity = $this->createMock(Activity::class);
-        $activity->method('getId')->willReturn(42);
-
-        $project = $this->createMock(Project::class);
-        $project->method('getId')->willReturn(4711);
-
-        $repository = $this->getMockBuilder(TimesheetRepository::class)->disableOriginalConstructor()->onlyMethods(['getDailyData'])->getMock();
-        $repository->expects($this->once())->method('getDailyData')->willReturnCallback(function ($begin, $end, $user) use ($activity, $project) {
-            return [
-                [
-                    'year' => $begin->format('Y'),
-                    'month' => $begin->format('n'),
-                    'day' => $begin->format('j'),
-                    'rate' => 13.75,
-                    'duration' => 1234,
-                    'billable' => 1234,
-                    'details' => [
-                        [
-                            'activity' => $activity,
-                            'project' => $project,
-                            'billable' => 1234,
-                        ]
-                    ]
-                ]
-            ];
-        });
-
-        $sut = new DailyWorkingTimeChart($repository);
-        $sut->setUser(new User());
-        $data = $sut->getData([]);
-        self::assertCount(2, $data);
-        self::assertArrayHasKey('activities', $data);
-        self::assertArrayHasKey('data', $data);
-
-        self::assertCount(1, $data['activities']);
-        self::assertArrayHasKey('4711_42', $data['activities']);
-        self::assertCount(2, $data['activities']['4711_42']);
-        self::assertArrayHasKey('activity', $data['activities']['4711_42']);
-        self::assertArrayHasKey('project', $data['activities']['4711_42']);
-        self::assertSame($activity, $data['activities']['4711_42']['activity']);
-        self::assertSame($project, $data['activities']['4711_42']['project']);
-
-        self::assertCount(7, $data['data']);
-        foreach ($data['data'] as $statObj) {
-            self::assertInstanceOf(Day::class, $statObj);
-        }
+        self::assertEquals('xxx', $options['type']);
     }
 }

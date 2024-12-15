@@ -18,6 +18,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 /**
  * A voter to check permissions on Projects.
+ *
+ * @extends Voter<string, Project>
  */
 final class ProjectVoter extends Voter
 {
@@ -28,45 +30,33 @@ final class ProjectVoter extends Voter
         'view',
         'edit',
         'budget',
+        'time',
         'delete',
         'permissions',
         'comments',
-        'comments_create',
         'details',
     ];
 
-    private $permissionManager;
-
-    public function __construct(RolePermissionManager $permissionManager)
+    public function __construct(private readonly RolePermissionManager $permissionManager)
     {
-        $this->permissionManager = $permissionManager;
     }
 
-    /**
-     * @param string $attribute
-     * @param Project $subject
-     * @return bool
-     */
-    protected function supports($attribute, $subject)
+    public function supportsAttribute(string $attribute): bool
     {
-        if (!($subject instanceof Project)) {
-            return false;
-        }
-
-        if (!\in_array($attribute, self::ALLOWED_ATTRIBUTES)) {
-            return false;
-        }
-
-        return true;
+        return \in_array($attribute, self::ALLOWED_ATTRIBUTES, true);
     }
 
-    /**
-     * @param string $attribute
-     * @param Project $subject
-     * @param TokenInterface $token
-     * @return bool
-     */
-    protected function voteOnAttribute($attribute, $subject, TokenInterface $token)
+    public function supportsType(string $subjectType): bool
+    {
+        return str_contains($subjectType, Project::class);
+    }
+
+    protected function supports(string $attribute, mixed $subject): bool
+    {
+        return $subject instanceof Project && $this->supportsAttribute($attribute);
+    }
+
+    protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token): bool
     {
         $user = $token->getUser();
 
@@ -79,7 +69,7 @@ final class ProjectVoter extends Voter
         }
 
         // those cannot be assigned to teams
-        if (\in_array($attribute, ['create', 'delete'])) {
+        if (\in_array($attribute, ['create', 'delete'], true)) {
             return false;
         }
 

@@ -19,7 +19,7 @@ use PHPUnit\Framework\TestCase;
  */
 class MonthlyStatisticTest extends TestCase
 {
-    public function testStatistic()
+    public function testStatistic(): void
     {
         $begin = new \DateTime('2017-04-07 12:00:00');
         $end = new \DateTime('2019-11-13 18:00:00');
@@ -104,5 +104,10 @@ class MonthlyStatisticTest extends TestCase
         self::assertNull($sut->getMonth('2019', '12'));
         self::assertNull($sut->getMonth('2020', '1'));
         self::assertNull($sut->getMonth('2020', '01'));
+        self::assertNull($sut->getMonthByDateTime(new \DateTime('2020-01-01')));
+        self::assertInstanceOf(StatisticDate::class, $sut->getMonthByDateTime(new \DateTime('2018-04-01')));
+        self::assertInstanceOf(StatisticDate::class, $sut->getByDateTime(new \DateTime('2018-04-01')));
+
+        self::assertSame($sut->getMonths(), $sut->getData());
     }
 }

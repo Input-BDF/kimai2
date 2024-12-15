@@ -31,52 +31,27 @@ use App\Timesheet\TrackingMode\TrackingModeInterface;
 use App\Validator\ValidationException;
 use App\Validator\ValidationFailedException;
 use InvalidArgumentException;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
+use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 final class TimesheetService
 {
     /**
-     * @var TimesheetRepository
+     * @var array<string>
      */
-    private $repository;
-    /**
-     * @var SystemConfiguration
-     */
-    private $configuration;
-    /**
-     * @var TrackingModeService
-     */
-    private $trackingModeService;
-    /**
-     * @var EventDispatcherInterface
-     */
-    private $dispatcher;
-    /**
-     * @var AuthorizationCheckerInterface
-     */
-    private $auth;
-    /**
-     * @var ValidatorInterface
-     */
-    private $validator;
+    private array $doNotValidateCodes = [];
 
     public function __construct(
-        SystemConfiguration $configuration,
-        TimesheetRepository $repository,
-        TrackingModeService $service,
-        EventDispatcherInterface $dispatcher,
-        AuthorizationCheckerInterface $security,
-        ValidatorInterface $validator
+        private SystemConfiguration $configuration,
+        private TimesheetRepository $repository,
+        private TrackingModeService $trackingModeService,
+        private EventDispatcherInterface $dispatcher,
+        private AuthorizationCheckerInterface $auth,
+        private ValidatorInterface $validator
     ) {
-        $this->configuration = $configuration;
-        $this->repository = $repository;
-        $this->trackingModeService = $service;
-        $this->dispatcher = $dispatcher;
-        $this->auth = $security;
-        $this->validator = $validator;
     }
 
     /**
@@ -110,12 +85,15 @@ final class TimesheetService
         $mode = $this->trackingModeService->getActiveMode();
         $mode->create($timesheet, $request);
 
+        $timesheet->setBillableMode(Timesheet::BILLABLE_AUTOMATIC);
+
         return $timesheet;
     }
 
     /**
      * @param Timesheet $timesheet
      * @param Timesheet $copyFrom
+     * @return Timesheet
      * @throws ValidationFailedException for invalid timesheets or running timesheets that should be stopped
      * @throws InvalidArgumentException for already persisted timesheets
      * @throws AccessDeniedException if user is not allowed to start timesheet
@@ -130,8 +108,6 @@ final class TimesheetService
     }
 
     /**
-     * @param Timesheet $timesheet
-     * @return Timesheet
      * @throws ValidationFailedException for invalid timesheets or running timesheets that should be stopped
      * @throws InvalidArgumentException for already persisted timesheets
      * @throws AccessDeniedException if user is not allowed to start timesheet
@@ -155,13 +131,16 @@ final class TimesheetService
             $this->repository->save($timesheet);
             $this->dispatcher->dispatch(new TimesheetCreatePostEvent($timesheet));
 
-            // TODO really stop always or only if $timesheet->getEnd() === null
-            try {
-                $this->stopActiveEntries($timesheet);
-            } catch (ValidationFailedException $vex) {
-                // could happen for timesheets that were started in the future (end before begin)
-                throw new ValidationFailedException($vex->getViolations(), 'Cannot stop running timesheet');
+            if ($timesheet->isRunning()) {
+                try {
+                    $this->stopActiveEntries($timesheet);
+                } catch (ValidationFailedException $vex) {
+                    // could happen for timesheets that were started in the future (end before begin)
+                    // or if you try to create a new timesheet while an old one is running for too long
+                    throw new ValidationFailedException($vex->getViolations(), 'Cannot stop running timesheet');
+                }
             }
+
             $this->repository->commit();
         } catch (\Exception $ex) {
             $this->repository->rollback();
@@ -180,16 +159,6 @@ final class TimesheetService
      */
     public function updateTimesheet(Timesheet $timesheet): Timesheet
     {
-        // FIXME stop active entries upon update
-        // there is at least one edge case which leads to a problem:
-        // if you do not allow overlapping entries, you cannot restart a timesheet by removing the
-        // end date if another timesheet is running, because the check for existing timesheets will always trigger
-        /*
-        if ($timesheet->getEnd() === null) {
-            $this->stopActiveEntries($timesheet);
-        }
-        */
-
         $this->fixTimezone($timesheet);
 
         $this->dispatcher->dispatch(new TimesheetUpdatePreEvent($timesheet));
@@ -220,13 +189,18 @@ final class TimesheetService
      * But also to check that all required data is set.
      *
      * @param Timesheet $timesheet
+     * @param bool $validate
      * @throws ValidationException for already stopped timesheets
      * @throws ValidationFailedException
      */
-    public function stopTimesheet(Timesheet $timesheet): void
+    public function stopTimesheet(Timesheet $timesheet, bool $validate = true): void
     {
         if (null !== $timesheet->getEnd()) {
-            throw new ValidationException('Timesheet entry already stopped');
+            // timesheet already stopped, nothing to do. in previous version, this method did throw a:
+            // new ValidationException('Timesheet entry already stopped');
+            // but this was removed, because it can happen in the frontend when using multiple tabs/devices and should
+            // simply be ignored - showing the message to the user with a "danger status" is not necessary
+            return;
         }
 
         $begin = clone $timesheet->getBegin();
@@ -235,7 +209,9 @@ final class TimesheetService
         $timesheet->setBegin($begin);
         $timesheet->setEnd($now);
 
-        $this->validateTimesheet($timesheet);
+        if ($validate) {
+            $this->validateTimesheet($timesheet);
+        }
 
         $this->dispatcher->dispatch(new TimesheetStopPreEvent($timesheet));
         $this->repository->save($timesheet);
@@ -255,17 +231,31 @@ final class TimesheetService
     }
 
     /**
-     * @param Timesheet $timesheet
      * @param string[] $groups
      * @throws ValidationFailedException
      */
-    private function validateTimesheet(Timesheet $timesheet, array $groups = []): void
+    public function validateTimesheet(Timesheet $timesheet, array $groups = []): void
     {
         $errors = $this->validator->validate($timesheet, null, $groups);
 
         if ($errors->count() > 0) {
-            throw new ValidationFailedException($errors, 'Validation Failed');
+            /** @var ConstraintViolation $error */
+            foreach ($errors as $error) {
+                if (\in_array($error->getCode(), $this->doNotValidateCodes, true)) {
+                    continue;
+                }
+
+                throw new ValidationFailedException($errors, 'Validation Failed');
+            }
         }
+    }
+
+    /**
+     * @param array<string> $validationCodes
+     */
+    public function setIgnoreValidationCodes(array $validationCodes): void
+    {
+        $this->doNotValidateCodes = $validationCodes;
     }
 
     /**
@@ -320,5 +310,18 @@ final class TimesheetService
     public function getActiveTrackingMode(): TrackingModeInterface
     {
         return $this->trackingModeService->getActiveMode();
+    }
+
+    public function stopAll(): int
+    {
+        $activeEntries = $this->repository->getActiveEntries();
+        $counter = 0;
+
+        foreach ($activeEntries as $timesheet) {
+            $this->stopTimesheet($timesheet, false);
+            $counter++;
+        }
+
+        return $counter;
     }
 }

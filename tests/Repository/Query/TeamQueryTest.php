@@ -17,19 +17,16 @@ use App\Repository\Query\TeamQuery;
  */
 class TeamQueryTest extends BaseQueryTest
 {
-    public function testQuery()
+    public function testQuery(): void
     {
         $sut = new TeamQuery();
 
         $this->assertBaseQuery($sut, 'name');
-        $this->assertInstanceOf(TeamQuery::class, $sut);
-
         $this->assertUsers($sut);
-
         $this->assertResetByFormError(new TeamQuery(), 'name');
     }
 
-    protected function assertUsers(TeamQuery $sut)
+    public function assertUsers(TeamQuery $sut): void
     {
         $this->assertEmpty($sut->getUsers());
 

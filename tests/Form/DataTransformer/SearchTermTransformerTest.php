@@ -18,14 +18,14 @@ use PHPUnit\Framework\TestCase;
  */
 class SearchTermTransformerTest extends TestCase
 {
-    public function testTransform()
+    public function testTransform(): void
     {
         $sut = new SearchTermTransformer();
 
-        /* @phpstan-ignore-next-line */
+        /* @phpstan-ignore argument.type */
         self::assertEquals('', $sut->transform(''));
         self::assertEquals('', $sut->transform(null));
-        /* @phpstan-ignore-next-line */
+        /* @phpstan-ignore argument.type */
         self::assertEquals('', $sut->transform(new \stdClass()));
 
         self::assertEquals(
@@ -34,7 +34,7 @@ class SearchTermTransformerTest extends TestCase
         );
     }
 
-    public function testReverseTransform()
+    public function testReverseTransform(): void
     {
         $sut = new SearchTermTransformer();
 

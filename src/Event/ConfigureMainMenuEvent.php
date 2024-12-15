@@ -9,9 +9,7 @@
 
 namespace App\Event;
 
-use KevinPapst\AdminLTEBundle\Event\SidebarMenuEvent;
-use KevinPapst\AdminLTEBundle\Model\MenuItemModel;
-use Symfony\Component\HttpFoundation\Request;
+use App\Utils\MenuItemModel;
 use Symfony\Contracts\EventDispatcher\Event;
 
 /**
@@ -19,70 +17,74 @@ use Symfony\Contracts\EventDispatcher\Event;
  */
 final class ConfigureMainMenuEvent extends Event
 {
-    /**
-     * @deprecated since 1.4, will be removed with 2.0
-     */
-    public const CONFIGURE = ConfigureMainMenuEvent::class;
+    private MenuItemModel $menu;
+    private MenuItemModel $apps;
+    private MenuItemModel $admin;
+    private MenuItemModel $system;
 
-    /**
-     * @var Request
-     */
-    private $request;
-    /**
-     * @var SidebarMenuEvent
-     */
-    private $event;
-    /**
-     * @var MenuItemModel
-     */
-    private $admin;
-    /**
-     * @var MenuItemModel
-     */
-    private $system;
-
-    /**
-     * @param Request $request
-     * @param SidebarMenuEvent $event
-     * @param MenuItemModel $admin
-     * @param MenuItemModel $system
-     */
-    public function __construct(Request $request, SidebarMenuEvent $event, MenuItemModel $admin, MenuItemModel $system)
+    public function __construct()
     {
-        $this->request = $request;
-        $this->event = $event;
-        $this->admin = $admin;
-        $this->system = $system;
+        $this->menu = new MenuItemModel('main', 'menu.root');
+        $this->apps = new MenuItemModel('apps', 'menu.apps', '', [], 'applications');
+        $this->admin = new MenuItemModel('admin', 'menu.admin', '', [], 'administration');
+        $this->system = new MenuItemModel('system', 'menu.system', '', [], 'configuration');
+    }
+
+    public function findById(string $identifier): ?MenuItemModel
+    {
+        if (($tmp = $this->menu->findChild($identifier)) !== null) {
+            return $tmp;
+        }
+
+        if (($tmp = $this->apps->findChild($identifier)) !== null) {
+            return $tmp;
+        }
+
+        if (($tmp = $this->admin->findChild($identifier)) !== null) {
+            return $tmp;
+        }
+
+        if (($tmp = $this->system->findChild($identifier)) !== null) {
+            return $tmp;
+        }
+
+        return null;
+    }
+
+    public function getMenu(): MenuItemModel
+    {
+        return $this->menu;
+    }
+
+    public function getTimesheetMenu(): ?MenuItemModel
+    {
+        return $this->menu->getChild('times');
+    }
+
+    public function getInvoiceMenu(): ?MenuItemModel
+    {
+        return $this->menu->getChild('invoices');
+    }
+
+    public function getReportingMenu(): ?MenuItemModel
+    {
+        return $this->menu->getChild('reporting');
     }
 
     /**
-     * @return Request
+     * @deprecated since 2.22 - use getMenu() or getAdminMenu() instead
      */
-    public function getRequest()
+    public function getAppsMenu(): MenuItemModel
     {
-        return $this->request;
+        return $this->apps;
     }
 
-    /**
-     * @return SidebarMenuEvent
-     */
-    public function getMenu()
-    {
-        return $this->event;
-    }
-
-    /**
-     * @return MenuItemModel
-     */
-    public function getAdminMenu()
+    public function getAdminMenu(): MenuItemModel
     {
         return $this->admin;
     }
 
-    /**
-     * @return MenuItemModel
-     */
-    public function getSystemMenu()
+    public function getSystemMenu(): MenuItemModel
     {
         return $this->system;
     }

@@ -9,12 +9,10 @@
 
 namespace App\Invoice\Renderer;
 
-use App\Entity\InvoiceDocument;
 use App\Invoice\InvoiceModel;
 use App\Invoice\RendererInterface;
-use App\Twig\LocaleFormatExtensions;
-use Symfony\Bridge\Twig\Extension\TranslationExtension;
-use Symfony\Contracts\Translation\LocaleAwareInterface;
+use App\Model\InvoiceDocument;
+use App\Twig\TwigRendererTrait;
 use Twig\Environment;
 
 /**
@@ -22,48 +20,31 @@ use Twig\Environment;
  */
 abstract class AbstractTwigRenderer implements RendererInterface
 {
-    /**
-     * @var Environment
-     */
-    private $twig;
+    use TwigRendererTrait;
 
-    public function __construct(Environment $twig)
+    public function __construct(private Environment $twig)
     {
-        $this->twig = $twig;
     }
 
-    protected function renderTwigTemplate(InvoiceDocument $document, InvoiceModel $model): string
+    protected function renderTwigTemplate(InvoiceDocument $document, InvoiceModel $model, array $options = []): string
     {
-        $previousLocale = $this->changeTwigLocale($this->twig, $model->getTemplate()->getLanguage());
-
-        $content = $this->twig->render('@invoice/' . basename($document->getFilename()), [
-            'model' => $model
-        ]);
-
-        $this->changeTwigLocale($this->twig, $previousLocale);
-
-        return $content;
-    }
-
-    private function changeTwigLocale(Environment $twig, ?string $locale = null): ?string
-    {
-        // for invoices that don't have a language configured (using request locale)
-        if (null === $locale) {
-            return null;
+        $language = $model->getTemplate()->getLanguage();
+        $formatLocale = $model->getFormatter()->getLocale();
+        $template = '@invoice/' . basename($document->getFilename());
+        $entries = [];
+        foreach ($model->getCalculator()->getEntries() as $entry) {
+            $entries[] = $model->itemToArray($entry);
         }
 
-        /** @var TranslationExtension $extension */
-        $extension = $twig->getExtension(TranslationExtension::class);
-        /** @var LocaleAwareInterface $translator */
-        $translator = $extension->getTranslator();
-        $previousLocale = $translator->getLocale();
+        $options = array_merge([
+            // model should not be used in the future, but we can likely not remove it
+            'model' => $model,
+            // new since 1.16.7 - templates should only use the pre-generated values
+            'invoice' => $model->toArray(),
+            // new since 1.19.5 - templates should only use the pre-generated values
+            'entries' => $entries
+        ], $options);
 
-        $translator->setLocale($locale);
-
-        /** @var LocaleFormatExtensions $extension */
-        $extension = $twig->getExtension(LocaleFormatExtensions::class);
-        $extension->setLocale($locale);
-
-        return $previousLocale;
+        return $this->renderTwigTemplateWithLanguage($this->twig, $template, $options, $language, $formatLocale);
     }
 }

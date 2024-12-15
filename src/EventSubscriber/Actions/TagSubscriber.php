@@ -12,7 +12,7 @@ namespace App\EventSubscriber\Actions;
 use App\Entity\Tag;
 use App\Event\PageActionsEvent;
 
-class TagSubscriber extends AbstractActionsSubscriber
+final class TagSubscriber extends AbstractActionsSubscriber
 {
     public static function getActionName(): string
     {
@@ -42,18 +42,17 @@ class TagSubscriber extends AbstractActionsSubscriber
         }
 
         if ($this->isGranted('manage_tag')) {
-            $class = ($event->isView('edit') ? '' : 'modal-ajax-form');
-            $event->addAction('edit', ['url' => $this->path('tags_edit', ['id' => $id]), 'class' => $class]);
+            $event->addEdit($this->path('tags_edit', ['id' => $id]));
         }
 
         if ($this->isGranted('view_other_timesheet')) {
-            $event->addActionToSubmenu('filter', 'timesheet', ['title' => 'timesheet', 'translation_domain' => 'actions', 'url' => $this->path('admin_timesheet', ['tags' => $name])]);
+            $event->addActionToSubmenu('filter', 'timesheet', ['title' => 'timesheet.filter', 'url' => $this->path('admin_timesheet', ['tags' => $name])]);
         }
 
         if ($event->isIndexView() && $this->isGranted('delete_tag')) {
             $event->addAction('trash', [
                 'url' => $this->path('delete_tag', ['id' => $id]),
-                'class' => 'api-link',
+                'class' => 'api-link text-red',
                 'attr' => [
                     'data-event' => 'kimai.tagDelete kimai.tagUpdate',
                     'data-method' => 'DELETE',

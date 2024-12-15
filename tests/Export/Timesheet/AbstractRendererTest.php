@@ -9,7 +9,7 @@
 
 namespace App\Tests\Export\Timesheet;
 
-use App\Configuration\LanguageFormattings;
+use App\Configuration\LocaleService;
 use App\Entity\Activity;
 use App\Entity\ActivityMeta;
 use App\Entity\Customer;
@@ -29,48 +29,43 @@ use App\Export\TimesheetExportInterface;
 use App\Repository\Query\TimesheetQuery;
 use App\Twig\LocaleFormatExtensions;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
-use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 abstract class AbstractRendererTest extends KernelTestCase
 {
     /**
-     * @param string $classname
-     * @return TimesheetExportInterface
+     * @param class-string $classname
      */
-    protected function getAbstractRenderer(string $classname)
+    protected function getAbstractRenderer(string $classname): TimesheetExportInterface
     {
         $languages = [
-            'en' => [
-                'date' => 'Y.m.d',
-                'duration' => '%h:%m h',
-                'time' => 'H:i',
-            ]
+            'en' => LocaleService::DEFAULT_SETTINGS
         ];
 
+        $user = new User();
+        $user->setUserIdentifier('ssdf');
+
+        $security = $this->createMock(Security::class);
+        $security->expects($this->any())->method('getUser')->willReturn($user);
+        $security->expects($this->any())->method('isGranted')->willReturn(true);
+
         $translator = $this->getMockBuilder(TranslatorInterface::class)->getMock();
-        $dateExtension = new LocaleFormatExtensions(new LanguageFormattings($languages));
+        $dateExtension = new LocaleFormatExtensions(new LocaleService($languages));
 
         $dispatcher = new EventDispatcher();
         $dispatcher->addSubscriber(new MetaFieldColumnSubscriber());
 
-        $authMock = $this->getMockBuilder(AuthorizationCheckerInterface::class)->getMock();
-        $authMock->method('isGranted')->willReturn(true);
-
-        return new $classname($translator, $dateExtension, $dispatcher, $authMock);
+        return new $classname($translator, $dateExtension, $dispatcher, $security);
     }
 
-    /**
-     * @param TimesheetExportInterface $renderer
-     * @return \Symfony\Component\HttpFoundation\Response
-     */
-    protected function render(TimesheetExportInterface $renderer)
+    protected function render(TimesheetExportInterface $renderer): Response
     {
-        $customer = new Customer();
-        $customer->setName('Customer Name');
+        $customer = new Customer('Customer Name');
         $customer->setNumber('A-0123456789');
         $customer->setVatId('DE-9876543210');
         $customer->setMetaField((new CustomerMeta())->setName('customer-foo')->setValue('customer-bar')->setIsVisible(true));
@@ -87,15 +82,17 @@ abstract class AbstractRendererTest extends KernelTestCase
         $activity->setProject($project);
         $activity->setMetaField((new ActivityMeta())->setName('activity-foo')->setValue('activity-bar')->setIsVisible(true));
 
-        $userMethods = ['getId', 'getPreferenceValue', 'getUsername'];
+        $userMethods = ['getId', 'getPreferenceValue', 'getUsername', 'getUserIdentifier'];
         $user1 = $this->getMockBuilder(User::class)->onlyMethods($userMethods)->disableOriginalConstructor()->getMock();
         $user1->method('getId')->willReturn(1);
         $user1->method('getPreferenceValue')->willReturn('50');
         $user1->method('getUsername')->willReturn('foo-bar');
+        $user1->method('getUserIdentifier')->willReturn('foo-bar');
 
         $user2 = $this->getMockBuilder(User::class)->onlyMethods($userMethods)->disableOriginalConstructor()->getMock();
         $user2->method('getId')->willReturn(2);
         $user2->method('getUsername')->willReturn('hello-world');
+        $user2->method('getUserIdentifier')->willReturn('hello-world');
 
         $timesheet = new Timesheet();
         $timesheet
@@ -142,11 +139,14 @@ abstract class AbstractRendererTest extends KernelTestCase
             ->addTag((new Tag())->setName('foo'))
         ;
 
+        $user = new User();
+        $user->setUserIdentifier('kevin');
+
         $timesheet5 = new Timesheet();
         $timesheet5
             ->setDuration(400)
             ->setFixedRate(84)
-            ->setUser((new User())->setUsername('kevin'))
+            ->setUser($user)
             ->setActivity($activity)
             ->setProject($project)
             ->setBegin(new \DateTime('2019-06-16 12:00:00'))
@@ -181,29 +181,29 @@ class MetaFieldColumnSubscriber implements EventSubscriberInterface
         ];
     }
 
-    public function loadTimesheetField(TimesheetMetaDisplayEvent $event)
+    public function loadTimesheetField(TimesheetMetaDisplayEvent $event): void
     {
         $event->addField($this->prepareEntity(new TimesheetMeta(), 'foo'));
         $event->addField($this->prepareEntity(new TimesheetMeta(), 'foo2'));
     }
 
-    public function loadCustomerField(CustomerMetaDisplayEvent $event)
+    public function loadCustomerField(CustomerMetaDisplayEvent $event): void
     {
         $event->addField($this->prepareEntity(new CustomerMeta(), 'customer-foo'));
     }
 
-    public function loadProjectField(ProjectMetaDisplayEvent $event)
+    public function loadProjectField(ProjectMetaDisplayEvent $event): void
     {
         $event->addField($this->prepareEntity(new ProjectMeta(), 'project-foo'));
         $event->addField($this->prepareEntity(new ProjectMeta(), 'project-foo2')->setIsVisible(false));
     }
 
-    public function loadActivityField(ActivityMetaDisplayEvent $event)
+    public function loadActivityField(ActivityMetaDisplayEvent $event): void
     {
         $event->addField($this->prepareEntity(new ActivityMeta(), 'activity-foo'));
     }
 
-    private function prepareEntity(MetaTableTypeInterface $meta, string $name)
+    private function prepareEntity(MetaTableTypeInterface $meta, string $name): MetaTableTypeInterface
     {
         return $meta
             ->setLabel('Working place')

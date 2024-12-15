@@ -11,38 +11,47 @@ namespace App\Tests\Repository\Query;
 
 use App\Entity\Team;
 use App\Repository\Query\UserQuery;
-use App\Repository\Query\VisibilityInterface;
 
 /**
  * @covers \App\Repository\Query\UserQuery
  */
 class UserQueryTest extends BaseQueryTest
 {
-    public function testQuery()
+    public function testQuery(): void
     {
         $sut = new UserQuery();
         $this->assertBaseQuery($sut, 'username');
-        $this->assertInstanceOf(VisibilityInterface::class, $sut);
         $this->assertRole($sut);
         $this->assertSearchTeam($sut);
-
         $this->assertResetByFormError(new UserQuery(), 'username');
     }
 
-    protected function assertRole(UserQuery $sut)
+    protected function assertRole(UserQuery $sut): void
     {
         $this->assertNull($sut->getRole());
         $sut->setRole('ROLE_USER');
         $this->assertEquals('ROLE_USER', $sut->getRole());
     }
 
-    protected function assertSearchTeam(UserQuery $sut)
+    protected function assertSearchTeam(UserQuery $sut): void
     {
-        $team = new Team();
+        $team = new Team('foo');
         $this->assertIsArray($sut->getSearchTeams());
         $this->assertEmpty($sut->getSearchTeams());
-        $sut->setSearchTeams([$team, new Team()]);
+        $sut->setSearchTeams([$team, new Team('foo')]);
         $this->assertCount(2, $sut->getSearchTeams());
         $this->assertSame($team, $sut->getSearchTeams()[0]);
+    }
+
+    public function testSystemAccount(): void
+    {
+        $sut = new UserQuery();
+        self::assertNull($sut->getSystemAccount());
+        $sut->setSystemAccount(false);
+        self::assertFalse($sut->getSystemAccount());
+        $sut->setSystemAccount(true);
+        self::assertTrue($sut->getSystemAccount());
+        $sut->setSystemAccount(null);
+        self::assertNull($sut->getSystemAccount());
     }
 }

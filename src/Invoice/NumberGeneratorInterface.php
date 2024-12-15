@@ -9,19 +9,16 @@
 
 namespace App\Invoice;
 
+use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
+
 /**
  * Class NumberGeneratorInterface defines all methods that invoice number generator have to implement.
  */
+#[AutoconfigureTag]
 interface NumberGeneratorInterface
 {
-    /**
-     * @param InvoiceModel $model
-     */
-    public function setModel(InvoiceModel $model);
+    public function setModel(InvoiceModel $model): void;
 
-    /**
-     * @return string
-     */
     public function getInvoiceNumber(): string;
 
     /**

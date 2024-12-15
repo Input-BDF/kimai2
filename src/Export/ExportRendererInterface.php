@@ -9,13 +9,14 @@
 
 namespace App\Export;
 
+use App\Entity\ExportableItem;
 use App\Repository\Query\TimesheetQuery;
 use Symfony\Component\HttpFoundation\Response;
 
 interface ExportRendererInterface
 {
     /**
-     * @param ExportItemInterface[] $exportItems
+     * @param ExportableItem[] $exportItems
      * @param TimesheetQuery $query
      * @return Response
      */
@@ -25,11 +26,6 @@ interface ExportRendererInterface
      * @return string
      */
     public function getId(): string;
-
-    /**
-     * @return string
-     */
-    public function getIcon(): string;
 
     /**
      * @return string

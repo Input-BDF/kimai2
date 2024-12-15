@@ -9,67 +9,51 @@
 
 namespace App\Entity;
 
-use Doctrine\Common\Collections\ArrayCollection;
+use App\Repository\TagRepository;
+use App\Utils\Color;
 use Doctrine\ORM\Mapping as ORM;
 use JMS\Serializer\Annotation as Serializer;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Validator\Constraints as Assert;
 
-/**
- * @ORM\Table(name="kimai2_tags",
- *      uniqueConstraints={
- *          @ORM\UniqueConstraint(columns={"name"})
- *      }
- * )
- * @ORM\Entity(repositoryClass="App\Repository\TagRepository")
- * @UniqueEntity("name")
- *
- * @Serializer\ExclusionPolicy("all")
- */
+#[ORM\Table(name: 'kimai2_tags')]
+#[ORM\UniqueConstraint(columns: ['name'])]
+#[ORM\Entity(repositoryClass: TagRepository::class)]
+#[ORM\ChangeTrackingPolicy('DEFERRED_EXPLICIT')]
+#[UniqueEntity('name')]
+#[Serializer\ExclusionPolicy('all')]
+#[Serializer\VirtualProperty('ColorSafe', exp: 'object.getColorSafe()', options: [new Serializer\SerializedName('color-safe'), new Serializer\Type(name: 'string'), new Serializer\Groups(['Default'])])]
 class Tag
 {
     /**
-     * The internal ID
-     *
-     * @var int
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Default"})
-     *
-     * @ORM\Column(name="id", type="integer")
-     * @ORM\Id
-     * @ORM\GeneratedValue(strategy="IDENTITY")
+     * Internal Tag ID
      */
-    private $id;
+    #[ORM\Column(name: 'id', type: 'integer')]
+    #[ORM\Id]
+    #[ORM\GeneratedValue(strategy: 'IDENTITY')]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    private ?int $id = null;
     /**
      * The tag name
-     *
-     * @var string
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Default"})
-     *
-     * @ORM\Column(name="name", type="string", length=100, nullable=false)
-     * @Assert\NotBlank()
-     * @Assert\Length(min=2, max=100, allowEmptyString=false, normalizer="trim")
-     * @Assert\Regex(pattern="/,/",match=false,message="Tag name cannot contain comma")
      */
-    private $name;
+    #[ORM\Column(name: 'name', type: 'string', length: 100, nullable: false)]
+    #[Assert\NotBlank]
+    #[Assert\Length(min: 2, max: 100, normalizer: 'trim')]
+    #[Assert\Regex(pattern: '/,/', message: 'Tag name cannot contain comma', match: false)]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    private ?string $name = null;
+    #[ORM\Column(name: 'visible', type: 'boolean', nullable: false, options: ['default' => true])]
+    #[Assert\NotNull]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    private bool $visible = true;
 
     use ColorTrait;
 
-    /**
-     * @var Timesheet[]|ArrayCollection
-     *
-     * @Serializer\Exclude()
-     *
-     * @ORM\ManyToMany(targetEntity="Timesheet", mappedBy="tags", fetch="EXTRA_LAZY")
-     */
-    private $timesheets;
-
     public function __construct()
     {
-        $this->timesheets = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -79,7 +63,7 @@ class Tag
 
     public function setName(?string $tagName): Tag
     {
-        $this->name = $tagName;
+        $this->name = $tagName !== null ? trim($tagName) : $tagName;
 
         return $this;
     }
@@ -89,31 +73,23 @@ class Tag
         return $this->name;
     }
 
-    public function addTimesheet(Timesheet $timesheet)
+    public function isVisible(): bool
     {
-        if ($this->timesheets->contains($timesheet)) {
-            return;
-        }
-
-        $this->timesheets->add($timesheet);
-        $timesheet->addTag($this);
+        return $this->visible;
     }
 
-    public function removeTimesheet(Timesheet $timesheet)
+    public function setVisible(bool $visible): void
     {
-        if (!$this->timesheets->contains($timesheet)) {
-            return;
-        }
-
-        $this->timesheets->removeElement($timesheet);
-        $timesheet->removeTag($this);
+        $this->visible = $visible;
     }
 
-    /**
-     * @return string
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->getName();
+    }
+
+    public function getColorSafe(): string
+    {
+        return $this->getColor() ?? (new Color())->getRandom($this->getName());
     }
 }

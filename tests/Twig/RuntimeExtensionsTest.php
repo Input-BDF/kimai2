@@ -20,9 +20,9 @@ use Twig\TwigFunction;
  */
 class RuntimeExtensionsTest extends TestCase
 {
-    public function testGetFilters()
+    public function testGetFilters(): void
     {
-        $expected = ['md2html', 'desc2html', 'comment2html', 'comment1line', 'colorize'];
+        $expected = ['md2html', 'desc2html', 'comment2html', 'comment1line', 'colorize', 'icon', 'sanitize_dde'];
         $i = 0;
 
         $sut = new RuntimeExtensions();
@@ -35,7 +35,7 @@ class RuntimeExtensionsTest extends TestCase
         }
     }
 
-    public function testGetFunctions()
+    public function testGetFunctions(): void
     {
         $expected = [
             'trigger',
@@ -43,10 +43,14 @@ class RuntimeExtensionsTest extends TestCase
             'get_title',
             'progressbar_color',
             'javascript_translations',
-            'theme_config',
+            'form_time_presets',
             'active_timesheets',
+            'favorite_timesheets',
             'encore_entry_css_source',
             'render_widget',
+            'icon',
+            'qr_code_data_uri',
+            'user_shortcuts',
         ];
 
         $i = 0;
@@ -62,7 +66,7 @@ class RuntimeExtensionsTest extends TestCase
         }
     }
 
-    public function testGetFilterDefinition()
+    public function testGetFilterDefinition(): void
     {
         $sut = new RuntimeExtensions();
         $filters = $sut->getFilters();
@@ -80,12 +84,10 @@ class RuntimeExtensionsTest extends TestCase
                     $found_md2html = true;
                     break;
                 case 'desc2html':
-                    self::assertEquals('html', $filters[1]->getPreEscape());
                     self::assertEquals(['html'], $filters[1]->getSafe(new Node()));
                     $found_desc2html = true;
                     break;
                 case 'comment2html':
-                    self::assertEquals('html', $filters[2]->getPreEscape());
                     self::assertEquals(['html'], $filters[2]->getSafe(new Node()));
                     $found_comment2html = true;
                     break;

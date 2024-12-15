@@ -19,49 +19,54 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\User
  * @covers \App\Validator\Constraints\UserValidator
+ * @extends ConstraintValidatorTestCase<UserValidator>
  */
 class UserValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator()
+    protected function createValidator(): UserValidator
     {
         $userService = $this->createMock(UserService::class);
 
         return new UserValidator($userService);
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
-        $this->validator->validate('foo', new NotBlank());
+        $this->validator->validate('foo', new NotBlank()); // @phpstan-ignore argument.type
     }
 
-    public function testNullIsValid()
+    public function testNullIsValid(): void
     {
-        $this->validator->validate(null, new User(['message' => 'myMessage']));
+        $this->validator->validate(null, new User(['message' => 'myMessage'])); // @phpstan-ignore argument.type
 
         $this->assertNoViolation();
     }
 
-    public function testNonUserIsValid()
+    public function testNonUserIsValid(): void
     {
-        $this->validator->validate(new TestUserEntity(), new User(['message' => 'myMessage']));
+        $this->validator->validate(new TestUserEntity(), new User(['message' => 'myMessage'])); // @phpstan-ignore argument.type
 
         $this->assertNoViolation();
     }
 
-    public function testEmptyUserIsValid()
-    {
-        $this->validator->validate(new UserEntity(), new User(['message' => 'myMessage']));
-
-        $this->assertNoViolation();
-    }
-
-    public function testUserIsValidWithEmptyRepository()
+    public function testEmptyUserIsValid(): void
     {
         $user = new UserEntity();
-        $user->setUsername('foo');
+        $user->setUserIdentifier('foo');
+        $user->setEmail('test');
+        $this->validator->validate($user, new User(['message' => 'myMessage']));
+
+        $this->assertNoViolation();
+    }
+
+    public function testUserIsValidWithEmptyRepository(): void
+    {
+        $user = new UserEntity();
+        $user->setUserIdentifier('foo');
         $user->setEmail('foo@example.com');
 
         $this->validator->validate($user, new User(['message' => 'myMessage']));
@@ -69,7 +74,7 @@ class UserValidatorTest extends ConstraintValidatorTestCase
         $this->assertNoViolation();
     }
 
-    public function testUserIsInvalidWithRepository()
+    public function testUserIsInvalidWithRepository(): void
     {
         $existing = $this->createMock(UserEntity::class);
         $existing->expects($this->exactly(4))->method('getId')->willReturn(123);
@@ -82,7 +87,7 @@ class UserValidatorTest extends ConstraintValidatorTestCase
         $this->validator->initialize($this->context);
 
         $user = new UserEntity();
-        $user->setUsername('foo');
+        $user->setUserIdentifier('foo');
         $user->setEmail('foo@example.com');
 
         $this->validator->validate($user, new User());
@@ -91,15 +96,15 @@ class UserValidatorTest extends ConstraintValidatorTestCase
             ->buildViolation('The email is already used.')
             ->atPath('property.path.email')
             ->setCode(User::USER_EXISTING_EMAIL)
+            ->buildNextViolation('An equal username is already used.')
+            ->atPath('property.path.email')
+            ->setCode(User::USER_EXISTING_EMAIL_AS_NAME)
             ->buildNextViolation('An equal email is already used.')
             ->atPath('property.path.username')
             ->setCode(User::USER_EXISTING_NAME_AS_EMAIL)
             ->buildNextViolation('The username is already used.')
             ->atPath('property.path.username')
             ->setCode(User::USER_EXISTING_NAME)
-            ->buildNextViolation('An equal username is already used.')
-            ->atPath('property.path.email')
-            ->setCode(User::USER_EXISTING_EMAIL_AS_NAME)
             ->assertRaised();
     }
 }

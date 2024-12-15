@@ -25,13 +25,15 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
  */
 class MetaFieldExtractorTest extends TestCase
 {
-    public function testExtract()
+    public function testExtract(): void
     {
         $dispatcher = $this->createMock(EventDispatcherInterface::class);
         $dispatcher->expects(self::once())->method('dispatch')->willReturnCallback(function (ProjectMetaDisplayEvent $event) {
             $event->addField((new ProjectMeta())->setName('foo')->setIsVisible(true));
             $event->addField((new ProjectMeta())->setName('no')->setIsVisible(false));
             $event->addField((new ProjectMeta())->setName('bar')->setIsVisible(true));
+
+            return $event;
         });
 
         $sut = new MetaFieldExtractor($dispatcher);
@@ -53,7 +55,7 @@ class MetaFieldExtractorTest extends TestCase
         self::assertEquals('tralalalala', \call_user_func($definition->getAccessor(), (new Project())->setMetaField((new ProjectMeta())->setName('bar')->setValue('tralalalala'))));
     }
 
-    public function testCheckType()
+    public function testCheckType(): void
     {
         $dispatcher = $this->createMock(EventDispatcherInterface::class);
         $sut = new MetaFieldExtractor($dispatcher);
@@ -61,7 +63,7 @@ class MetaFieldExtractorTest extends TestCase
         $this->expectException(ExtractorException::class);
         $this->expectExceptionMessage('MetaFieldExtractor needs a MetaDisplayEventInterface instance for work');
 
-        /* @phpstan-ignore-next-line */
+        /* @phpstan-ignore argument.type */
         $sut->extract(new \stdClass());
     }
 }

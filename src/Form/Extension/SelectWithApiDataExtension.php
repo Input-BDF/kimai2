@@ -19,19 +19,10 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 /**
  * Support Remote-API calls for Entity select-boxes.
  */
-class SelectWithApiDataExtension extends AbstractTypeExtension
+final class SelectWithApiDataExtension extends AbstractTypeExtension
 {
-    /**
-     * @var UrlGeneratorInterface
-     */
-    private $router;
-
-    /**
-     * @param UrlGeneratorInterface $router
-     */
-    public function __construct(UrlGeneratorInterface $router)
+    public function __construct(private readonly UrlGeneratorInterface $router)
     {
-        $this->router = $router;
     }
 
     public static function getExtendedTypes(): iterable
@@ -39,12 +30,7 @@ class SelectWithApiDataExtension extends AbstractTypeExtension
         return [EntityType::class];
     }
 
-    /**
-     * @param FormView $view
-     * @param FormInterface $form
-     * @param array $options
-     */
-    public function buildView(FormView $view, FormInterface $form, array $options)
+    public function buildView(FormView $view, FormInterface $form, array $options): void
     {
         if (!isset($options['api_data'])) {
             return;
@@ -54,6 +40,12 @@ class SelectWithApiDataExtension extends AbstractTypeExtension
 
         if (!\is_array($apiData)) {
             throw new \InvalidArgumentException('Option "api_data" must be an array for form "' . $form->getName() . '"');
+        }
+
+        if (isset($apiData['create'])) {
+            $view->vars['attr'] = array_merge($view->vars['attr'], [
+                'data-create' => $this->router->generate($apiData['create']),
+            ]);
         }
 
         if (!isset($apiData['select'])) {
@@ -68,13 +60,23 @@ class SelectWithApiDataExtension extends AbstractTypeExtension
             $apiData['route_params'] = [];
         }
 
-        $formPrefix = $form->getParent()->getName();
-        if (!empty($formPrefix)) {
-            $formPrefix .= '_';
+        $formPrefixes = [];
+        $parent = $form->getParent();
+        do {
+            $formPrefixes[] = $parent->getName();
+        } while (($parent = $parent?->getParent()) !== null);
+
+        $formPrefix = implode('_', array_reverse($formPrefixes));
+        $formField = $apiData['select'];
+
+        // forms with prefix (like toolbar & search) would result in a wrong field name "_foo" instead of "foo"
+        if ($formPrefix !== '') {
+            $formField = $formPrefix . '_' . $apiData['select'];
         }
 
         $view->vars['attr'] = array_merge($view->vars['attr'], [
-            'data-related-select' => $formPrefix . $apiData['select'],
+            'data-form-prefix' => $formPrefix,
+            'data-related-select' => $formField,
             'data-api-url' => $this->router->generate($apiData['route'], $apiData['route_params']),
         ]);
 
@@ -83,12 +85,15 @@ class SelectWithApiDataExtension extends AbstractTypeExtension
                 'data-empty-url' => $this->router->generate($apiData['route'], $apiData['empty_route_params']),
             ]);
         }
+
+        if (isset($apiData['reload'])) {
+            $view->vars['attr'] = array_merge($view->vars['attr'], [
+                'data-reload' => $this->router->generate($apiData['reload']),
+            ]);
+        }
     }
 
-    /**
-     * @param OptionsResolver $resolver
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefined(['api_data']);
         $resolver->setAllowedTypes('api_data', 'array');

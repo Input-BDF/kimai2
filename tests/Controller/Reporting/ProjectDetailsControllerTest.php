@@ -21,12 +21,12 @@ use App\Tests\DataFixtures\TimesheetFixtures;
  */
 class ProjectDetailsControllerTest extends ControllerBaseTest
 {
-    public function testReportIsSecure()
+    public function testReportIsSecure(): void
     {
         $this->assertUrlIsSecured('/reporting/project_details');
     }
 
-    public function testReport()
+    public function testReport(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
 
@@ -55,10 +55,10 @@ class ProjectDetailsControllerTest extends ControllerBaseTest
         $this->assertHasNoEntriesWithFilter($client);
 
         $this->assertAccessIsGranted($client, '/reporting/project_details?project=' . $projects[0]->getId());
-        $rows = $client->getCrawler()->filterXPath("//form[@id='project-details-form']");
+        $rows = $client->getCrawler()->filterXPath("//form[@id='report-form']");
         self::assertEquals(1, $rows->count());
 
-        $rows = $client->getCrawler()->filterXPath("//div[@id='reporting-content']/div[@class='nav-tabs-custom']");
+        $rows = $client->getCrawler()->filterXPath("//div[@id='reporting-content']//ul[contains(@class, 'nav-pills')]");
         self::assertGreaterThan(1, $rows->count());
     }
 }

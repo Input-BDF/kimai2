@@ -12,20 +12,19 @@ namespace App\Timesheet;
 /**
  * A static helper class for re-usable functionality.
  */
-class Util
+final class Util
 {
+    private function __construct()
+    {
+    }
+
     /**
-     * Calculates the rate for a hourly rate and a given duration in seconds.
-     *
-     * @param float $hourlyRate
-     * @param int $seconds
-     * @return float
+     * Calculates the rate by an hourly rate and a given duration in seconds.
      */
     public static function calculateRate(float $hourlyRate, int $seconds): float
     {
-        $rate = (float) ($hourlyRate * ($seconds / 3600));
-        $rate = round($rate, 2);
+        $rate = $hourlyRate * ($seconds / 3600);
 
-        return $rate;
+        return round($rate, 4);
     }
 }

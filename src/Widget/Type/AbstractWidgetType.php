@@ -9,32 +9,18 @@
 
 namespace App\Widget\Type;
 
-use App\Widget\WidgetInterface;
-
-abstract class AbstractWidgetType implements WidgetInterface
+abstract class AbstractWidgetType extends AbstractWidget
 {
+    private ?string $id = null;
+    private string $title = '';
     /**
-     * @var string
+     * @var array<string>
      */
-    protected $id;
-    /**
-     * @var string
-     */
-    protected $title = '';
-    /**
-     * @var array
-     */
-    protected $options = [];
-    /**
-     * @var mixed
-     */
-    protected $data;
+    private array $permissions = [];
 
-    public function setId(string $id): self
+    public function setId(string $id): void
     {
         $this->id = $id;
-
-        return $this;
     }
 
     public function getId(): string
@@ -46,27 +32,9 @@ abstract class AbstractWidgetType implements WidgetInterface
         return (new \ReflectionClass($this))->getShortName();
     }
 
-    public function setData($data): self
-    {
-        $this->data = $data;
-
-        return $this;
-    }
-
-    /**
-     * @param array $options
-     * @return mixed|null
-     */
-    public function getData(array $options = [])
-    {
-        return $this->data;
-    }
-
-    public function setTitle(string $title): self
+    public function setTitle(string $title): void
     {
         $this->title = $title;
-
-        return $this;
     }
 
     public function getTitle(): string
@@ -74,40 +42,20 @@ abstract class AbstractWidgetType implements WidgetInterface
         return $this->title;
     }
 
-    public function setOptions(array $options): self
+    public function setOptions(array $options): void
     {
         foreach ($options as $key => $value) {
-            $this->options[$key] = $value;
+            $this->setOption($key, $value);
         }
-
-        return $this;
     }
 
-    /**
-     * @param string $name
-     * @param mixed $value
-     */
-    public function setOption(string $name, $value): void
+    public function getPermissions(): array
     {
-        $this->options[$name] = $value;
+        return $this->permissions;
     }
 
-    /**
-     * @param string $name
-     * @param mixed|null $default
-     * @return mixed|null
-     */
-    public function getOption(string $name, $default = null)
+    public function setPermissions(array $permissions): void
     {
-        if (\array_key_exists($name, $this->options)) {
-            return $this->options[$name];
-        }
-
-        return $default;
-    }
-
-    public function getOptions(array $options = []): array
-    {
-        return array_merge($this->options, $options);
+        $this->permissions = $permissions;
     }
 }

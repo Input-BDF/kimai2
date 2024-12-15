@@ -9,79 +9,77 @@
 
 namespace App\Invoice;
 
-use App\Configuration\LanguageFormattings;
+use App\Configuration\LocaleService;
 use App\Utils\LocaleFormatter;
 
 final class DefaultInvoiceFormatter implements InvoiceFormatter
 {
     /**
-     * @var LocaleFormatter
+     * @var LocaleFormatter|null
      */
     private $formatter;
 
-    public function __construct(LanguageFormattings $formats, string $locale)
+    public function __construct(private LocaleService $localeService, private string $locale)
     {
-        $this->formatter = new LocaleFormatter($formats, $locale);
     }
 
-    /**
-     * @param \DateTime $date
-     * @return mixed
-     */
-    public function getFormattedDateTime(\DateTime $date)
+    private function getFormatter(): LocaleFormatter
     {
-        return $this->formatter->dateShort($date);
+        if ($this->formatter === null) {
+            $this->formatter = new LocaleFormatter($this->localeService, $this->locale);
+        }
+
+        return $this->formatter;
     }
 
-    /**
-     * @param \DateTime $date
-     * @return mixed
-     */
-    public function getFormattedTime(\DateTime $date)
+    public function getFormattedDateTime(\DateTimeInterface $date): string
     {
-        return $this->formatter->time($date);
+        return (string) $this->getFormatter()->dateShort($date);
     }
 
-    /**
-     * @param \DateTime $date
-     * @return mixed
-     */
-    public function getFormattedMonthName(\DateTime $date)
+    public function getFormattedTime(\DateTimeInterface $date): string
     {
-        return $this->formatter->monthName($date);
+        return (string) $this->getFormatter()->time($date);
     }
 
-    /**
-     * @param float|int $amount
-     * @param string|null $currency
-     * @param bool $withCurrency
-     * @return string
-     */
-    public function getFormattedMoney($amount, ?string $currency, bool $withCurrency = true)
+    public function getFormattedMonthName(\DateTimeInterface $date): string
     {
-        return $this->formatter->money($amount, $currency, $withCurrency);
+        return $this->getFormatter()->monthName($date);
     }
 
-    /**
-     * @param int $seconds
-     * @return mixed
-     */
-    public function getFormattedDuration($seconds)
+    public function getFormattedMoney(float $amount, ?string $currency, bool $withCurrency = true): string
     {
-        return $this->formatter->duration($seconds);
+        return $this->getFormatter()->money($amount, $currency, $withCurrency);
     }
 
-    /**
-     * @param int $seconds
-     * @return mixed
-     */
-    public function getFormattedDecimalDuration($seconds)
+    public function getFormattedDuration(int $seconds): string
     {
-        return $this->formatter->durationDecimal($seconds);
+        return $this->getFormatter()->duration($seconds);
+    }
+
+    public function getFormattedDecimalDuration(int $seconds): string
+    {
+        return $this->getFormatter()->durationDecimal($seconds);
     }
 
     public function getCurrencySymbol(string $currency): string
     {
-        return $this->formatter->currency($currency);
+        return $this->getFormatter()->currency($currency);
+    }
+
+    public function getLocale(): string
+    {
+        return $this->locale;
+    }
+
+    public function setLocale(string $locale): void
+    {
+        $this->locale = $locale;
+        $this->formatter = null;
+    }
+
+    public function getFormattedAmount(float $amount): string
+    {
+        return $this->getFormatter()->amount($amount);
     }
 }

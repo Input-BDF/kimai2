@@ -17,23 +17,25 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\TimeFormat
  * @covers \App\Validator\Constraints\TimeFormatValidator
+ * @extends ConstraintValidatorTestCase<TimeFormatValidator>
  */
 class TimeFormatValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator()
+    protected function createValidator(): TimeFormatValidator
     {
         return new TimeFormatValidator();
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
         $this->validator->validate('foo', new NotBlank());
     }
 
-    public function testWrongValueThrowsException()
+    public function testWrongValueThrowsException(): void
     {
         $this->expectException(UnexpectedValueException::class);
         $this->expectExceptionMessage('Expected argument of type "string", "stdClass" given');
@@ -44,7 +46,7 @@ class TimeFormatValidatorTest extends ConstraintValidatorTestCase
     /**
      * @dataProvider getValidTimes
      */
-    public function testValidationSucceeds(?string $value)
+    public function testValidationSucceeds(?string $value): void
     {
         $this->validator->validate($value, new TimeFormat());
         $this->assertNoViolation();
@@ -67,7 +69,7 @@ class TimeFormatValidatorTest extends ConstraintValidatorTestCase
     /**
      * @dataProvider getInvalidTimes
      */
-    public function testValidationProblem(?string $value)
+    public function testValidationProblem(?string $value): void
     {
         $this->validator->validate($value, new TimeFormat());
 

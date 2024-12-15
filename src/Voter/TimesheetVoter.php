@@ -11,6 +11,7 @@ namespace App\Voter;
 
 use App\Entity\Timesheet;
 use App\Entity\User;
+use App\Form\Model\MultiUserTimesheet;
 use App\Security\RolePermissionManager;
 use App\Timesheet\LockdownService;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
@@ -18,6 +19,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 /**
  * A voter to check permissions on Timesheets.
+ *
+ * @extends Voter<string, Timesheet>
  */
 final class TimesheetVoter extends Voter
 {
@@ -44,48 +47,38 @@ final class TimesheetVoter extends Voter
         self::VIEW_RATE,
         self::EDIT_RATE,
         self::EDIT_EXPORT,
+        'edit_billable',
         'duplicate'
     ];
 
-    private $permissionManager;
-    private $lockdownService;
+    private ?bool $lockdownGrace = null;
+    private ?bool $lockdownOverride = null;
+    private ?bool $editExported = null;
+    private ?\DateTime $now = null;
 
-    private $lockdownGrace;
-    private $lockdownOverride;
-    private $editExported;
-    private $now;
-
-    public function __construct(RolePermissionManager $permissionManager, LockdownService $lockdownService)
+    public function __construct(
+        private readonly RolePermissionManager $permissionManager,
+        private readonly LockdownService $lockdownService
+    )
     {
-        $this->permissionManager = $permissionManager;
-        $this->lockdownService = $lockdownService;
     }
 
-    /**
-     * @param string $attribute
-     * @param mixed $subject
-     * @return bool
-     */
-    protected function supports($attribute, $subject)
+    public function supportsAttribute(string $attribute): bool
     {
-        if (!($subject instanceof Timesheet)) {
-            return false;
-        }
-
-        if (!\in_array($attribute, self::ALLOWED_ATTRIBUTES)) {
-            return false;
-        }
-
-        return true;
+        return \in_array($attribute, self::ALLOWED_ATTRIBUTES, true);
     }
 
-    /**
-     * @param string $attribute
-     * @param Timesheet $subject
-     * @param TokenInterface $token
-     * @return bool
-     */
-    protected function voteOnAttribute($attribute, $subject, TokenInterface $token)
+    public function supportsType(string $subjectType): bool
+    {
+        return str_contains($subjectType, Timesheet::class) || str_contains($subjectType, MultiUserTimesheet::class);
+    }
+
+    protected function supports(string $attribute, mixed $subject): bool
+    {
+        return $subject instanceof Timesheet && $this->supportsAttribute($attribute);
+    }
+
+    protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token): bool
     {
         $user = $token->getUser();
 
@@ -118,7 +111,7 @@ final class TimesheetVoter extends Voter
                 break;
 
             case 'duplicate':
-                if (!$this->canDuplicate($user, $subject)) {
+                if (!$this->canStart($subject)) {
                     return false;
                 }
                 $permission = self::EDIT;
@@ -130,6 +123,7 @@ final class TimesheetVoter extends Voter
             case self::VIEW:
             case self::EXPORT:
             case self::EDIT_EXPORT:
+            case 'edit_billable':
                 $permission .= $attribute;
                 break;
 
@@ -140,7 +134,7 @@ final class TimesheetVoter extends Voter
         $permission .= '_';
 
         // extend me for "team" support later on
-        if ($subject->getUser()->getId() == $user->getId()) {
+        if ($subject->getUser()?->getId() === $user->getId()) {
             $permission .= 'own';
         } else {
             $permission .= 'other';
@@ -151,7 +145,7 @@ final class TimesheetVoter extends Voter
         return $this->permissionManager->hasRolePermission($user, $permission);
     }
 
-    protected function canStart(Timesheet $timesheet): bool
+    private function canStart(Timesheet $timesheet): bool
     {
         // possible improvements for the future:
         // we could check the amount of active entries (maybe slow)
@@ -165,7 +159,7 @@ final class TimesheetVoter extends Voter
             return false;
         }
 
-        if (!$timesheet->getActivity()->isVisible() || !$timesheet->getProject()->isVisible()) {
+        if (!$timesheet->getProject()->isVisible()) {
             return false;
         }
 
@@ -173,10 +167,14 @@ final class TimesheetVoter extends Voter
             return false;
         }
 
+        if (!$timesheet->getActivity()->isVisible()) {
+            return false;
+        }
+
         return true;
     }
 
-    protected function canEdit(User $user, Timesheet $timesheet): bool
+    private function canEdit(User $user, Timesheet $timesheet): bool
     {
         if (!$this->isAllowedExported($user, $timesheet)) {
             return false;
@@ -189,21 +187,12 @@ final class TimesheetVoter extends Voter
         return true;
     }
 
-    protected function canDelete(User $user, Timesheet $timesheet): bool
+    private function canDelete(User $user, Timesheet $timesheet): bool
     {
         if (!$this->isAllowedExported($user, $timesheet)) {
             return false;
         }
 
-        if (!$this->isAllowedInLockdown($user, $timesheet)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    protected function canDuplicate(User $user, Timesheet $timesheet): bool
-    {
         if (!$this->isAllowedInLockdown($user, $timesheet)) {
             return false;
         }

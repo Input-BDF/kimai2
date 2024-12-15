@@ -13,22 +13,22 @@ use App\Entity\User;
 use Symfony\Contracts\EventDispatcher\Event;
 
 /**
- * This event should be used, if a user profile is loaded and want to fill the dynamic user preferences
+ * To be used when a user profile is loaded and should be filled with dynamic user preferences.
+ *
+ * @internal
  */
 final class PrepareUserEvent extends Event
 {
-    /**
-     * @deprecated since 1.4, will be removed with 2.0
-     */
-    public const PREPARE = PrepareUserEvent::class;
-    /**
-     * @var User
-     */
-    private $user;
-
-    public function __construct(User $user)
+    public function __construct(private User $user, private bool $booting = true)
     {
-        $this->user = $user;
+    }
+
+    /**
+     * Whether this event is dispatched for the currently logged in user during kernel boot.
+     */
+    public function isBooting(): bool
+    {
+        return $this->booting;
     }
 
     public function getUser(): User

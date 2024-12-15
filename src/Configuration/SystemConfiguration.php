@@ -9,21 +9,149 @@
 
 namespace App\Configuration;
 
-class SystemConfiguration implements SystemBundleConfiguration
+use App\Constants;
+
+final class SystemConfiguration
 {
-    use StringAccessibleConfigTrait;
+    private bool $initialized = false;
 
-    public function getPrefix(): string
+    public function __construct(private ConfigLoaderInterface $repository, private array $settings = [])
     {
-        return 'kimai';
     }
 
-    protected function getConfigurations(ConfigLoaderInterface $repository): array
+    private function prepare(): void
     {
-        return $repository->getConfiguration();
+        if ($this->initialized) {
+            return;
+        }
+
+        foreach ($this->repository->getConfigurations() as $key => $value) {
+            $this->set($key, $value);
+        }
+
+        $this->initialized = true;
     }
 
-    // ========== Login form ==========
+    /**
+     * Set a new or replace an existing system configuration.
+     */
+    public function set(string $key, mixed $value): void
+    {
+        if (\array_key_exists($key, $this->settings)) {
+            if (\is_bool($this->settings[$key])) {
+                $value = (bool) $value;
+            } elseif (\is_int($this->settings[$key])) {
+                $value = (int) $value;
+            }
+        }
+        $this->settings[$key] = $value;
+    }
+
+    /**
+     * @param string $key
+     * @return string|int|bool|float|null
+     */
+    public function find(string $key): string|int|bool|float|null
+    {
+        $this->prepare();
+
+        if (\array_key_exists($key, $this->settings)) {
+            return $this->settings[$key];
+        }
+
+        return null;
+    }
+
+    /**
+     * This method should be avoided if possible, use plain keys instead.
+     *
+     * @see https://github.com/divineomega/array_undot
+     * @param string $key
+     * @return array
+     */
+    public function findArray(string $key): array
+    {
+        $this->prepare();
+
+        $result = array_filter($this->settings, function ($settingName) use ($key): bool {
+            return str_starts_with($settingName, $key);
+        }, ARRAY_FILTER_USE_KEY);
+
+        $replaced = [];
+        foreach ($result as $settingName => $value) {
+            if (\is_bool($this->settings[$settingName])) {
+                $value = (bool) $value;
+            } elseif (\is_int($this->settings[$settingName])) {
+                $value = (int) $value;
+            }
+
+            $baseName = str_replace($key . '.', '', $settingName);
+
+            $keys = explode('.', $baseName);
+            $array = &$replaced;
+            while (\count($keys) > 1) {
+                $search = array_shift($keys);
+                /* @phpstan-ignore-next-line  */
+                if (!\array_key_exists($search, $array) || !\is_array($array[$search])) {
+                    $array[$search] = [];
+                }
+
+                $array = &$array[$search];
+            }
+            $array[array_shift($keys)] = $value;
+        }
+
+        return $replaced;
+    }
+
+    public function has(string $key): bool
+    {
+        $this->prepare();
+
+        if (\array_key_exists($key, $this->settings)) {
+            return true;
+        }
+
+        $result = array_filter($this->settings, function ($settingName) use ($key): bool {
+            return str_starts_with($settingName, $key);
+        }, ARRAY_FILTER_USE_KEY);
+
+        return \count($result) > 0;
+    }
+
+    // ========== Array access methods ==========
+
+    /**
+     * @deprecated since 2.0.35
+     */
+    public function offsetExists($offset): bool
+    {
+        @trigger_error('The method "SystemConfiguration::offsetExists()" is deprecated, use "has()" instead', E_USER_DEPRECATED);
+
+        return $this->has($offset);
+    }
+
+    /**
+     * @deprecated since 2.0.35
+     */
+    public function offsetGet($offset): mixed
+    {
+        @trigger_error('The method "SystemConfiguration::offsetGet()" is deprecated, use "find()" instead', E_USER_DEPRECATED);
+
+        return $this->find($offset);
+    }
+
+    /**
+     * @deprecated since 2.0.35
+     */
+    public function offsetSet(mixed $offset, mixed $value): void
+    {
+        @trigger_error('The method "SystemConfiguration::offsetSet()" is deprecated, use "set()" instead', E_USER_DEPRECATED);
+
+        $this->set($offset, $value);
+    }
+
+    // ========== Authentication configurations ==========
 
     public function isLoginFormActive(): bool
     {
@@ -41,6 +169,10 @@ class SystemConfiguration implements SystemBundleConfiguration
 
     public function isSelfRegistrationActive(): bool
     {
+        if (!$this->isLoginFormActive()) {
+            return false;
+        }
+
         return (bool) $this->find('user.registration');
     }
 
@@ -56,10 +188,12 @@ class SystemConfiguration implements SystemBundleConfiguration
 
     public function isPasswordResetActive(): bool
     {
+        if (!$this->isLoginFormActive()) {
+            return false;
+        }
+
         return (bool) $this->find('user.password_reset');
     }
-
-    // ========== SAML configurations ==========
 
     public function isSamlActive(): bool
     {
@@ -71,54 +205,56 @@ class SystemConfiguration implements SystemBundleConfiguration
         return (string) $this->find('saml.title');
     }
 
+    public function getSamlProvider(): ?string
+    {
+        return $this->find('saml.provider');
+    }
+
+    public function isSamlRolesResetOnLogin(): bool
+    {
+        return (bool) $this->find('saml.roles.resetOnLogin');
+    }
+
+    /**
+     * @return array<int, array<'saml'|'kimai', string>>
+     */
+    public function getSamlRolesMapping(): array
+    {
+        return $this->findArray('saml.roles.mapping');
+    }
+
+    /**
+     * @return array<string, array<mixed>|bool>
+     */
+    public function getSamlConnection(): array
+    {
+        return $this->findArray('saml.connection');
+    }
+
+    /**
+     * @return array<int, array<'saml'|'kimai', string>>
+     */
     public function getSamlAttributeMapping(): array
     {
-        return (array) $this->find('saml.mapping');
+        return $this->findArray('saml.mapping');
     }
 
     public function getSamlRolesAttribute(): ?string
     {
-        return (string) $this->find('saml.roles.attribute');
-    }
+        $attr = $this->find('saml.roles.attribute');
+        if (empty($attr)) {
+            return null;
+        }
 
-    public function getSamlRolesMapping(): array
-    {
-        return (array) $this->find('saml.roles.mapping');
+        return (string) $attr;
     }
-
-    public function getSamlConnection(): array
-    {
-        return (array) $this->find('saml.connection');
-    }
-
-    // ========== LDAP configurations ==========
 
     public function isLdapActive(): bool
     {
         return (bool) $this->find('ldap.activate');
     }
 
-    public function getLdapRoleParameters(): array
-    {
-        return (array) $this->find('ldap.role');
-    }
-
-    public function getLdapUserParameters(): array
-    {
-        return (array) $this->find('ldap.user');
-    }
-
-    public function getLdapConnectionParameters(): array
-    {
-        return (array) $this->find('ldap.connection');
-    }
-
     // ========== Calendar configurations ==========
-
-    public function getCalendarBusinessDays(): array
-    {
-        return (array) $this->find('calendar.businessHours.days');
-    }
 
     public function getCalendarBusinessTimeBegin(): string
     {
@@ -160,9 +296,9 @@ class SystemConfiguration implements SystemBundleConfiguration
         return $this->find('calendar.google.api_key');
     }
 
-    public function getCalendarGoogleSources(): ?array
+    public function getCalendarGoogleSources(): array
     {
-        return $this->find('calendar.google.sources');
+        return $this->findArray('calendar.google.sources');
     }
 
     public function getCalendarSlotDuration(): string
@@ -173,6 +309,11 @@ class SystemConfiguration implements SystemBundleConfiguration
     public function getCalendarDragAndDropMaxEntries(): int
     {
         return (int) $this->find('calendar.dragdrop_amount');
+    }
+
+    public function isCalendarDragAndDropCopyData(): bool
+    {
+        return (bool) $this->find('calendar.dragdrop_data');
     }
 
     // ========== Customer configurations ==========
@@ -237,6 +378,11 @@ class SystemConfiguration implements SystemBundleConfiguration
         return (bool) $this->find('timesheet.rules.allow_future_times');
     }
 
+    public function isTimesheetAllowZeroDuration(): bool
+    {
+        return (bool) $this->find('timesheet.rules.allow_zero_duration');
+    }
+
     public function isTimesheetAllowOverbookingBudget(): bool
     {
         return (bool) $this->find('timesheet.rules.allow_overbooking_budget');
@@ -249,7 +395,7 @@ class SystemConfiguration implements SystemBundleConfiguration
 
     public function getTimesheetTrackingMode(): string
     {
-        return (string) $this->find('timesheet.mode');
+        return $this->getString('timesheet.mode', 'default');
     }
 
     public function isTimesheetMarkdownEnabled(): bool
@@ -257,16 +403,14 @@ class SystemConfiguration implements SystemBundleConfiguration
         return (bool) $this->find('timesheet.markdown_content');
     }
 
+    public function isTimesheetRequiresActivity(): bool
+    {
+        return (bool) $this->find('timesheet.rules.require_activity');
+    }
+
     public function getTimesheetActiveEntriesHardLimit(): int
     {
         return (int) $this->find('timesheet.active_entries.hard_limit');
-    }
-
-    public function getTimesheetActiveEntriesSoftLimit(): int
-    {
-        @trigger_error('The configuration timesheet.active_entries.soft_limit is deprecated since 1.15', E_USER_DEPRECATED);
-
-        return $this->getTimesheetActiveEntriesHardLimit();
     }
 
     public function getTimesheetDefaultRoundingDays(): string
@@ -294,57 +438,24 @@ class SystemConfiguration implements SystemBundleConfiguration
         return (int) $this->find('timesheet.rounding.default.duration');
     }
 
-    public function getTimesheetLockdownPeriodStart(): string
+    public function getTimesheetIncrementDuration(): int
     {
-        return (string) $this->find('timesheet.rules.lockdown_period_start');
+        return $this->getIncrement('timesheet.duration_increment', $this->getTimesheetDefaultRoundingDuration(), 0);
     }
 
-    public function getTimesheetLockdownPeriodEnd(): string
+    public function getTimesheetIncrementMinutes(): int
     {
-        return (string) $this->find('timesheet.rules.lockdown_period_end');
+        return $this->getIncrement('timesheet.time_increment', $this->getTimesheetDefaultRoundingDuration(), 0);
     }
 
-    public function getTimesheetLockdownGracePeriod(): string
+    public function getQuickEntriesRecentAmount(): int
     {
-        return (string) $this->find('timesheet.rules.lockdown_grace_period');
+        return $this->getIncrement('quick_entry.recent_activities', 5, 0);
     }
 
-    public function getTimesheetLockdownTimeZone(): ?string
+    public function isBreakTimeEnabled(): bool
     {
-        return $this->find('timesheet.rules.lockdown_period_timezone');
-    }
-
-    public function isTimesheetLockdownActive(): bool
-    {
-        return !empty($this->find('timesheet.rules.lockdown_period_start')) && !empty($this->find('timesheet.rules.lockdown_period_end'));
-    }
-
-    private function getIncrement(string $key, int $fallback, int $min = 1): ?int
-    {
-        $config = $this->find($key);
-
-        if ($config === null || trim($config) === '') {
-            return $fallback;
-        }
-
-        $config = (int) $config;
-
-        return $config < $min ? null : $config;
-    }
-
-    public function getTimesheetIncrementDuration(): ?int
-    {
-        return $this->getIncrement('timesheet.duration_increment', $this->getTimesheetDefaultRoundingDuration(), 1);
-    }
-
-    public function getTimesheetIncrementBegin(): ?int
-    {
-        return $this->getIncrement('timesheet.time_increment', $this->getTimesheetDefaultRoundingBegin(), 0);
-    }
-
-    public function getTimesheetIncrementEnd(): ?int
-    {
-        return $this->getIncrement('timesheet.time_increment', $this->getTimesheetDefaultRoundingEnd(), 0);
+        return (bool) $this->find('timesheet.rules.break_time_active');
     }
 
     // ========== Company configurations ==========
@@ -362,14 +473,9 @@ class SystemConfiguration implements SystemBundleConfiguration
 
     // ========== Theme configurations ==========
 
-    public function isThemeColorsLimited(): bool
+    public function isShowAbout(): bool
     {
-        return (bool) $this->find('theme.colors_limited');
-    }
-
-    public function isThemeRandomColors(): bool
-    {
-        return (bool) $this->find('theme.random_colors');
+        return (bool) $this->find('theme.show_about');
     }
 
     public function isThemeAllowAvatarUrls(): bool
@@ -377,30 +483,89 @@ class SystemConfiguration implements SystemBundleConfiguration
         return (bool) $this->find('theme.avatar_url');
     }
 
-    public function getThemeAutocompleteCharacters(): int
-    {
-        return (int) $this->find('theme.autocomplete_chars');
-    }
-
-    public function getThemeColorChoices(): ?string
+    /**
+     * @internal will be made private soon after 2.18.0 - do not access this method directly, but through getThemeColors()
+     */
+    public function getThemeColorChoices(): string
     {
         $config = $this->find('theme.color_choices');
-        if (!empty($config)) {
+        if (\is_string($config) && $config !== '') {
             return $config;
         }
 
-        return $this->default('theme.color_choices');
+        return 'Silver|#c0c0c0';
     }
 
-    // ========== Branding configurations ==========
-
-    public function getBrandingTitle(): ?string
+    /**
+     * @return array<string, string>
+     */
+    public function getThemeColors(): array
     {
-        return $this->find('theme.branding.title');
+        $config = explode(',', $this->getThemeColorChoices());
+
+        $colors = [];
+        foreach ($config as $item) {
+            if (empty($item)) {
+                continue;
+            }
+            $item = explode('|', $item);
+            $key = $item[0];
+            $value = $key;
+
+            if (\count($item) > 1) {
+                $value = $item[1];
+            }
+
+            if (empty($key)) {
+                $key = $value;
+            }
+
+            if ($value === Constants::DEFAULT_COLOR) {
+                continue;
+            }
+
+            $colors[$key] = $value;
+        }
+
+        return array_unique($colors);
     }
 
-    public function isAllowTagCreation(): bool
+    // ========== Projects ==========
+
+    public function isProjectCopyTeamsOnCreate(): bool
     {
-        return (bool) $this->find('theme.tags_create');
+        return $this->find('project.copy_teams_on_create') === true;
+    }
+
+    // ========== Helper functions ==========
+
+    private function getIncrement(string $key, int $fallback, int $min = 1): int
+    {
+        $config = $this->find($key);
+
+        if ($config === null || trim($config) === '') {
+            return $fallback;
+        }
+
+        $config = (int) $config;
+
+        return max($config, $min);
+    }
+
+    private function getString(string $key, string $fallback): string
+    {
+        $config = $this->find($key);
+
+        if ($config === null) {
+            return $fallback;
+        }
+
+        $config = (string) $config;
+
+        if (trim($config) === '') {
+            return $fallback;
+        }
+
+        return $config;
     }
 }

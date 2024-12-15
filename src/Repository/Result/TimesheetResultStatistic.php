@@ -9,17 +9,19 @@
 
 namespace App\Repository\Result;
 
-class TimesheetResultStatistic
+final class TimesheetResultStatistic
 {
-    private $count = 0;
-    private $duration = 0;
-
-    public function __construct(int $count, int $duration)
+    /**
+     * @param int<0, max> $count
+     * @param int<0, max> $duration
+     */
+    public function __construct(private readonly int $count, private readonly int $duration)
     {
-        $this->count = $count;
-        $this->duration = $duration;
     }
 
+    /**
+     * @return int<0, max>
+     */
     public function getCount(): int
     {
         return $this->count;

@@ -13,192 +13,91 @@ use App\Configuration\SystemConfiguration;
 use App\Invoice\InvoiceModel;
 use App\Invoice\NumberGeneratorInterface;
 use App\Repository\InvoiceRepository;
+use App\Utils\NumberGenerator;
 
 final class ConfigurableNumberGenerator implements NumberGeneratorInterface
 {
-    /**
-     * @var InvoiceModel
-     */
-    private $model;
-    /**
-     * @var InvoiceRepository
-     */
-    private $repository;
-    /**
-     * @var SystemConfiguration
-     */
-    private $configuration;
+    private ?InvoiceModel $model = null;
 
-    public function __construct(InvoiceRepository $repository, SystemConfiguration $configuration)
+    public function __construct(
+        private readonly InvoiceRepository $repository,
+        private readonly SystemConfiguration $configuration
+    )
     {
-        $this->repository = $repository;
-        $this->configuration = $configuration;
     }
 
-    /**
-     * @return string
-     */
     public function getId(): string
     {
         return 'default';
     }
 
-    /**
-     * @param InvoiceModel $model
-     */
-    public function setModel(InvoiceModel $model)
+    public function setModel(InvoiceModel $model): void
     {
         $this->model = $model;
     }
 
-    /**
-     * @return string
-     */
     public function getInvoiceNumber(): string
     {
         $format = $this->configuration->find('invoice.number_format');
+        if (empty($format) || !\is_string($format)) {
+            $format = '{Y}/{cy,3}';
+        }
+
         $invoiceDate = $this->model->getInvoiceDate();
-        $result = $format;
 
-        preg_match_all('/{[^}]*?}/', $format, $matches);
-        foreach ($matches[0] as $part) {
-            $partialResult = $this->parseReplacer($invoiceDate, $part);
-            $result = str_replace($part, $partialResult, $result);
-        }
-
-        return (string) $result;
-    }
-
-    private function parseReplacer(\DateTime $invoiceDate, string $originalFormat): string
-    {
-        $formatterLength = null;
+        $loops = 0;
         $increaseBy = 0;
-        $formatPattern = str_replace(['{', '}'], '', $originalFormat);
 
-        $parts = preg_split('/([+\-,])+/', $formatPattern, -1, PREG_SPLIT_DELIM_CAPTURE);
-        $format = array_shift($parts);
-
-        if (\count($parts) % 2 !== 0) {
-            throw new \InvalidArgumentException('Invalid configuration found');
-        }
-
-        while (null !== ($tmp = array_shift($parts))) {
-            switch ($tmp) {
-                case '+':
-                    $local = array_shift($parts);
-                    if (!is_numeric($local)) {
-                        throw new \InvalidArgumentException('Unknown increment found');
-                    }
-                    $increaseBy = $increaseBy + \intval($local);
-                    break;
-
-                case '-':
-                    $local = array_shift($parts);
-                    if (!is_numeric($local)) {
-                        throw new \InvalidArgumentException('Unknown decrement found');
-                    }
-                    $increaseBy = $increaseBy - \intval($local);
-                    break;
-
-                case ',':
-                    $local = array_shift($parts);
-                    if (!is_numeric($local)) {
-                        throw new \InvalidArgumentException('Unknown format length found');
-                    }
-                    $formatterLength = \intval($local);
-                    if ((string) $formatterLength !== $local) {
-                        throw new \InvalidArgumentException('Unknown format length found');
-                    }
-                    break;
-
-                default:
-                    throw new \InvalidArgumentException('Unknown pattern found');
+        $numberGenerator = new NumberGenerator($format, function (string $originalFormat, string $format, int $increaseBy) use ($invoiceDate): string|int {
+            if ($this->model === null) {
+                throw new \InvalidArgumentException('Missing invoice model, cannot calculate invoice number');
             }
-        }
 
-        if ($increaseBy === 0) {
-            $increaseBy = 1;
-        }
+            if ($format === 'cname' && $this->model->getCustomer()?->getName() === null) {
+                throw new \InvalidArgumentException('Customer has no name, replacer {cname} failed evaluation');
+            }
 
-        switch ($format) {
-            case 'Y':
-                $partialResult = $invoiceDate->format('Y');
-                break;
+            if ($format === 'cnumber' && $this->model->getCustomer()?->getNumber() === null) {
+                throw new \InvalidArgumentException('Customer has no number, replacer {cnumber} failed evaluation');
+            }
 
-            case 'y':
-                $partialResult = $invoiceDate->format('y');
-                break;
+            return match ($format) {
+                'Y' => $invoiceDate->format('Y'),
+                'y' => $invoiceDate->format('y'),
+                'M' => $invoiceDate->format('m'),
+                'm' => $invoiceDate->format('n'),
+                'D' => $invoiceDate->format('d'),
+                'd' => $invoiceDate->format('j'),
+                'YY' => (int) $invoiceDate->format('Y') + $increaseBy,
+                'yy' => (int) $invoiceDate->format('y') + $increaseBy,
+                'MM' => (int) $invoiceDate->format('m') + $increaseBy,
+                'DD' => (int) $invoiceDate->format('d') + $increaseBy,
+                'date' => $invoiceDate->format('ymd'),
+                'cc' => $this->repository->getCounterForCustomerAllTime($this->model->getCustomer()) + $increaseBy,
+                'ccy' => $this->repository->getCounterForYear($invoiceDate, $this->model->getCustomer()) + $increaseBy,
+                'ccm' => $this->repository->getCounterForMonth($invoiceDate, $this->model->getCustomer()) + $increaseBy,
+                'ccd' => $this->repository->getCounterForDay($invoiceDate, $this->model->getCustomer()) + $increaseBy,
+                'cu' => $this->repository->getCounterForUserAllTime($this->model->getUser()) + $increaseBy,
+                'cuy' => $this->repository->getCounterForYear($invoiceDate, null, $this->model->getUser()) + $increaseBy,
+                'cum' => $this->repository->getCounterForMonth($invoiceDate, null, $this->model->getUser()) + $increaseBy,
+                'cud' => $this->repository->getCounterForDay($invoiceDate, null, $this->model->getUser()) + $increaseBy,
+                'ustaff' => (string) $this->model->getUser()?->getAccountNumber(),
+                'uid' => (string) $this->model->getUser()?->getId(),
+                'c' => $this->repository->getCounterForCustomerAllTime() + $increaseBy,
+                'cy' => $this->repository->getCounterForYear($invoiceDate) + $increaseBy,
+                'cm' => $this->repository->getCounterForMonth($invoiceDate) + $increaseBy,
+                'cd' => $this->repository->getCounterForDay($invoiceDate) + $increaseBy,
+                'cname' => (string) $this->model->getCustomer()?->getName(),
+                'cnumber' => (string) $this->model->getCustomer()?->getNumber(),
+                default => $originalFormat,
+            };
+        });
 
-            case 'M':
-                $partialResult = $invoiceDate->format('m');
-                break;
+        do {
+            $result = $numberGenerator->getNumber($increaseBy);
+            $increaseBy++;
+        } while ((int) $result < 0 || ($this->repository->hasInvoice($result) && $loops++ < 99));
 
-            case 'm':
-                $partialResult = $invoiceDate->format('n');
-                break;
-
-            case 'D':
-                $partialResult = $invoiceDate->format('d');
-                break;
-
-            case 'd':
-                $partialResult = $invoiceDate->format('j');
-                break;
-
-            case 'date':
-                $partialResult = $invoiceDate->format('ymd');
-                break;
-
-            // for customer
-            case 'cc':
-                $partialResult = $this->repository->getCounterForAllTime($this->model->getCustomer()) + $increaseBy;
-                break;
-
-            case 'ccy':
-                $partialResult = $this->repository->getCounterForYear($invoiceDate, $this->model->getCustomer()) + $increaseBy;
-                break;
-
-            case 'ccm':
-                $partialResult = $this->repository->getCounterForMonth($invoiceDate, $this->model->getCustomer()) + $increaseBy;
-                break;
-
-            case 'ccd':
-                $partialResult = $this->repository->getCounterForDay($invoiceDate, $this->model->getCustomer()) + $increaseBy;
-                break;
-
-            // across all invoices
-            case 'c':
-                $partialResult = $this->repository->getCounterForAllTime() + $increaseBy;
-                break;
-
-            case 'cy':
-                $partialResult = $this->repository->getCounterForYear($invoiceDate) + $increaseBy;
-                break;
-
-            case 'cm':
-                $partialResult = $this->repository->getCounterForMonth($invoiceDate) + $increaseBy;
-                break;
-
-            case 'cd':
-                $partialResult = $this->repository->getCounterForDay($invoiceDate) + $increaseBy;
-                break;
-
-            case 'cname':
-                $partialResult = $this->model->getCustomer()->getName();
-                break;
-
-            case 'cnumber':
-                $partialResult = $this->model->getCustomer()->getNumber();
-                break;
-
-            default:
-                $partialResult = $originalFormat;
-        }
-
-        if (null !== $formatterLength) {
-            $partialResult = str_pad($partialResult, $formatterLength, '0', STR_PAD_LEFT);
-        }
-
-        return $partialResult;
+        return $result;
     }
 }

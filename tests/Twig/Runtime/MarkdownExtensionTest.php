@@ -10,7 +10,7 @@
 namespace App\Tests\Twig\Runtime;
 
 use App\Configuration\ConfigLoaderInterface;
-use App\Configuration\SystemConfiguration;
+use App\Tests\Mocks\SystemConfigurationFactory;
 use App\Twig\Runtime\MarkdownExtension;
 use App\Utils\Markdown;
 use PHPUnit\Framework\TestCase;
@@ -20,19 +20,23 @@ use PHPUnit\Framework\TestCase;
  */
 class MarkdownExtensionTest extends TestCase
 {
-    public function testMarkdownToHtml()
+    public function testMarkdownToHtml(): void
     {
         $loader = $this->createMock(ConfigLoaderInterface::class);
-        $config = new SystemConfiguration($loader, ['timesheet' => ['markdown_content' => true]]);
+        $config = SystemConfigurationFactory::create($loader, ['timesheet' => ['markdown_content' => true]]);
         $sut = new MarkdownExtension(new Markdown(), $config);
         $this->assertEquals('<p><em>test</em></p>', $sut->markdownToHtml('*test*'));
-        $this->assertEquals('<p># foobar</p>', $sut->markdownToHtml('# foobar'));
+        $this->assertEquals('<h1>foobar</h1>', $sut->markdownToHtml('# foobar'));
+        $this->assertEquals(
+            '<p><a href="javascript%3Aalert(`XSS`)">XSS</a></p>',
+            $sut->markdownToHtml('[XSS](javascript:alert(`XSS`))')
+        );
     }
 
-    public function testTimesheetContent()
+    public function testTimesheetContent(): void
     {
         $loader = $this->createMock(ConfigLoaderInterface::class);
-        $config = new SystemConfiguration($loader, ['timesheet' => ['markdown_content' => false]]);
+        $config = SystemConfigurationFactory::create($loader, ['timesheet' => ['markdown_content' => false]]);
         $sut = new MarkdownExtension(new Markdown(), $config);
         $this->assertEquals(
             "- test<br />\n- foo",
@@ -40,19 +44,26 @@ class MarkdownExtensionTest extends TestCase
         );
         $this->assertEquals('', $sut->timesheetContent(null));
         $this->assertEquals('', $sut->timesheetContent(''));
+        $this->assertEquals('# foobar', $sut->timesheetContent('# foobar'));
+        $this->assertEquals('## foobar', $sut->timesheetContent('## foobar'));
+        $this->assertEquals('### foobar', $sut->timesheetContent('### foobar'));
 
-        $config = new SystemConfiguration($loader, ['timesheet' => ['markdown_content' => true]]);
+        $config = SystemConfigurationFactory::create($loader, ['timesheet' => ['markdown_content' => true]]);
         $sut = new MarkdownExtension(new Markdown(), $config);
         $this->assertEquals(
             "<ul>\n<li>test</li>\n<li>foo</li>\n</ul>\n<p>foo <strong>bar</strong></p>",
             $sut->timesheetContent("- test\n- foo\n\nfoo __bar__")
         );
+        $this->assertEquals(
+            '<p><a href="javascript%3Aalert(`XSS`)">XSS</a></p>',
+            $sut->timesheetContent('[XSS](javascript:alert(`XSS`))')
+        );
     }
 
-    public function testCommentContent()
+    public function testCommentContent(): void
     {
         $loader = $this->createMock(ConfigLoaderInterface::class);
-        $config = new SystemConfiguration($loader, ['timesheet' => ['markdown_content' => false]]);
+        $config = SystemConfigurationFactory::create($loader, ['timesheet' => ['markdown_content' => false]]);
         $sut = new MarkdownExtension(new Markdown(), $config);
         $this->assertEquals(
             "<p>- test<br />\n- foo</p>",
@@ -63,25 +74,36 @@ class MarkdownExtensionTest extends TestCase
             $sut->commentContent("- test\n- foo", false)
         );
 
-        $loremIpsum = 'Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua.';
+        $loremIpsum = 'Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua.';
+        $loremIpsumShort = 'Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut l &hellip;';
 
         $this->assertEquals('', $sut->commentContent(null));
         $this->assertEquals('', $sut->commentContent(''));
+        $this->assertEquals('# foobar', $sut->commentContent('# foobar', false));
+        $this->assertEquals('<p># foobar</p>', $sut->commentContent('# foobar', true));
+        $this->assertEquals('<p># foobar</p>', $sut->commentContent('# foobar'));
+        $this->assertEquals('## foobar', $sut->commentContent('## foobar', false));
+        $this->assertEquals('### foobar', $sut->commentContent('### foobar', false));
         $this->assertEquals('<p>' . $loremIpsum . '</p>', $sut->commentContent($loremIpsum, true));
-        $this->assertEquals('Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut l &hellip;', $sut->commentContent($loremIpsum));
+        $this->assertEquals('<p>' . $loremIpsum . '</p>', $sut->commentContent($loremIpsum));
+        $this->assertEquals($loremIpsumShort, $sut->commentContent($loremIpsum, false));
 
-        $config = new SystemConfiguration($loader, ['timesheet' => ['markdown_content' => true]]);
+        $config = SystemConfigurationFactory::create($loader, ['timesheet' => ['markdown_content' => true]]);
         $sut = new MarkdownExtension(new Markdown(), $config);
         $this->assertEquals(
             "<ul>\n<li>test</li>\n<li>foo</li>\n</ul>\n<p>foo <strong>bar</strong></p>",
             $sut->commentContent("- test\n- foo\n\nfoo __bar__")
         );
+        $this->assertEquals(
+            '<p><a href="javascript%3Aalert(`XSS`)">XSS</a></p>',
+            $sut->commentContent('[XSS](javascript:alert(`XSS`))')
+        );
     }
 
-    public function testCommentOneLiner()
+    public function testCommentOneLiner(): void
     {
         $loader = $this->createMock(ConfigLoaderInterface::class);
-        $config = new SystemConfiguration($loader, []);
+        $config = SystemConfigurationFactory::create($loader, []);
         $sut = new MarkdownExtension(new Markdown(), $config);
 
         $loremIpsum = 'Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua.';

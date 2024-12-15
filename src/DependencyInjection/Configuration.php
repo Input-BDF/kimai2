@@ -9,28 +9,20 @@
 
 namespace App\DependencyInjection;
 
-use App\Constants;
 use App\Entity\Customer;
 use App\Entity\User;
+use App\Form\Helper\ActivityHelper;
+use App\Form\Helper\CustomerHelper;
+use App\Form\Helper\ProjectHelper;
 use App\Repository\InvoiceDocumentRepository;
 use App\Timesheet\Rounding\RoundingInterface;
-use App\Widget\Type\CompoundRow;
-use App\Widget\Type\Counter;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
-/**
- * This class validates and merges configuration from the files:
- * - config/packages/kimai.yaml
- * - config/packages/local.yaml
- */
-class Configuration implements ConfigurationInterface
+final class Configuration implements ConfigurationInterface
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function getConfigTreeBuilder()
+    public function getConfigTreeBuilder(): TreeBuilder
     {
         $treeBuilder = new TreeBuilder('kimai');
         /** @var ArrayNodeDefinition $node */
@@ -51,31 +43,126 @@ class Configuration implements ConfigurationInterface
                         ->thenInvalid('Data directory does not exist')
                     ->end()
                 ->end()
-                ->scalarNode('plugin_dir')
-                    ->setDeprecated('Changing the plugin directory via "kimai.plugin_dir" is not supported since 1.9')
-                ->end()
                 ->append($this->getUserNode())
+                ->append($this->getCustomerNode())
                 ->append($this->getTimesheetNode())
                 ->append($this->getInvoiceNode())
                 ->append($this->getExportNode())
-                ->append($this->getLanguagesNode())
                 ->append($this->getCalendarNode())
                 ->append($this->getThemeNode())
                 ->append($this->getCompanyNode())
-                ->append($this->getIndustryNode())
-                ->append($this->getDashboardNode())
-                ->append($this->getWidgetsNode())
                 ->append($this->getDefaultsNode())
                 ->append($this->getPermissionsNode())
                 ->append($this->getLdapNode())
                 ->append($this->getSamlNode())
+                ->append($this->getQuickEntryNode())
+                ->append($this->getActivityNode())
+                ->append($this->getProjectNode())
+                ->append($this->getFeaturesNode())
             ->end()
         ->end();
 
         return $treeBuilder;
     }
 
-    protected function getTimesheetNode()
+    private function getFeaturesNode(): ArrayNodeDefinition
+    {
+        $builder = new TreeBuilder('features');
+        /** @var ArrayNodeDefinition $node */
+        $node = $builder->getRootNode();
+
+        $node
+            ->addDefaultsIfNotSet()
+                ->children()
+                    // this feature was deactivated in order to deprecate/remove it in the future, very likely not necessary for anyone
+                    ->integerNode('user_registration')
+                ->defaultFalse()
+                ->end()
+            ->end()
+        ;
+
+        return $node;
+    }
+
+    private function getQuickEntryNode(): ArrayNodeDefinition
+    {
+        $builder = new TreeBuilder('quick_entry');
+        /** @var ArrayNodeDefinition $node */
+        $node = $builder->getRootNode();
+
+        $node
+            ->addDefaultsIfNotSet()
+            ->children()
+                ->integerNode('recent_activities')
+                    ->defaultValue(5)
+                ->end()
+                ->integerNode('recent_activity_weeks')
+                    ->defaultNull()
+                ->end()
+                ->integerNode('minimum_rows')
+                    ->defaultValue(3)
+                ->end()
+            ->end()
+        ;
+
+        return $node;
+    }
+
+    private function getProjectNode(): ArrayNodeDefinition
+    {
+        $builder = new TreeBuilder('project');
+        /** @var ArrayNodeDefinition $node */
+        $node = $builder->getRootNode();
+
+        $node
+            ->addDefaultsIfNotSet()
+            ->children()
+                ->scalarNode('choice_pattern')
+                    ->defaultValue(ProjectHelper::PATTERN_NAME)
+                ->end()
+                ->booleanNode('copy_teams_on_create')
+                    ->defaultValue(false)
+                ->end()
+                ->scalarNode('number_format')
+                    ->defaultValue('{pc,4}')
+                ->end()
+                ->booleanNode('allow_duplicate_number')
+                    ->defaultFalse()
+                ->end()
+            ->end()
+        ;
+
+        return $node;
+    }
+
+    private function getActivityNode(): ArrayNodeDefinition
+    {
+        $builder = new TreeBuilder('activity');
+        /** @var ArrayNodeDefinition $node */
+        $node = $builder->getRootNode();
+
+        $node
+            ->addDefaultsIfNotSet()
+            ->children()
+                ->scalarNode('choice_pattern')
+                    ->defaultValue(ActivityHelper::PATTERN_NAME)
+                ->end()
+                ->booleanNode('allow_inline_create')
+                    ->defaultValue(false)
+                ->end()
+                ->scalarNode('number_format')
+                    ->defaultValue('{ac,4}')
+                ->end()
+                ->booleanNode('allow_duplicate_number')
+                    ->defaultFalse()
+                ->end()
+            ->end()
+        ;
+
+        return $node;
+    }
+
+    private function getTimesheetNode(): ArrayNodeDefinition
     {
         $builder = new TreeBuilder('timesheet');
         /** @var ArrayNodeDefinition $node */
@@ -86,17 +173,14 @@ class Configuration implements ConfigurationInterface
                 ->scalarNode('default_begin')
                     ->defaultValue('now')
                 ->end()
-                ->booleanNode('duration_only')
-                    ->setDeprecated()
-                ->end()
                 ->scalarNode('mode')
                     ->defaultValue('default')
                 ->end()
                 ->booleanNode('markdown_content')
                     ->defaultValue(false)
                 ->end()
-                ->scalarNode('duration_increment')
-                    ->defaultNull()
+                ->integerNode('duration_increment')
+                    ->defaultValue(15)
                     ->validate()
                         ->ifTrue(function ($value) {
                             if ($value !== null) {
@@ -108,8 +192,8 @@ class Configuration implements ConfigurationInterface
                         ->thenInvalid('Duration increment is invalid')
                     ->end()
                 ->end()
-                ->scalarNode('time_increment')
-                    ->defaultNull()
+                ->integerNode('time_increment')
+                    ->defaultValue(15)
                     ->validate()
                         ->ifTrue(function ($value) {
                             if ($value !== null) {
@@ -197,16 +281,6 @@ class Configuration implements ConfigurationInterface
                 ->arrayNode('active_entries')
                     ->addDefaultsIfNotSet()
                     ->children()
-                        ->integerNode('soft_limit')
-                            ->defaultValue(1)
-                            ->setDeprecated('The node "%node%" at path "%path%" is deprecated, please use "kimai.timesheet.active_entries.hard_limit" instead.')
-                            ->validate()
-                                ->ifTrue(function ($value) {
-                                    return $value <= 0;
-                                })
-                                ->thenInvalid('The soft_limit must be at least 1')
-                            ->end()
-                        ->end()
                         ->integerNode('hard_limit')
                             ->defaultValue(1)
                             ->validate()
@@ -222,6 +296,9 @@ class Configuration implements ConfigurationInterface
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->booleanNode('allow_future_times')
+                            ->defaultTrue()
+                        ->end()
+                        ->booleanNode('allow_zero_duration')
                             ->defaultTrue()
                         ->end()
                         ->booleanNode('allow_overbooking_budget')
@@ -251,6 +328,12 @@ class Configuration implements ConfigurationInterface
                         ->integerNode('long_running_duration')
                             ->defaultValue(0)
                         ->end()
+                        ->booleanNode('require_activity')
+                            ->defaultTrue()
+                        ->end()
+                        ->booleanNode('break_time_active')
+                            ->defaultFalse()
+                        ->end()
                     ->end()
                 ->end()
             ->end()
@@ -259,7 +342,7 @@ class Configuration implements ConfigurationInterface
         return $node;
     }
 
-    protected function getInvoiceNode()
+    private function getInvoiceNode(): ArrayNodeDefinition
     {
         $builder = new TreeBuilder('invoice');
         /** @var ArrayNodeDefinition $node */
@@ -280,11 +363,11 @@ class Configuration implements ConfigurationInterface
                     ->scalarPrototype()->end()
                     ->defaultValue([])
                 ->end()
-                ->booleanNode('simple_form')
-                    ->defaultFalse()
-                ->end()
                 ->scalarNode('number_format')
                     ->defaultValue('{Y}/{cy,3}')
+                ->end()
+                ->booleanNode('upload_twig')
+                    ->defaultFalse()
                 ->end()
             ->end()
         ;
@@ -292,7 +375,7 @@ class Configuration implements ConfigurationInterface
         return $node;
     }
 
-    protected function getExportNode()
+    private function getExportNode(): ArrayNodeDefinition
     {
         $builder = new TreeBuilder('export');
         /** @var ArrayNodeDefinition $node */
@@ -319,31 +402,7 @@ class Configuration implements ConfigurationInterface
         return $node;
     }
 
-    protected function getLanguagesNode()
-    {
-        $builder = new TreeBuilder('languages');
-        /** @var ArrayNodeDefinition $node */
-        $node = $builder->getRootNode();
-
-        $node
-            ->useAttributeAsKey('name', false) // see https://github.com/symfony/symfony/issues/18988
-            ->arrayPrototype()
-                ->children()
-                    ->scalarNode('date_time_type')->defaultValue('yyyy-MM-dd HH:mm')->end()     // for DateTimeType
-                    ->scalarNode('date_type')->defaultValue('yyyy-MM-dd')->end()                // for DateType
-                    ->scalarNode('date')->defaultValue('Y-m-d')->end()                          // for display via twig
-                    ->scalarNode('date_time')->defaultValue('m-d H:i')->end()                   // for display via twig
-                    ->scalarNode('duration')->defaultValue('%%h:%%m h')->end()                  // for display via twig
-                    ->scalarNode('time')->defaultValue('H:i')->end()                            // for display via twig
-                    ->booleanNode('24_hours')->defaultTrue()->end()                             // for DateTimeType JS component
-                ->end()
-            ->end()
-        ;
-
-        return $node;
-    }
-
-    protected function getCalendarNode()
+    private function getCalendarNode(): ArrayNodeDefinition
     {
         $builder = new TreeBuilder('calendar');
         /** @var ArrayNodeDefinition $node */
@@ -358,11 +417,6 @@ class Configuration implements ConfigurationInterface
                 ->arrayNode('businessHours')
                     ->addDefaultsIfNotSet()
                     ->children()
-                        ->arrayNode('days')
-                            ->requiresAtLeastOneElement()
-                            ->integerPrototype()->end()
-                            ->defaultValue([1, 2, 3, 4, 5])
-                        ->end()
                         ->scalarNode('begin')->defaultValue('08:00')->end()
                         ->scalarNode('end')->defaultValue('20:00')->end()
                     ->end()
@@ -392,7 +446,7 @@ class Configuration implements ConfigurationInterface
                 ->end()
                 ->booleanNode('weekends')->defaultTrue()->end()
                 ->integerNode('dragdrop_amount')
-                    ->defaultValue(10)
+                    ->defaultValue(5)
                     ->validate()
                         ->ifTrue(static function ($v) {
                             if ($v === null || $v < 0 || $v > 20) {
@@ -404,13 +458,18 @@ class Configuration implements ConfigurationInterface
                         ->thenInvalid('The dragdrop_amount must be between 0 and 20')
                     ->end()
                 ->end()
+                ->booleanNode('dragdrop_data')->defaultFalse()->end()
+                ->enumNode('title_pattern')
+                    ->values(['{activity}', '{project}', '{customer}', '{description}'])
+                    ->defaultValue('{activity}')
+                ->end()
             ->end()
         ;
 
         return $node;
     }
 
-    protected function getThemeNode()
+    private function getThemeNode(): ArrayNodeDefinition
     {
         $builder = new TreeBuilder('theme');
         /** @var ArrayNodeDefinition $node */
@@ -419,21 +478,6 @@ class Configuration implements ConfigurationInterface
         $node
             ->addDefaultsIfNotSet()
             ->children()
-                ->integerNode('active_warning')
-                    ->defaultValue(3)
-                    ->setDeprecated('The node "%node%" at path "%path%" is deprecated, please use "kimai.timesheet.active_entries.soft_limit" instead.')
-                ->end()
-                ->scalarNode('box_color')
-                    ->defaultValue('blue')
-                    ->setDeprecated('The node "%node%" at path "%path%" was removed, please delete it from your config.')
-                ->end()
-                ->scalarNode('select_type')
-                    ->defaultValue('selectpicker')
-                    ->setDeprecated()
-                ->end()
-                ->booleanNode('tags_create')
-                    ->defaultTrue()
-                ->end()
                 ->booleanNode('show_about')
                     ->defaultTrue()
                 ->end()
@@ -450,21 +494,6 @@ class Configuration implements ConfigurationInterface
                         'Purple|#800080', 'Fuchsia|#ff00ff', 'Violet|#ee82ee', 'Rose|#ffe4e1', 'Lavender|#E6E6FA'
                     ]))
                 ->end()
-                ->arrayNode('chart')
-                    ->addDefaultsIfNotSet()
-                    ->children()
-                        ->scalarNode('background_color')->defaultValue('#3c8dbc')->end() // rgba(0,115,183,0.7) = #0073b7 = Constants::DEFAULT_COLOR
-                        ->scalarNode('border_color')->defaultValue('#3b8bba')->end()
-                        ->scalarNode('grid_color')->defaultValue('rgba(0,0,0,.05)')->end()
-                        ->scalarNode('height')->defaultValue('200')->end()
-                    ->end()
-                ->end()
-                ->arrayNode('calendar')
-                    ->addDefaultsIfNotSet()
-                    ->children()
-                        ->scalarNode('background_color')->defaultValue(Constants::DEFAULT_COLOR)->end()
-                    ->end()
-                ->end()
                 ->arrayNode('branding')
                     ->addDefaultsIfNotSet()
                     ->children()
@@ -480,16 +509,7 @@ class Configuration implements ConfigurationInterface
                         ->scalarNode('title')
                             ->defaultNull()
                         ->end()
-                        ->scalarNode('translation')
-                            ->defaultNull()
-                        ->end()
                     ->end()
-                ->end()
-                ->integerNode('autocomplete_chars')
-                    ->defaultValue(3)
-                ->end()
-                ->booleanNode('random_colors')
-                    ->defaultTrue()
                 ->end()
                 ->booleanNode('avatar_url')
                     ->defaultFalse()
@@ -500,23 +520,7 @@ class Configuration implements ConfigurationInterface
         return $node;
     }
 
-    protected function getIndustryNode()
-    {
-        $builder = new TreeBuilder('industry');
-        /** @var ArrayNodeDefinition $node */
-        $node = $builder->getRootNode();
-
-        $node
-            ->addDefaultsIfNotSet()
-            ->children()
-                ->scalarNode('translation')->defaultNull()->end()
-            ->end()
-        ;
-
-        return $node;
-    }
-
-    protected function getCompanyNode()
+    private function getCompanyNode(): ArrayNodeDefinition
     {
         $builder = new TreeBuilder('company');
         /** @var ArrayNodeDefinition $node */
@@ -532,7 +536,7 @@ class Configuration implements ConfigurationInterface
         return $node;
     }
 
-    protected function getUserNode()
+    private function getUserNode(): ArrayNodeDefinition
     {
         $builder = new TreeBuilder('user');
         /** @var ArrayNodeDefinition $node */
@@ -551,7 +555,7 @@ class Configuration implements ConfigurationInterface
                     ->defaultTrue()
                 ->end()
                 ->integerNode('password_reset_retry_ttl')
-                    ->defaultValue(7200)
+                    ->defaultValue(3600)
                 ->end()
                 ->integerNode('password_reset_token_ttl')
                     ->defaultValue(86400)
@@ -562,53 +566,26 @@ class Configuration implements ConfigurationInterface
         return $node;
     }
 
-    protected function getWidgetsNode()
+    private function getCustomerNode(): ArrayNodeDefinition
     {
-        $builder = new TreeBuilder('widgets');
+        $builder = new TreeBuilder('customer');
         /** @var ArrayNodeDefinition $node */
         $node = $builder->getRootNode();
 
         $node
-            ->requiresAtLeastOneElement()
-            ->useAttributeAsKey('key')
-            ->arrayPrototype()
-                ->addDefaultsIfNotSet()
-                ->children()
-                    ->scalarNode('title')->isRequired()->end()
-                    ->scalarNode('query')->isRequired()->end()
-                    ->booleanNode('user')->defaultFalse()->end()
-                    ->scalarNode('begin')->end()
-                    ->scalarNode('end')->end()
-                    ->scalarNode('icon')->defaultValue('')->end()
-                    ->scalarNode('color')->defaultValue('')->end()
-                    ->scalarNode('type')->defaultValue(Counter::class)->end()
+            ->addDefaultsIfNotSet()
+            ->children()
+                ->scalarNode('choice_pattern')
+                    ->defaultValue(CustomerHelper::PATTERN_NAME)
                 ->end()
-            ->end()
-        ;
-
-        return $node;
-    }
-
-    protected function getDashboardNode()
-    {
-        $builder = new TreeBuilder('dashboard');
-        /** @var ArrayNodeDefinition $node */
-        $node = $builder->getRootNode();
-
-        $node
-            ->requiresAtLeastOneElement()
-                ->useAttributeAsKey('key')
-                ->arrayPrototype()
+                ->scalarNode('number_format')
+                    ->defaultValue('{cc,4}')
+                ->end()
+                ->arrayNode('rules')
                     ->addDefaultsIfNotSet()
                     ->children()
-                        ->scalarNode('type')->defaultValue(CompoundRow::class)->end()
-                        ->integerNode('order')->defaultValue(0)->end()
-                        ->scalarNode('title')->end()
-                        ->scalarNode('permission')->defaultNull()->end()
-                        ->arrayNode('widgets')
-                            ->isRequired()
-                            ->performNoDeepMerging()
-                            ->scalarPrototype()
+                        ->booleanNode('allow_duplicate_number')
+                            ->defaultFalse()
                         ->end()
                     ->end()
                 ->end()
@@ -618,7 +595,7 @@ class Configuration implements ConfigurationInterface
         return $node;
     }
 
-    protected function getDefaultsNode()
+    private function getDefaultsNode(): ArrayNodeDefinition
     {
         $builder = new TreeBuilder('defaults');
         /** @var ArrayNodeDefinition $node */
@@ -640,7 +617,7 @@ class Configuration implements ConfigurationInterface
                     ->children()
                         ->scalarNode('timezone')->defaultNull()->end()
                         ->scalarNode('language')->defaultValue(User::DEFAULT_LANGUAGE)->end()
-                        ->scalarNode('theme')->defaultNull()->end()
+                        ->scalarNode('theme')->defaultValue('default')->end()
                         ->scalarNode('currency')->defaultValue(Customer::DEFAULT_CURRENCY)->end()
                     ->end()
                 ->end()
@@ -650,7 +627,7 @@ class Configuration implements ConfigurationInterface
         return $node;
     }
 
-    protected function getPermissionsNode()
+    private function getPermissionsNode(): ArrayNodeDefinition
     {
         $builder = new TreeBuilder('permissions');
         /** @var ArrayNodeDefinition $node */
@@ -700,7 +677,7 @@ class Configuration implements ConfigurationInterface
         return $node;
     }
 
-    protected function getLdapNode()
+    private function getLdapNode(): ArrayNodeDefinition
     {
         $treeBuilder = new TreeBuilder('ldap');
         $node = $treeBuilder->getRootNode();
@@ -823,7 +800,7 @@ class Configuration implements ConfigurationInterface
         return $node;
     }
 
-    protected function getSamlNode()
+    private function getSamlNode(): ArrayNodeDefinition
     {
         $builder = new TreeBuilder('saml');
         /** @var ArrayNodeDefinition $node */
@@ -838,9 +815,17 @@ class Configuration implements ConfigurationInterface
                 ->scalarNode('title')
                     ->defaultValue('Login with SAML')
                 ->end()
+                ->scalarNode('provider')
+                    // the "default" was only added, to prevent support requests by people who did not
+                    // adjust their config between 1.x and 2.0
+                    ->defaultValue('default')
+                ->end()
                 ->arrayNode('roles')
                     ->addDefaultsIfNotSet()
                     ->children()
+                        ->booleanNode('resetOnLogin')
+                            ->defaultTrue()
+                        ->end()
                         ->scalarNode('attribute')
                             ->defaultNull()
                         ->end()

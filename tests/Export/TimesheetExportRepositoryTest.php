@@ -22,7 +22,7 @@ use PHPUnit\Framework\TestCase;
  */
 class TimesheetExportRepositoryTest extends TestCase
 {
-    public function testSetExported()
+    public function testSetExported(): void
     {
         $repository = $this->createMock(TimesheetRepository::class);
         $repository->expects($this->once())->method('setExported')->willReturnCallback(function (array $items) {
@@ -31,14 +31,13 @@ class TimesheetExportRepositoryTest extends TestCase
 
         $sut = new TimesheetExportRepository($repository);
 
-        /* @phpstan-ignore-next-line */
         $sut->setExported([new Timesheet(), null, new \stdClass(), new Timesheet(), new Activity()]);
         // test else for empty array
-        /* @phpstan-ignore-next-line */
-        $sut->setExported([new Customer(), new Project()]);
+        /* @phpstan-ignore argument.type */
+        $sut->setExported([new Customer('foo'), new Project()]);
     }
 
-    public function testSetType()
+    public function testSetType(): void
     {
         $repository = $this->createMock(TimesheetRepository::class);
         $sut = new TimesheetExportRepository($repository);

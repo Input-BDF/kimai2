@@ -17,7 +17,7 @@ use PHPUnit\Framework\TestCase;
  */
 class InvoiceItemTest extends TestCase
 {
-    public function testEmptyObject()
+    public function testEmptyObject(): void
     {
         $sut = new InvoiceItem();
 
@@ -32,6 +32,7 @@ class InvoiceItemTest extends TestCase
         self::assertEmpty($sut->getAdditionalFields());
         self::assertNull($sut->getAdditionalField('foo'));
         self::assertEquals('bar', $sut->getAdditionalField('foo', 'bar'));
+        self::assertNull($sut->getAdditionalField('foo'));
         self::assertInstanceOf(InvoiceItem::class, $sut->addAdditionalField('foo', 'bar2'));
         self::assertEquals('bar2', $sut->getAdditionalField('foo'));
         self::assertEquals(0, $sut->getAmount());

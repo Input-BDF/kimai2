@@ -12,37 +12,34 @@ namespace App\Repository\Paginator;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 
+/**
+ * @deprecated use QueryPaginator instead
+ * @implements PaginatorInterface<mixed>
+ */
 final class QueryBuilderPaginator implements PaginatorInterface
 {
     /**
-     * @var QueryBuilder
+     * @param int<0, max> $results
      */
-    private $query;
-    /**
-     * @var int
-     */
-    private $results = 0;
-
-    public function __construct(QueryBuilder $query, int $results)
+    public function __construct(
+        private readonly QueryBuilder $queryBuilder,
+        private readonly int $results
+    )
     {
-        $this->query = $query;
-        $this->results = $results;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getNbResults()
+    public function getNbResults(): int
     {
         return $this->results;
     }
 
     /**
-     * {@inheritdoc}
+     * @return iterable<array-key, mixed>
      */
-    public function getSlice($offset, $length)
+    public function getSlice(int $offset, int $length): iterable
     {
-        $query = $this->query
+        /** @var Query<null, mixed> $query */
+        $query = $this->queryBuilder
             ->getQuery()
             ->setFirstResult($offset)
             ->setMaxResults($length);
@@ -50,13 +47,20 @@ final class QueryBuilderPaginator implements PaginatorInterface
         return $this->getResults($query);
     }
 
-    private function getResults(Query $query)
+    /**
+     * @param Query<null, mixed> $query
+     * @return iterable<array-key, mixed>
+     */
+    private function getResults(Query $query): iterable
     {
-        return $query->execute();
+        return $query->execute(); // @phpstan-ignore-line
     }
 
+    /**
+     * @return iterable<array-key, mixed>
+     */
     public function getAll(): iterable
     {
-        return $this->getResults($this->query->getQuery());
+        return $this->getResults($this->queryBuilder->getQuery());
     }
 }

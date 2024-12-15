@@ -16,6 +16,7 @@ use JMS\Serializer\GraphNavigatorInterface;
 use JMS\Serializer\JsonSerializationVisitor;
 use JMS\Serializer\SerializationContext;
 use PHPUnit\Framework\TestCase;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\ErrorHandler\Exception\FlattenException;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -26,7 +27,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  */
 class ValidationFailedExceptionErrorHandlerTest extends TestCase
 {
-    public function testSubscribingMethods()
+    public function testSubscribingMethods(): void
     {
         self::assertEquals([[
             'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
@@ -43,11 +44,12 @@ class ValidationFailedExceptionErrorHandlerTest extends TestCase
         ]], ValidationFailedExceptionErrorHandler::getSubscribingMethods());
     }
 
-    public function testWithEmptyConstraintsList()
+    public function testWithEmptyConstraintsList(): void
     {
+        $security = $this->createMock(Security::class);
         $translator = $this->createMock(TranslatorInterface::class);
         $handler = $this->createMock(FlattenExceptionHandler::class);
-        $sut = new ValidationFailedExceptionErrorHandler($translator, $handler);
+        $sut = new ValidationFailedExceptionErrorHandler($translator, $handler, $security);
 
         $constraints = new ConstraintViolationList();
         $validations = new ValidationFailedException($constraints, 'Uuups, that is broken');
@@ -62,12 +64,13 @@ class ValidationFailedExceptionErrorHandlerTest extends TestCase
         self::assertEquals($expected, $sut->serializeValidationExceptionToJson(new JsonSerializationVisitor(), $validations, [], new SerializationContext()));
     }
 
-    public function testWithUnsupportedException()
+    public function testWithUnsupportedException(): void
     {
+        $security = $this->createMock(Security::class);
         $translator = $this->createMock(TranslatorInterface::class);
         $handler = $this->createMock(FlattenExceptionHandler::class);
         $handler->method('serializeToJson')->willReturn('foooo');
-        $sut = new ValidationFailedExceptionErrorHandler($translator, $handler);
+        $sut = new ValidationFailedExceptionErrorHandler($translator, $handler, $security);
         $actual = $sut->serializeExceptionToJson(
             new JsonSerializationVisitor(),
             FlattenException::createFromThrowable(new \Exception('sdfsdf')),
@@ -78,11 +81,12 @@ class ValidationFailedExceptionErrorHandlerTest extends TestCase
         self::assertEquals('foooo', $actual);
     }
 
-    public function testWithConstraintsList()
+    public function testWithConstraintsList(): void
     {
+        $security = $this->createMock(Security::class);
         $translator = $this->createMock(TranslatorInterface::class);
         $handler = $this->createMock(FlattenExceptionHandler::class);
-        $sut = new ValidationFailedExceptionErrorHandler($translator, $handler);
+        $sut = new ValidationFailedExceptionErrorHandler($translator, $handler, $security);
         $translator->method('trans')->willReturnArgument(0);
 
         $constraints = new ConstraintViolationList();
@@ -121,12 +125,13 @@ class ValidationFailedExceptionErrorHandlerTest extends TestCase
         ));
     }
 
-    public function testWithConstraintsListAndWrongException()
+    public function testWithConstraintsListAndWrongException(): void
     {
+        $security = $this->createMock(Security::class);
         $translator = $this->createMock(TranslatorInterface::class);
         $handler = $this->createMock(FlattenExceptionHandler::class);
         $handler->method('serializeToJson')->willReturn('foooo');
-        $sut = new ValidationFailedExceptionErrorHandler($translator, $handler);
+        $sut = new ValidationFailedExceptionErrorHandler($translator, $handler, $security);
         $translator->method('trans')->willReturnArgument(0);
 
         $constraints = new ConstraintViolationList();

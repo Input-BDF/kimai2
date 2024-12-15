@@ -16,36 +16,24 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 /**
  * Custom form field type to select the themes skin.
  */
-class SkinType extends AbstractType
+final class SkinType extends AbstractType
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public const THEMES = [
+        'skin.light' => 'default',
+        'skin.dark' => 'dark',
+    ];
+
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
+            'label' => 'skin',
+            'search' => false,
             'required' => true,
-            'choices' => [
-                'blue' => 'blue',
-                'black' => 'black',
-                'green' => 'green',
-                'purple' => 'purple',
-                'red' => 'red',
-                'yellow' => 'yellow',
-                'blue-light' => 'blue-light',
-                'black-light' => 'black-light',
-                'green-light' => 'green-light',
-                'purple-light' => 'purple-light',
-                'red-light' => 'red-light',
-                'yellow-light' => 'yellow-light',
-            ]
+            'choices' => self::THEMES,
         ]);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getParent()
+    public function getParent(): string
     {
         return ChoiceType::class;
     }

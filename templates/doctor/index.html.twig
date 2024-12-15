@@ -1,27 +1,37 @@
 {% extends 'base.html.twig' %}
-{% import "macros/widgets.html.twig" as widgets %}
 
-{% block page_title %}{{ 'menu.doctor'|trans }}{% endblock %}
-{% block page_subtitle %}Environment: {{ environment }} &ndash; Version: {{ constant('App\\Constants::VERSION') }} {{ constant('App\\Constants::STATUS') }}{% endblock %}
-{% block page_actions %}
-    {% set event = actions(app.user, 'doctor', 'index') %}
-    {{ widgets.page_actions(event.actions) }}
+{% block status %}
+    {% from "macros/status.html.twig" import status %}
+    {{ status(constant('App\\Constants::VERSION')) }}
+    {{ status(environment, environment == 'dev' ? 'red' : 'green') }}
 {% endblock %}
 
 {% block main %}
 
-    {% set permissionOpts = {collapsed: true, boxtype: 'success'} %}
+    {% if release is not null and release is iterable %}
+        {% embed '@theme/embeds/card.html.twig' with {'release': release, boxtype: 'warning'} %}
+            {% block box_title %}Kimai {{ release.version }} available (released on {{ release.date|date_short }}){% endblock %}
+            {% block box_body %}
+                {{ release.content|md2html }}
+                <p>
+                    <a class="btn btn-primary" href="{{ release.url }}" target=_blank">Read more</a>
+                </p>
+            {% endblock %}
+        {% endembed %}
+    {% endif %}
+
+    {% set permissionOpts = {boxtype: 'success'} %}
     {% for name, value in directories %}
         {% if value is same as (false) %}
-            {% set permissionOpts = {boxtype: 'danger'} %}
+            {% set permissionOpts = {boxtype: 'danger', open: true} %}
         {% endif %}
     {% endfor %}
 
-    {% embed '@AdminLTE/Widgets/box-widget.html.twig' with permissionOpts %}
-        {% block box_title %}File permissions{% endblock %}
-        {% block box_body %}
+    {% embed '@theme/embeds/collapsible.html.twig' with permissionOpts %}
+        {% block title %}File permissions{% endblock %}
+        {% block body %}
             <p>
-                If you see a warning icon <i class="{{ 'warning'|icon }} text-red"></i> in the list below, you should talk to your administrator.
+                If you see a warning icon <i class="{{ 'warning'|icon(false) }} text-red"></i> in the list below, you should talk to your administrator.
                 The path is either not readable or not writable and Kimai might not work as expected.
             </p>
             <table class="table">
@@ -30,9 +40,9 @@
                         <th style="width:15%">{{ name }}</th>
                         <td>
                             {% if value is same as (false) %}
-                                <i class="{{ 'warning'|icon }} text-red"></i>
+                                <i class="{{ 'warning'|icon(false) }} text-red"></i>
                             {% else %}
-                                <i class="{{ 'success'|icon }} text-green"></i>
+                                <i class="{{ 'success'|icon(false) }} text-green"></i>
                             {% endif %}
                         </td>
                     </tr>
@@ -41,19 +51,18 @@
         {% endblock %}
     {% endembed %}
 
-    {% set extensionOpts = {collapsed: true, boxtype: 'success'} %}
+    {% set extensionOpts = {boxtype: 'success'} %}
     {% for name, value in extensions %}
         {% if value is same as (false) %}
-            {% set extensionOpts = {boxtype: 'danger'} %}
+            {% set extensionOpts = {boxtype: 'danger', open: true} %}
         {% endif %}
     {% endfor %}
 
-    {% embed '@AdminLTE/Widgets/box-widget.html.twig' with extensionOpts %}
-        {% block box_title %}Required PHP extensions{% endblock %}
-        {% block box_body %}
+    {% embed '@theme/embeds/collapsible.html.twig' with extensionOpts %}
+        {% block title %}PHP extensions{% endblock %}
+        {% block body %}
             <p>
-                If you see a warning icon <i class="{{ 'warning'|icon }} text-red"></i> in the list below, you should talk to your administrator. 
-                There is a missing PHP extension and Kimai might not work as expected.
+                If you see a warning icon <i class="{{ 'warning'|icon(false) }} text-red"></i> in the list below, you should talk to your administrator, as there is a missing PHP extension causing Kimai not to work as expected.
             </p>
             <table class="table">
                 {% for name, value in extensions %}
@@ -61,9 +70,9 @@
                         <th style="width:15%">{{ name }}</th>
                         <td>
                             {% if value is same as (false) %}
-                                <i class="{{ 'warning'|icon }} text-red"></i>
+                                <i class="{{ 'warning'|icon(false) }} text-red"></i>
                             {% else %}
-                                <i class="{{ 'success'|icon }} text-green"></i>
+                                <i class="{{ 'success'|icon(false) }} text-green"></i>
                             {% endif %}
                         </td>
                     </tr>
@@ -72,18 +81,14 @@
         {% endblock %}
     {% endembed %}
 
-    {% set logOpts = {collapsed: true} %}
+    {% set logOpts = {} %}
     {% if logSize > 52428800 %}
-        {% set logOpts = {boxtype: 'danger'} %}
+        {% set logOpts = {boxtype: 'danger', open: true} %}
     {% endif %}
-    {% embed '@AdminLTE/Widgets/box-widget.html.twig' with logOpts %}
-        {% block box_title %}Logfile (max. {{ logLines }} last lines){% endblock %}
-        {% block box_tools %}
-            {% if log_delete %}
-                <a class="btn-box-tool confirmation-link" href="{{ path('doctor_flush_log') }}" data-question="confirm.delete"><i class="{{ 'delete'|icon }}"></i></a>
-            {% endif %}
-        {% endblock %}
-        {% block box_body %}
+    {% embed '@theme/embeds/collapsible.html.twig' with logOpts %}
+        {% from "@theme/components/button.html.twig" import button %}
+        {% block title %}Logfile (max. {{ logLines }} last lines){% endblock %}
+        {% block body %}
             {% if logSize > 52428800 %}
                 <p>Your logfile is larger than 50 MB, consider deleting it (it will be re-created automatically).</p>
             {% endif %}
@@ -96,45 +101,49 @@
                 {%- elseif '.ERROR' in logLine -%}
                     {%- set logLineClass = 'text-warning text-bold' -%}
                 {%- elseif '.DEBUG' in logLine -%}
-                    {%- set logLineClass = 'text-muted' -%}
+                    {%- set logLineClass = 'text-body-secondary' -%}
                 {%- endif -%}
                 <span class="{{ logLineClass }}">{{- logLine -}}</span>
             {%- endfor %}</pre>
+            {% if log_delete %}
+                {{ button('delete', {combined: true, 'class': 'confirmation-link btn-danger', 'title': 'delete', 'url': path('doctor_flush_log', {'token': csrf_token('doctor.flush_log')}), 'attr': {'data-question': 'confirm.delete'}}) }}
+            {% endif %}
         {% endblock %}
     {% endembed %}
 
-    {% embed '@AdminLTE/Widgets/box-widget.html.twig' with {collapsed: true} %}
-        {% block box_title %}Composer packages{% endblock %}
-        {% block box_body_class %}no-padding{% endblock %}
-        {% block box_body %}
+    {% embed '@theme/embeds/collapsible.html.twig' %}
+        {% import "macros/widgets.html.twig" as widgets %}
+        {% block title %}Composer{% endblock %}
+        {% block body_class %}p-0{% endblock %}
+        {% block body %}
             <table class="table table-hover">
                 {% for name, value in composer %}
                     <tr>
-                        <th style="width:15%">{{ name }}</th>
-                        <td>{{ value }}</td>
+                        <th class="text-nowrap w-min">{{ name }}</th>
+                        <td class="text-break">{{ value }}</td>
                     </tr>
                 {% endfor %}
             </table>
         {% endblock %}
     {% endembed %}
-    
-    {% embed '@AdminLTE/Widgets/box-widget.html.twig' with {collapsed: true} %}
-        {% block box_title %}PHP{% endblock %}
-        {% block box_body_class %}no-padding{% endblock %}
-        {% block box_body %}
+
+    {% embed '@theme/embeds/collapsible.html.twig' %}
+        {% block title %}PHP{% endblock %}
+        {% block body_class %}p-0{% endblock %}
+        {% block body %}
             <table class="table table-hover">
                 <tr>
-                    <th style="width:15%">Version</th>
+                    <th class="text-nowrap w-min">{{ 'version'|trans }}</th>
                     <td>{{ constant('PHP_VERSION') }}</td>
                 </tr>
                 <tr>
-                    <th style="width:15%;max-width:25%">Modules</th>
-                    <td>{{ modules|join(', ') }}</td>
+                    <th class="text-nowrap w-min">Modules</th>
+                    <td class="text-break">{{ modules|join(', ') }}</td>
                 </tr>
                 {% for name, value in settings %}
                     <tr>
-                        <th style="width:15%">{{ name }}</th>
-                        <td>
+                        <th class="text-nowrap w-min">{{ name }}</th>
+                        <td class="text-break">
                             {% if value is empty %}
                                 <i>unknown</i>
                             {% else %}
@@ -143,19 +152,10 @@
                         </td>
                     </tr>
                 {% endfor %}
-            </table>
-        {% endblock %}
-    {% endembed %}
-
-    {% embed '@AdminLTE/Widgets/box-widget.html.twig' with {collapsed: true} %}
-        {% block box_title %}Server{% endblock %}
-        {% block box_body_class %}no-padding{% endblock %}
-        {% block box_body %}
-            <table class="table table-hover">
                 {% for name, value in info %}
                     <tr>
-                        <th style="width:15%">{{ name }}</th>
-                        <td>{{ value|raw }}</td>
+                        <th class="text-nowrap w-min">{{ name }}</th>
+                        <td class="text-break">{{ value|raw }}</td>
                     </tr>
                 {% endfor %}
             </table>

@@ -19,26 +19,17 @@ class ThemeEvent extends Event
     public const HTML_HEAD = 'app.theme.html_head';
     public const CONTENT_BEFORE = 'app.theme.content_before';
     public const CONTENT_START = 'app.theme.content_start';
+    public const TOOLBAR = 'app.theme.toolbar';
     public const CONTENT_END = 'app.theme.content_end';
     public const CONTENT_AFTER = 'app.theme.content_after';
 
-    /**
-     * @var User|null
-     */
-    private $user;
-    /**
-     * @var string
-     */
-    private $content = '';
-    /**
-     * @var mixed
-     */
-    protected $payload;
+    private string $content = '';
 
-    public function __construct(?User $user = null, $payload = null)
+    /**
+     * @param array<string, mixed|array<mixed>> $payload
+     */
+    public function __construct(private readonly ?User $user = null, protected array $payload = [])
     {
-        $this->user = $user;
-        $this->payload = $payload;
     }
 
     public function getUser(): ?User
@@ -59,21 +50,10 @@ class ThemeEvent extends Event
     }
 
     /**
-     * @return mixed
+     * @return array<string, mixed|array<mixed>>
      */
-    public function getPayload()
+    public function getPayload(): array
     {
         return $this->payload;
-    }
-
-    /**
-     * @param mixed $payload
-     * @return ThemeEvent
-     */
-    public function setPayload($payload)
-    {
-        $this->payload = $payload;
-
-        return $this;
     }
 }

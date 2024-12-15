@@ -11,6 +11,7 @@ namespace App\Validator\Constraints;
 
 use App\Configuration\SystemConfiguration;
 use App\Entity\Timesheet as TimesheetEntity;
+use App\Form\Model\MultiUserTimesheet;
 use App\Repository\TimesheetRepository;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
@@ -18,37 +19,29 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 
 final class TimesheetOverlappingValidator extends ConstraintValidator
 {
-    /**
-     * @var SystemConfiguration
-     */
-    private $configuration;
-    /**
-     * @var TimesheetRepository
-     */
-    private $repository;
-
-    public function __construct(SystemConfiguration $configuration, TimesheetRepository $repository)
+    public function __construct(
+        private readonly SystemConfiguration $configuration,
+        private readonly TimesheetRepository $repository
+    )
     {
-        $this->configuration = $configuration;
-        $this->repository = $repository;
     }
 
-    /**
-     * @param TimesheetEntity $timesheet
-     * @param Constraint $constraint
-     */
-    public function validate($timesheet, Constraint $constraint)
+    public function validate(mixed $value, Constraint $constraint): void
     {
         if (!($constraint instanceof TimesheetOverlapping)) {
             throw new UnexpectedTypeException($constraint, TimesheetOverlapping::class);
         }
 
-        if (!\is_object($timesheet) || !($timesheet instanceof TimesheetEntity)) {
-            throw new UnexpectedTypeException($timesheet, TimesheetEntity::class);
+        if (!\is_object($value) || !($value instanceof TimesheetEntity)) {
+            throw new UnexpectedTypeException($value, TimesheetEntity::class);
         }
 
-        $begin = $timesheet->getBegin();
-        $end = $timesheet->getEnd();
+        if ($value instanceof MultiUserTimesheet) {
+            return;
+        }
+
+        $begin = $value->getBegin();
+        $end = $value->getEnd();
 
         // this case is handled in TimesheetValidator and should not raise a second validation
         if ($begin !== null && $end !== null && $begin > $end) {
@@ -59,12 +52,12 @@ final class TimesheetOverlappingValidator extends ConstraintValidator
             return;
         }
 
-        if (!$this->repository->hasRecordForTime($timesheet)) {
+        if (!$this->repository->hasRecordForTime($value)) {
             return;
         }
 
         $this->context->buildViolation('You already have an entry for this time.')
-            ->atPath('begin')
+            ->atPath('begin_date')
             ->setTranslationDomain('validators')
             ->setCode(TimesheetOverlapping::RECORD_OVERLAPPING)
             ->addViolation();

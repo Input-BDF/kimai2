@@ -9,7 +9,6 @@
 
 namespace App\Tests\Repository\Query;
 
-use App\Entity\User;
 use App\Repository\Query\UserFormTypeQuery;
 
 /**
@@ -18,25 +17,10 @@ use App\Repository\Query\UserFormTypeQuery;
  */
 class UserFormTypeQueryTest extends BaseFormTypeQueryTest
 {
-    public function testQuery()
+    public function testQuery(): void
     {
         $sut = new UserFormTypeQuery();
 
         $this->assertBaseQuery($sut);
-    }
-
-    public function testUsersAreAlwaysIncluded()
-    {
-        $sut = new UserFormTypeQuery();
-
-        $users = [(new User())->setUsername('foo'), new User(), new User()];
-
-        self::assertEquals([], $sut->getUsersAlwaysIncluded());
-        self::assertInstanceOf(UserFormTypeQuery::class, $sut->setUsersAlwaysIncluded($users));
-        self::assertSame($users, $sut->getUsersAlwaysIncluded());
-
-        self::assertEquals([], $sut->getUsersToIgnore());
-        self::assertInstanceOf(UserFormTypeQuery::class, $sut->addUserToIgnore($users[0]));
-        self::assertSame([$users[0]], $sut->getUsersToIgnore());
     }
 }

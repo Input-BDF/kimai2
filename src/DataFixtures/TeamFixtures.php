@@ -13,7 +13,6 @@ use App\Entity\Project;
 use App\Entity\Team;
 use App\Entity\User;
 use Doctrine\Bundle\FixturesBundle\Fixture;
-use Doctrine\Common\DataFixtures\DependentFixtureInterface;
 use Doctrine\Persistence\ObjectManager;
 use Faker\Factory;
 
@@ -26,27 +25,22 @@ use Faker\Factory;
  *
  * @codeCoverageIgnore
  */
-class TeamFixtures extends Fixture implements DependentFixtureInterface
+final class TeamFixtures extends Fixture
 {
     public const AMOUNT_TEAMS = 10;
     public const MAX_USERS_PER_TEAM = 15;
     public const MAX_PROJECTS_PER_TEAM = 5;
 
-    /**
-     * @return string[]
-     */
-    public function getDependencies()
+    public static function getGroups(): array
     {
-        return [
-            UserFixtures::class,
-        ];
+        return ['users', 'team'];
     }
 
     /**
      * @param ObjectManager $manager
      * @return array<int|string, User>
      */
-    protected function getAllUsers(ObjectManager $manager): array
+    private function getAllUsers(ObjectManager $manager): array
     {
         $all = [];
         /** @var User[] $entries */
@@ -62,7 +56,7 @@ class TeamFixtures extends Fixture implements DependentFixtureInterface
      * @param ObjectManager $manager
      * @return array<int|string, Project>
      */
-    protected function getAllProjects(ObjectManager $manager): array
+    private function getAllProjects(ObjectManager $manager): array
     {
         $all = [];
 
@@ -75,10 +69,7 @@ class TeamFixtures extends Fixture implements DependentFixtureInterface
         return $all;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function load(ObjectManager $manager)
+    public function load(ObjectManager $manager): void
     {
         $allUsers = $this->getAllUsers($manager);
         $allProjects = $this->getAllProjects($manager);
@@ -97,8 +88,7 @@ class TeamFixtures extends Fixture implements DependentFixtureInterface
             }
             $projectCount = mt_rand(0, $maxProjects);
 
-            $team = new Team();
-            $team->setName($faker->company . ' ' . $i);
+            $team = new Team($faker->company() . ' ' . $i);
             $team->addTeamlead($allUsers[array_rand($allUsers)]);
 
             if ($userCount > 0) {
@@ -125,6 +115,6 @@ class TeamFixtures extends Fixture implements DependentFixtureInterface
         }
 
         $manager->flush();
-        $manager->clear(Team::class);
+        $manager->clear();
     }
 }

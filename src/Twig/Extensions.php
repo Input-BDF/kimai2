@@ -15,16 +15,13 @@ use App\Utils\Color;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 use Twig\TwigFunction;
+use Twig\TwigTest;
 
-/**
- * Multiple Twig extensions: filters and functions
- */
-class Extensions extends AbstractExtension
+final class Extensions extends AbstractExtension
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function getFilters()
+    public const REPORT_DATE = 'Y-m-d';
+
+    public function getFilters(): array
     {
         return [
             new TwigFilter('report_date', [$this, 'formatReportDate']),
@@ -37,21 +34,60 @@ class Extensions extends AbstractExtension
         ];
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getFunctions()
+    public function getFunctions(): array
     {
         return [
+            new TwigFunction('report_date', [$this, 'buildReportDate']),
             new TwigFunction('class_name', [$this, 'getClassName']),
             new TwigFunction('iso_day_by_name', [$this, 'getIsoDayByName']),
             new TwigFunction('random_color', [$this, 'randomColor']),
         ];
     }
 
-    public function formatReportDate(\DateTime $dateTime): string
+    public function getTests(): array
     {
-        return $dateTime->format('Y-m-d');
+        return [
+            new TwigTest('number', function ($value): bool {
+                return !\is_string($value) && is_numeric($value);
+            }),
+        ];
+    }
+
+    public function buildReportDate(string|int $year, string|int $month = 1, string|int $day = 1): \DateTimeImmutable
+    {
+        if (\is_string($month)) {
+            $month = (int) $month;
+        }
+        if ($month > 12 || $month < 1) {
+            throw new \InvalidArgumentException('Unknown month: ' . $month);
+        }
+        if ($month < 10) {
+            $month = '0' . $month;
+        }
+
+        if (\is_string($day)) {
+            $day = (int) $day;
+        }
+        if ($day > 31 || $day < 1) {
+            throw new \InvalidArgumentException('Unknown day: ' . $day);
+        }
+        if ($day < 10) {
+            $day = '0' . $day;
+        }
+
+        if (\is_string($year)) {
+            $year = (int) $year;
+        }
+        if ($year < 1980 || $year > 2100) {
+            throw new \InvalidArgumentException('Unknown year: ' . $year);
+        }
+
+        return \DateTimeImmutable::createFromFormat('Y-m-d', $year . '-' . $month . '-' . $day); // @phpstan-ignore-line
+    }
+
+    public function formatReportDate(\DateTimeInterface $dateTime): string
+    {
+        return $dateTime->format(self::REPORT_DATE);
     }
 
     public function getIsoDayByName(string $weekDay): int

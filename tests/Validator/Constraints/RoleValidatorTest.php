@@ -18,11 +18,13 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\Role
  * @covers \App\Validator\Constraints\RoleValidator
+ * @extends ConstraintValidatorTestCase<RoleValidator>
  */
 class RoleValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator()
+    protected function createValidator(): RoleValidator
     {
         $factory = new RoleServiceFactory($this);
         $roleService = $factory->create();
@@ -40,7 +42,7 @@ class RoleValidatorTest extends ConstraintValidatorTestCase
         ];
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
@@ -51,14 +53,14 @@ class RoleValidatorTest extends ConstraintValidatorTestCase
      * @dataProvider getValidRoles
      * @param string $role
      */
-    public function testConstraintWithValidRole($role)
+    public function testConstraintWithValidRole($role): void
     {
         $constraint = new Role();
         $this->validator->validate($role, $constraint);
         $this->assertNoViolation();
     }
 
-    public function testNullIsInvalid()
+    public function testNullIsInvalid(): void
     {
         $this->validator->validate(null, new Role(['message' => 'myMessage']));
 
@@ -84,7 +86,7 @@ class RoleValidatorTest extends ConstraintValidatorTestCase
      * @dataProvider getInvalidRoles
      * @param mixed $role
      */
-    public function testValidationError($role)
+    public function testValidationError($role): void
     {
         $constraint = new Role([
             'message' => 'myMessage',
@@ -92,7 +94,7 @@ class RoleValidatorTest extends ConstraintValidatorTestCase
 
         $this->validator->validate($role, $constraint);
 
-        $expectedFormat = \is_string($role) ? '"' . $role . '"' : $role;
+        $expectedFormat = \is_string($role) ? '"' . $role . '"' : (string) $role;
 
         $this->buildViolation('myMessage')
             ->setParameter('{{ value }}', $expectedFormat)

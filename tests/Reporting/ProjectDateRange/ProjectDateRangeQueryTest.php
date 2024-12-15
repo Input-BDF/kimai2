@@ -19,7 +19,7 @@ use PHPUnit\Framework\TestCase;
  */
 class ProjectDateRangeQueryTest extends TestCase
 {
-    public function testDefaults()
+    public function testDefaults(): void
     {
         $user = new User();
         $date = new \DateTime();
@@ -28,25 +28,37 @@ class ProjectDateRangeQueryTest extends TestCase
         self::assertEquals($date->getTimestamp(), $sut->getMonth()->getTimestamp());
         self::assertSame($user, $sut->getUser());
         self::assertNull($sut->getCustomer());
-        self::assertFalse($sut->isOnlyWithRecords());
+        self::assertFalse($sut->isIncludeNoWork());
+
+        self::assertNull($sut->getBudgetType());
         self::assertFalse($sut->isIncludeNoBudget());
+        self::assertFalse($sut->isBudgetTypeMonthly());
+        self::assertTrue($sut->isBudgetIndependent());
     }
 
-    public function testSetterGetter()
+    public function testSetterGetter(): void
     {
         $sut = new ProjectDateRangeQuery(new \DateTime(), new User());
 
         $date = new \DateTime('+1 year');
-        $customer = new Customer();
+        $customer = new Customer('foo');
 
         $sut->setMonth($date);
         $sut->setCustomer($customer);
-        $sut->setIncludeNoBudget(true);
-        $sut->setOnlyWithRecords(true);
+        $sut->setIncludeNoWork(false);
 
         self::assertEquals($date->getTimestamp(), $sut->getMonth()->getTimestamp());
         self::assertSame($customer, $sut->getCustomer());
-        self::assertTrue($sut->isOnlyWithRecords());
+        self::assertFalse($sut->isIncludeNoWork());
+
+        $sut->setBudgetType('none');
+        self::assertEquals('none', $sut->getBudgetType());
         self::assertTrue($sut->isIncludeNoBudget());
+        self::assertFalse($sut->isBudgetTypeMonthly());
+
+        $sut->setBudgetType('full');
+        self::assertEquals('full', $sut->getBudgetType());
+        self::assertFalse($sut->isBudgetTypeMonthly());
+        self::assertFalse($sut->isIncludeNoBudget());
     }
 }

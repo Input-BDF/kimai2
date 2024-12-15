@@ -9,54 +9,52 @@
 
 namespace App\Tests\Widget\Type;
 
-use App\Configuration\SystemConfiguration;
+use App\Entity\User;
 use App\Repository\TimesheetRepository;
+use App\Tests\Mocks\SystemConfigurationFactory;
+use App\Widget\Type\AbstractCounterYear;
+use App\Widget\Type\AbstractWidget;
 use App\Widget\Type\AbstractWidgetType;
-use App\Widget\Type\CounterYear;
 use App\Widget\Type\DurationYear;
-use App\Widget\Type\SimpleStatisticChart;
 
 /**
  * @covers \App\Widget\Type\DurationYear
- * @covers \App\Widget\Type\CounterYear
+ * @covers \App\Widget\Type\AbstractCounterYear
  */
 class DurationYearTest extends AbstractWidgetTypeTest
 {
     /**
-     * @return CounterYear
+     * @return AbstractCounterYear
      */
     public function createSut(): AbstractWidgetType
     {
         $repository = $this->createMock(TimesheetRepository::class);
-        $configuration = $this->createMock(SystemConfiguration::class);
+        $configuration = SystemConfigurationFactory::createStub();
 
-        return new DurationYear($repository, $configuration);
+        $sut = new DurationYear($repository, $configuration);
+        $sut->setUser(new User());
+
+        return $sut;
+    }
+
+    protected function assertDefaultData(AbstractWidget $sut): void
+    {
+        self::assertEquals(0, $sut->getData());
     }
 
     public function getDefaultOptions(): array
     {
         return [
-            'dataType' => 'duration',
             'icon' => 'duration',
             'color' => 'yellow',
         ];
     }
 
-    public function testData()
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cannot set data on instances of SimpleStatisticChart');
-
-        $sut = $this->createSut();
-        self::assertInstanceOf(SimpleStatisticChart::class, $sut);
-        $sut->setData(10);
-    }
-
-    public function testSettings()
+    public function testSettings(): void
     {
         $sut = $this->createSut();
 
-        self::assertEquals('widget/widget-counter.html.twig', $sut->getTemplateName());
-        self::assertEquals('durationYear', $sut->getId());
+        self::assertEquals('widget/widget-counter-duration.html.twig', $sut->getTemplateName());
+        self::assertEquals('DurationYear', $sut->getId());
     }
 }

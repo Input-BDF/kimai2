@@ -16,8 +16,8 @@ use App\EventSubscriber\Actions\InvoiceArchiveSubscriber;
  */
 class InvoiceArchiveSubscriberTest extends AbstractActionsSubscriberTest
 {
-    public function testEventName()
+    public function testEventName(): void
     {
-        $this->assertGetSubscribedEvent(InvoiceArchiveSubscriber::class, 'invoice_details');
+        $this->assertGetSubscribedEvent(InvoiceArchiveSubscriber::class, 'invoice_archive');
     }
 }

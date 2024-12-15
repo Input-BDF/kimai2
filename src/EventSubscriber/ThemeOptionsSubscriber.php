@@ -9,37 +9,29 @@
 
 namespace App\EventSubscriber;
 
+use App\Configuration\LocaleService;
+use App\Constants;
 use App\Entity\User;
 use App\Entity\UserPreference;
-use KevinPapst\AdminLTEBundle\Helper\ContextHelper;
+use KevinPapst\TablerBundle\Helper\ContextHelper;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\KernelEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 
 /**
- * Allows dynamic injection of theme related options.
+ * Prepare all theme settings for user and context.
  */
 final class ThemeOptionsSubscriber implements EventSubscriberInterface
 {
-    /**
-     * @var TokenStorageInterface
-     */
-    private $storage;
-    /**
-     * @var ContextHelper
-     */
-    private $helper;
-
-    public function __construct(TokenStorageInterface $storage, ContextHelper $helper)
+    public function __construct(
+        private readonly TokenStorageInterface $storage,
+        private readonly ContextHelper $helper,
+        private readonly LocaleService $localeService
+    )
     {
-        $this->storage = $storage;
-        $this->helper = $helper;
     }
 
-    /**
-     * @return array
-     */
     public static function getSubscribedEvents(): array
     {
         return [
@@ -50,8 +42,14 @@ final class ThemeOptionsSubscriber implements EventSubscriberInterface
     public function setThemeOptions(KernelEvent $event): void
     {
         // Ignore sub-requests
-        if (!$event->isMasterRequest()) {
+        if (!$event->isMainRequest()) {
             return;
+        }
+
+        $this->helper->setAssetVersion((string) Constants::VERSION_ID);
+
+        if ($this->localeService->isRightToLeft($event->getRequest()->getLocale())) {
+            $this->helper->setIsRightToLeft(true);
         }
 
         // ignore events like the toolbar where we do not have a token
@@ -65,30 +63,17 @@ final class ThemeOptionsSubscriber implements EventSubscriberInterface
             return;
         }
 
-        /** @var UserPreference $ref */
-        foreach ($user->getPreferences() as $ref) {
-            $name = $ref->getName();
-            switch ($name) {
-                case UserPreference::SKIN:
-                    if (!empty($ref->getValue())) {
-                        $this->helper->setOption('skin', 'skin-' . $ref->getValue());
-                    }
-                    break;
-
-                case 'theme.layout':
-                    if ($ref->getValue() === 'boxed') {
-                        $this->helper->setOption('boxed_layout', true);
-                        $this->helper->setOption('fixed_layout', false);
-                    } elseif ($ref->getValue() === 'fixed') {
-                        $this->helper->setOption('boxed_layout', false);
-                        $this->helper->setOption('fixed_layout', true);
-                    }
-                    break;
-
-                case 'theme.collapsed_sidebar':
-                    $this->helper->setOption('collapsed_sidebar', $ref->getValue());
-                    break;
-            }
+        $skin = $user->getPreferenceValue(UserPreference::SKIN);
+        if ($skin === 'dark') {
+            $this->helper->setIsDarkMode(true);
         }
+
+        // do not allow boxed layout, header is not compatible and other functions need the full size as well
+        $this->helper->setIsBoxedLayout(false);
+        $this->helper->setIsCondensedUserMenu(false);
+        $this->helper->setIsCondensedNavbar(false);
+        $this->helper->setIsNavbarOverlapping(false);
+        $this->helper->setIsNavbarDark(true);
+        $this->helper->setIsHeaderDark($this->helper->isDarkMode());
     }
 }

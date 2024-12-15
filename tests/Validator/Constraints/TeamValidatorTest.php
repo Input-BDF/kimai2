@@ -19,35 +19,37 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\Team
  * @covers \App\Validator\Constraints\TeamValidator
+ * @extends ConstraintValidatorTestCase<TeamValidator>
  */
 class TeamValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator()
+    protected function createValidator(): TeamValidator
     {
         return new TeamValidator();
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
-        $this->validator->validate('foo', new NotBlank());
+        $this->validator->validate('foo', new NotBlank()); // @phpstan-ignore argument.type
     }
 
-    public function testMissingTeamlead()
+    public function testMissingTeamlead(): void
     {
         $member = new TeamMember();
         $member->setTeamlead(false);
         $member->setUser(new User());
 
-        $team = new Team();
+        $team = new Team('foo');
         $team->addMember($member);
 
         $this->validator->validate($team, new TeamConstraint());
 
         $this->buildViolation('At least one team leader must be assigned to the team.')
-            ->atPath('property.path.teamleads')
+            ->atPath('property.path.members')
             ->setCode(TeamConstraint::MISSING_TEAMLEAD)
             ->assertRaised();
     }

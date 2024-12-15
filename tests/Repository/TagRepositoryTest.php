@@ -28,31 +28,7 @@ class TagRepositoryTest extends AbstractRepositoryTest
         $this->importFixture($data);
     }
 
-    public function testFindIds()
-    {
-        $em = $this->getEntityManager();
-        /** @var TagRepository $repository */
-        $repository = $em->getRepository(Tag::class);
-
-        $result = $repository->findIdsByTagNameList('2018,Test');
-        $this->assertIsArray($result);
-        $this->assertNotEmpty($result);
-        $this->assertEquals(7, \count($result));
-    }
-
-    public function testFindNoIds()
-    {
-        $em = $this->getEntityManager();
-        /** @var TagRepository $repository */
-        $repository = $em->getRepository(Tag::class);
-
-        $result = $repository->findIdsByTagNameList('Simply');
-        $this->assertIsArray($result);
-        $this->assertEmpty($result);
-        $this->assertEquals(0, \count($result));
-    }
-
-    public function testFindAllTagNames()
+    public function testFindAllTagNames(): void
     {
         $em = $this->getEntityManager();
         /** @var TagRepository $repository */
@@ -70,7 +46,7 @@ class TagRepositoryTest extends AbstractRepositoryTest
         $this->assertEquals('#2018-012', $result[5]);
     }
 
-    public function testFindNoTagNames()
+    public function testFindNoTagNames(): void
     {
         $em = $this->getEntityManager();
         /** @var TagRepository $repository */

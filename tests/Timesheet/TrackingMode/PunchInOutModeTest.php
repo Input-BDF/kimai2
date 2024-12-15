@@ -14,15 +14,24 @@ use App\Entity\User;
 use App\Timesheet\TrackingMode\PunchInOutMode;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 /**
  * @covers \App\Timesheet\TrackingMode\PunchInOutMode
  */
 class PunchInOutModeTest extends TestCase
 {
-    public function testDefaultValues()
+    private function createSut(bool $allowApiTimes = false): PunchInOutMode
     {
-        $sut = new PunchInOutMode();
+        $auth = $this->createMock(AuthorizationCheckerInterface::class);
+        $auth->method('isGranted')->willReturn($allowApiTimes);
+
+        return new PunchInOutMode($auth);
+    }
+
+    public function testDefaultValues(): void
+    {
+        $sut = $this->createSut();
 
         self::assertFalse($sut->canEditBegin());
         self::assertFalse($sut->canEditEnd());
@@ -32,24 +41,36 @@ class PunchInOutModeTest extends TestCase
         self::assertEquals('punch', $sut->getId());
     }
 
-    public function testCreate()
+    public function testValuesForAdmin(): void
+    {
+        $sut = $this->createSut(true);
+
+        self::assertFalse($sut->canEditBegin());
+        self::assertFalse($sut->canEditEnd());
+        self::assertFalse($sut->canEditDuration());
+        self::assertTrue($sut->canUpdateTimesWithAPI());
+        self::assertTrue($sut->canSeeBeginAndEndTimes());
+        self::assertEquals('punch', $sut->getId());
+    }
+
+    public function testCreate(): void
     {
         $startingTime = new \DateTime('22:54');
         $timesheet = new Timesheet();
         $timesheet->setBegin($startingTime);
         $request = new Request();
 
-        $sut = new PunchInOutMode();
+        $sut = $this->createSut();
         $sut->create($timesheet, $request);
         self::assertEquals($timesheet->getBegin(), $startingTime);
     }
 
-    public function testCreateWithoutBegin()
+    public function testCreateWithoutBegin(): void
     {
         $timesheet = (new Timesheet())->setUser(new User());
         $request = new Request();
 
-        $sut = new PunchInOutMode();
+        $sut = $this->createSut();
         $sut->create($timesheet, $request);
         self::assertInstanceOf(\DateTime::class, $timesheet->getBegin());
     }

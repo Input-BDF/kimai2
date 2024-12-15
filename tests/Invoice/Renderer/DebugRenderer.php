@@ -9,10 +9,10 @@
 
 namespace App\Tests\Invoice\Renderer;
 
-use App\Entity\InvoiceDocument;
 use App\Invoice\InvoiceModel;
 use App\Invoice\Renderer\AbstractRenderer;
 use App\Invoice\RendererInterface;
+use App\Model\InvoiceDocument;
 use Symfony\Component\HttpFoundation\Response;
 
 class DebugRenderer extends AbstractRenderer implements RendererInterface
@@ -20,7 +20,7 @@ class DebugRenderer extends AbstractRenderer implements RendererInterface
     /**
      * @return string[]
      */
-    protected function getFileExtensions()
+    protected function getFileExtensions(): array
     {
         return [];
     }
@@ -28,7 +28,7 @@ class DebugRenderer extends AbstractRenderer implements RendererInterface
     /**
      * @return string
      */
-    protected function getContentType()
+    protected function getContentType(): string
     {
         return 'array';
     }

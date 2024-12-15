@@ -9,70 +9,35 @@
 
 namespace App\Plugin;
 
-class Plugin
+final class Plugin
 {
-    /**
-     * @var string
-     */
-    private $id;
-    /**
-     * @var string
-     */
-    private $name;
-    /**
-     * @var string
-     */
-    private $path;
-    /**
-     * @var PluginMetadata
-     */
-    private $metadata;
+    private ?PluginMetadata $metadata = null;
 
-    public function getMetadata(): ?PluginMetadata
+    public function __construct(private readonly PluginInterface $bundle)
     {
+    }
+
+    public function getMetadata(): PluginMetadata
+    {
+        if ($this->metadata === null) {
+            $this->metadata = PluginMetadata::createFromPath($this->getPath());
+        }
+
         return $this->metadata;
     }
 
-    public function setMetadata(PluginMetadata $metadata): Plugin
+    public function getPath(): string
     {
-        $this->metadata = $metadata;
-
-        return $this;
+        return $this->bundle->getPath();
     }
 
-    public function getPath(): ?string
+    public function getName(): string
     {
-        return $this->path;
+        return $this->getMetadata()->getName();
     }
 
-    public function setPath(string $path): Plugin
+    public function getId(): string
     {
-        $this->path = $path;
-
-        return $this;
-    }
-
-    public function getName(): ?string
-    {
-        return $this->name;
-    }
-
-    public function setName(string $name): Plugin
-    {
-        $this->name = $name;
-
-        return $this;
-    }
-
-    public function getId(): ?string
-    {
-        return $this->id;
-    }
-
-    public function setId(string $id): Plugin
-    {
-        $this->id = $id;
-
-        return $this;
+        return $this->bundle->getName();
     }
 }

@@ -11,52 +11,46 @@ namespace App\Command;
 
 use App\Entity\User;
 use App\User\UserService;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-class PromoteUserCommand extends AbstractRoleCommand
+#[AsCommand(name: 'kimai:user:promote')]
+final class PromoteUserCommand extends AbstractRoleCommand
 {
-    /**
-     * {@inheritdoc}
-     */
-    protected function configure()
+    protected function configure(): void
     {
         parent::configure();
 
         $this
-            ->setName('kimai:user:promote')
-            ->setAliases(['fos:user:promote'])
             ->setDescription('Promotes a user by adding a role')
             ->setHelp(
                 <<<'EOT'
-The <info>kimai:user:promote</info> command promotes a user by adding a role
+                    The <info>kimai:user:promote</info> command promotes a user by adding a role
 
-  <info>php %command.full_name% susan_super ROLE_TEAMLEAD</info>
-  <info>php %command.full_name% --super susan_super</info>
-EOT
+                      <info>php %command.full_name% susan_super ROLE_TEAMLEAD</info>
+                      <info>php %command.full_name% --super susan_super</info>
+                    EOT
             );
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function executeRoleCommand(UserService $manipulator, SymfonyStyle $output, User $user, bool $super, $role)
+    protected function executeRoleCommand(UserService $userService, SymfonyStyle $output, User $user, bool $super, $role): void
     {
-        $username = $user->getUsername();
+        $username = $user->getUserIdentifier();
         if ($super) {
             if (!$user->isSuperAdmin()) {
                 $user->setSuperAdmin(true);
-                $manipulator->updateUser($user);
-                $output->success(sprintf('User "%s" has been promoted as a super administrator.', $username));
+                $userService->saveUser($user);
+                $output->success(\sprintf('User "%s" has been promoted as a super administrator.', $username));
             } else {
-                $output->warning(sprintf('User "%s" does already have the super administrator role.', $username));
+                $output->warning(\sprintf('User "%s" does already have the super administrator role.', $username));
             }
         } else {
             if (!$user->hasRole($role)) {
                 $user->addRole($role);
-                $manipulator->updateUser($user);
-                $output->success(sprintf('Role "%s" has been added to user "%s".', $role, $username));
+                $userService->saveUser($user);
+                $output->success(\sprintf('Role "%s" has been added to user "%s".', $role, $username));
             } else {
-                $output->warning(sprintf('User "%s" did already have "%s" role.', $username, $role));
+                $output->warning(\sprintf('User "%s" did already have "%s" role.', $username, $role));
             }
         }
     }

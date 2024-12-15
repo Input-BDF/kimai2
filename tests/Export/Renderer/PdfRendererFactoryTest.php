@@ -11,8 +11,8 @@ namespace App\Tests\Export\Renderer;
 
 use App\Export\Renderer\PDFRenderer;
 use App\Export\Renderer\PdfRendererFactory;
+use App\Pdf\HtmlToPdfConverter;
 use App\Project\ProjectStatisticService;
-use App\Utils\HtmlToPdfConverter;
 use PHPUnit\Framework\TestCase;
 use Twig\Environment;
 
@@ -21,7 +21,7 @@ use Twig\Environment;
  */
 class PdfRendererFactoryTest extends TestCase
 {
-    public function testCreate()
+    public function testCreate(): void
     {
         $sut = new PdfRendererFactory(
             $this->createMock(Environment::class),

@@ -14,31 +14,26 @@ use App\Entity\Customer;
 use App\Event\CustomerCreateEvent;
 use App\Event\CustomerCreatePostEvent;
 use App\Event\CustomerCreatePreEvent;
+use App\Event\CustomerDeleteEvent;
 use App\Event\CustomerMetaDefinitionEvent;
 use App\Event\CustomerUpdatePostEvent;
 use App\Event\CustomerUpdatePreEvent;
 use App\Repository\CustomerRepository;
+use App\Repository\Query\CustomerQuery;
+use App\Utils\NumberGenerator;
 use App\Validator\ValidationFailedException;
 use InvalidArgumentException;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-/**
- * @final
- */
-class CustomerService
+final class CustomerService
 {
-    private $repository;
-    private $dispatcher;
-    private $validator;
-    private $configuration;
-
-    public function __construct(CustomerRepository $customerRepository, SystemConfiguration $configuration, ValidatorInterface $validator, EventDispatcherInterface $dispatcher)
-    {
-        $this->repository = $customerRepository;
-        $this->dispatcher = $dispatcher;
-        $this->validator = $validator;
-        $this->configuration = $configuration;
+    public function __construct(
+        private readonly CustomerRepository $repository,
+        private readonly SystemConfiguration $configuration,
+        private readonly ValidatorInterface $validator,
+        private readonly EventDispatcherInterface $dispatcher
+    ) {
     }
 
     private function getDefaultTimezone(): string
@@ -50,12 +45,13 @@ class CustomerService
         return $timezone;
     }
 
-    public function createNewCustomer(): Customer
+    public function createNewCustomer(string $name): Customer
     {
-        $customer = new Customer();
+        $customer = new Customer($name);
         $customer->setTimezone($this->getDefaultTimezone());
         $customer->setCountry($this->configuration->getCustomerDefaultCountry());
         $customer->setCurrency($this->configuration->getCustomerDefaultCurrency());
+        $customer->setNumber($this->calculateNextCustomerNumber());
 
         $this->dispatcher->dispatch(new CustomerMetaDefinitionEvent($customer));
         $this->dispatcher->dispatch(new CustomerCreateEvent($customer));
@@ -78,8 +74,13 @@ class CustomerService
         return $customer;
     }
 
+    public function deleteCustomer(Customer $customer): void
+    {
+        $this->dispatcher->dispatch(new CustomerDeleteEvent($customer));
+        $this->repository->deleteCustomer($customer);
+    }
+
     /**
-     * @param Customer $customer
      * @param string[] $groups
      * @throws ValidationFailedException
      */
@@ -111,5 +112,50 @@ class CustomerService
     public function findCustomerByNumber(string $number): ?Customer
     {
         return $this->repository->findOneBy(['number' => $number]);
+    }
+
+    /**
+     * @return iterable<Customer>
+     */
+    public function findCustomer(CustomerQuery $query): iterable
+    {
+        return $this->repository->getCustomersForQuery($query);
+    }
+
+    public function countCustomer(bool $visible = true): int
+    {
+        return $this->repository->countCustomer($visible);
+    }
+
+    private function calculateNextCustomerNumber(): ?string
+    {
+        $format = $this->configuration->find('customer.number_format');
+        if (empty($format) || !\is_string($format)) {
+            return null;
+        }
+
+        // we cannot use max(number) because a varchar column returns unexpected results
+        $start = $this->repository->countCustomer();
+        $i = 0;
+
+        do {
+            $start++;
+
+            $numberGenerator = new NumberGenerator($format, function (string $originalFormat, string $format, int $increaseBy) use ($start): string|int {
+                return match ($format) {
+                    'cc' => $start + $increaseBy,
+                    default => $originalFormat,
+                };
+            });
+
+            $number = $numberGenerator->getNumber();
+            $customer = $this->findCustomerByNumber($number);
+        } while ($customer !== null && $i++ < 100);
+
+        if ($customer !== null) {
+            return null;
+        }
+
+        return $number;
     }
 }

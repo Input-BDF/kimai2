@@ -9,24 +9,23 @@
 
 namespace App\Calendar;
 
-class RecentActivitiesSource implements DragAndDropSource
+final class RecentActivitiesSource implements DragAndDropSource
 {
-    /**
-     * @var DragAndDropEntry[]
-     */
-    private $entries;
-
     /**
      * @param DragAndDropEntry[] $entries
      */
-    public function __construct(array $entries)
+    public function __construct(private array $entries)
     {
-        $this->entries = $entries;
     }
 
     public function getTitle(): string
     {
         return 'recent.activities';
+    }
+
+    public function getTranslationDomain(): string
+    {
+        return 'messages';
     }
 
     public function getRoute(): string
@@ -63,7 +62,7 @@ class RecentActivitiesSource implements DragAndDropSource
         return $this->entries;
     }
 
-    public function getBlockInclude(): ?string
+    public function getBlockInclude(): string
     {
         return 'calendar/drag-drop.html.twig';
     }

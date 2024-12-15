@@ -18,16 +18,16 @@ use Symfony\Component\Form\AbstractType;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class TeamType extends AbstractType
+/**
+ * @extends AbstractType<Team>
+ */
+final class TeamType extends AbstractType
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'class' => Team::class,
-            'label' => 'label.team',
+            'label' => 'team',
             'teamlead_only' => true,
             'choice_label' => function (Team $team) {
                 return $team->getName();
@@ -54,10 +54,7 @@ class TeamType extends AbstractType
         });
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getParent()
+    public function getParent(): string
     {
         return EntityType::class;
     }

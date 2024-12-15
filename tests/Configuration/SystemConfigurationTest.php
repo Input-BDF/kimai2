@@ -11,11 +11,11 @@ namespace App\Tests\Configuration;
 
 use App\Configuration\SystemConfiguration;
 use App\Entity\Configuration;
+use App\Tests\Mocks\SystemConfigurationFactory;
 use PHPUnit\Framework\TestCase;
 
 /**
  * @covers \App\Configuration\SystemConfiguration
- * @covers \App\Configuration\StringAccessibleConfigTrait
  */
 class SystemConfigurationTest extends TestCase
 {
@@ -24,28 +24,31 @@ class SystemConfigurationTest extends TestCase
      * @param array $loaderSettings
      * @return SystemConfiguration
      */
-    protected function getSut(array $settings, array $loaderSettings = [])
+    protected function getSut(array $settings, array $loaderSettings = []): SystemConfiguration
     {
         $loader = new TestConfigLoader($loaderSettings);
 
-        return new SystemConfiguration($loader, $settings);
+        return SystemConfigurationFactory::create($loader, $settings);
     }
 
-    protected function getDefaultSettings()
+    /**
+     * @return array<string, array<mixed>>
+     */
+    protected function getDefaultSettings(): array
     {
         return [
             'timesheet' => [
                 'rules' => [
                     'allow_future_times' => false,
+                    'allow_zero_duration' => true,
                     'lockdown_period_start' => null,
                     'lockdown_period_end' => null,
                     'lockdown_grace_period' => null,
                 ],
-                'mode' => 'duration_only',
+                'mode' => 'punch',
                 'markdown_content' => false,
                 'active_entries' => [
                     'hard_limit' => 99,
-                    'soft_limit' => 15,
                 ],
                 'default_begin' => 'now',
                 'duration_increment' => 10,
@@ -66,7 +69,6 @@ class SystemConfigurationTest extends TestCase
             ],
             'calendar' => [
                 'businessHours' => [
-                    'days' => [2, 4, 6],
                     'begin' => '07:49',
                     'end' => '19:27'
                 ],
@@ -99,19 +101,18 @@ class SystemConfigurationTest extends TestCase
             'theme' => [
                 'color_choices' => 'Maroon|#800000,Brown|#a52a2a,Red|#ff0000,Orange|#ffa500,#ffffff,,|#000000',
                 'colors_limited' => true,
-                'tags_create' => true,
                 'branding' => [
                     'logo' => null,
-                    'mini' => null,
                     'company' => 'Acme Corp.',
-                    'title' => 'Fantastic Time-Tracking',
-                    'translation' => null,
                 ],
             ],
         ];
     }
 
-    protected function getDefaultLoaderSettings()
+    /**
+     * @return array<Configuration>
+     */
+    protected function getDefaultLoaderSettings(): array
     {
         return [
             (new Configuration())->setName('defaults.customer.timezone')->setValue('Russia/Moscov'),
@@ -125,31 +126,21 @@ class SystemConfigurationTest extends TestCase
             (new Configuration())->setName('timesheet.markdown_content')->setValue('1'),
             (new Configuration())->setName('timesheet.default_begin')->setValue('07:00'),
             (new Configuration())->setName('timesheet.active_entries.hard_limit')->setValue('7'),
-            (new Configuration())->setName('theme.colors_limited')->setValue(false),
         ];
     }
 
-    public function testPrefix()
-    {
-        $sut = $this->getSut($this->getDefaultSettings(), []);
-        $this->assertEquals('kimai', $sut->getPrefix());
-    }
-
-    public function testDefaultWithoutLoader()
+    public function testDefaultWithoutLoader(): void
     {
         $sut = $this->getSut($this->getDefaultSettings(), []);
         $this->assertEquals('Europe/London', $sut->find('defaults.customer.timezone'));
         $this->assertEquals('GBP', $sut->find('defaults.customer.currency'));
         $this->assertFalse($sut->find('timesheet.rules.allow_future_times'));
         $this->assertEquals(99, $sut->find('timesheet.active_entries.hard_limit'));
-        $this->assertTrue($sut->find('theme.colors_limited'));
-        $this->assertTrue($sut->isThemeColorsLimited());
         $this->assertEquals('Maroon|#800000,Brown|#a52a2a,Red|#ff0000,Orange|#ffa500,#ffffff,,|#000000', $sut->getThemeColorChoices());
-        $this->assertEquals('Fantastic Time-Tracking', $sut->getBrandingTitle());
-        $this->assertTrue($sut->isAllowTagCreation());
+        $this->assertEquals(['Maroon' => '#800000', 'Brown' => '#a52a2a', 'Red' => '#ff0000', 'Orange' => '#ffa500', '#ffffff' => '#ffffff', '#000000' => '#000000'], $sut->getThemeColors());
     }
 
-    public function testDefaultWithLoader()
+    public function testDefaultWithLoader(): void
     {
         $sut = $this->getSut($this->getDefaultSettings(), $this->getDefaultLoaderSettings());
         $this->assertEquals('Russia/Moscov', $sut->find('defaults.customer.timezone'));
@@ -157,11 +148,9 @@ class SystemConfigurationTest extends TestCase
         $this->assertTrue($sut->find('timesheet.rules.allow_future_times'));
         $this->assertEquals(7, $sut->find('timesheet.active_entries.hard_limit'));
         $this->assertFalse($sut->isSamlActive());
-        $this->assertFalse($sut->find('theme.colors_limited'));
-        $this->assertEquals('Europe/London', $sut->default('defaults.customer.timezone'));
     }
 
-    public function testDefaultWithMixedConfigs()
+    public function testDefaultWithMixedConfigs(): void
     {
         $sut = $this->getSut($this->getDefaultSettings(), [
             (new Configuration())->setName('timesheet.rules.allow_future_times')->setValue(''),
@@ -171,24 +160,30 @@ class SystemConfigurationTest extends TestCase
         ]);
         $this->assertFalse($sut->find('timesheet.rules.allow_future_times'));
         $this->assertTrue($sut->isSamlActive());
-        $this->assertEquals('Maroon|#800000,Brown|#a52a2a,Red|#ff0000,Orange|#ffa500,#ffffff,,|#000000', $sut->getThemeColorChoices());
+        $this->assertEquals('Silver|#c0c0c0', $sut->getThemeColorChoices());
+        $this->assertEquals(['Silver' => '#c0c0c0'], $sut->getThemeColors());
         $this->assertEquals('2020-03-27', $sut->getFinancialYearStart());
     }
 
-    public function testUnknownConfigs()
+    public function testUnknownConfigs(): void
     {
         $sut = $this->getSut($this->getDefaultSettings(), [
             (new Configuration())->setName('timesheet.foo')->setValue('hello'),
         ]);
         $this->assertEquals('hello', $sut->find('timesheet.foo'));
+        $this->assertTrue($sut->has('timesheet.foo'));
+        $this->assertFalse($sut->has('timesheet.yyyyyyyyy'));
         $this->assertFalse($sut->has('xxxxxxxx.yyyyyyyyy'));
         $this->assertNull($sut->find('xxxxxxxx.yyyyyyyyy'));
+
+        $sut->set('xxxxxxxx.yyyyyyyyy', 'foooo-bar!');
+        $this->assertTrue($sut->has('xxxxxxxx.yyyyyyyyy'));
+        $this->assertEquals('foooo-bar!', $sut->find('xxxxxxxx.yyyyyyyyy'));
     }
 
-    public function testCalendarWithoutLoader()
+    public function testCalendarWithoutLoader(): void
     {
         $sut = $this->getSut($this->getDefaultSettings(), []);
-        $this->assertEquals([2, 4, 6], $sut->getCalendarBusinessDays());
         $this->assertEquals('07:49', $sut->getCalendarBusinessTimeBegin());
         $this->assertEquals('19:27', $sut->getCalendarBusinessTimeEnd());
         $this->assertEquals('06:00:00', $sut->getCalendarTimeframeBegin());
@@ -203,7 +198,7 @@ class SystemConfigurationTest extends TestCase
         $this->assertEquals(2, \count($sources));
     }
 
-    public function testCalendarWithLoader()
+    public function testCalendarWithLoader(): void
     {
         $sut = $this->getSut($this->getDefaultSettings(), $this->getDefaultLoaderSettings());
         $this->assertEquals('00:30:00', $sut->getCalendarSlotDuration());
@@ -211,7 +206,7 @@ class SystemConfigurationTest extends TestCase
         $this->assertEquals(2, \count($sources));
     }
 
-    public function testFormDefaultWithoutLoader()
+    public function testFormDefaultWithoutLoader(): void
     {
         $sut = $this->getSut($this->getDefaultSettings(), []);
         $this->assertEquals('Europe/London', $sut->getCustomerDefaultTimezone());
@@ -224,7 +219,7 @@ class SystemConfigurationTest extends TestCase
         $this->assertNull($sut->getFinancialYearStart());
     }
 
-    public function testFormDefaultWithLoader()
+    public function testFormDefaultWithLoader(): void
     {
         $sut = $this->getSut($this->getDefaultSettings(), $this->getDefaultLoaderSettings());
         $this->assertEquals('Russia/Moscov', $sut->getCustomerDefaultTimezone());
@@ -236,18 +231,14 @@ class SystemConfigurationTest extends TestCase
         $this->assertEquals('USD', $sut->getUserDefaultCurrency());
     }
 
-    public function testTimesheetWithoutLoader()
+    public function testTimesheetWithoutLoader(): void
     {
         $sut = $this->getSut($this->getDefaultSettings(), []);
         $this->assertEquals(99, $sut->getTimesheetActiveEntriesHardLimit());
         $this->assertFalse($sut->isTimesheetAllowFutureTimes());
         $this->assertFalse($sut->isTimesheetMarkdownEnabled());
-        $this->assertEquals('duration_only', $sut->getTimesheetTrackingMode());
+        $this->assertEquals('punch', $sut->getTimesheetTrackingMode());
         $this->assertEquals('now', $sut->getTimesheetDefaultBeginTime());
-        $this->assertFalse($sut->isTimesheetLockdownActive());
-        $this->assertEquals('', $sut->getTimesheetLockdownPeriodStart());
-        $this->assertEquals('', $sut->getTimesheetLockdownPeriodEnd());
-        $this->assertEquals('', $sut->getTimesheetLockdownGracePeriod());
         $this->assertEquals('', $sut->isTimesheetAllowOverlappingRecords());
         $this->assertEquals('', $sut->getTimesheetDefaultRoundingDays());
         $this->assertEquals('', $sut->getTimesheetDefaultRoundingMode());
@@ -255,20 +246,10 @@ class SystemConfigurationTest extends TestCase
         $this->assertEquals(0, $sut->getTimesheetDefaultRoundingEnd());
         $this->assertEquals(0, $sut->getTimesheetDefaultRoundingBegin());
         $this->assertEquals(10, $sut->getTimesheetIncrementDuration());
-        $this->assertEquals(5, $sut->getTimesheetIncrementBegin());
-        $this->assertEquals(5, $sut->getTimesheetIncrementEnd());
+        $this->assertEquals(5, $sut->getTimesheetIncrementMinutes());
     }
 
-    /**
-     * @group legacy
-     */
-    public function testDeprecatedSettingsWithoutLoader()
-    {
-        $sut = $this->getSut($this->getDefaultSettings(), []);
-        $this->assertEquals(99, $sut->getTimesheetActiveEntriesSoftLimit());
-    }
-
-    public function testTimesheetWithLoader()
+    public function testTimesheetWithLoader(): void
     {
         $sut = $this->getSut($this->getDefaultSettings(), $this->getDefaultLoaderSettings());
         $this->assertEquals(7, $sut->getTimesheetActiveEntriesHardLimit());
@@ -276,10 +257,6 @@ class SystemConfigurationTest extends TestCase
         $this->assertTrue($sut->isTimesheetMarkdownEnabled());
         $this->assertEquals('default', $sut->getTimesheetTrackingMode());
         $this->assertEquals('07:00', $sut->getTimesheetDefaultBeginTime());
-        $this->assertTrue($sut->isTimesheetLockdownActive());
-        $this->assertEquals('first day of last month', $sut->getTimesheetLockdownPeriodStart());
-        $this->assertEquals('last day of last month', $sut->getTimesheetLockdownPeriodEnd());
-        $this->assertEquals('+5 days', $sut->getTimesheetLockdownGracePeriod());
         $this->assertEquals('', $sut->isTimesheetAllowOverlappingRecords());
         $this->assertEquals('', $sut->getTimesheetDefaultRoundingDays());
         $this->assertEquals('', $sut->getTimesheetDefaultRoundingMode());
@@ -287,7 +264,6 @@ class SystemConfigurationTest extends TestCase
         $this->assertEquals(0, $sut->getTimesheetDefaultRoundingEnd());
         $this->assertEquals(0, $sut->getTimesheetDefaultRoundingBegin());
         $this->assertEquals(10, $sut->getTimesheetIncrementDuration());
-        $this->assertEquals(5, $sut->getTimesheetIncrementBegin());
-        $this->assertEquals(5, $sut->getTimesheetIncrementEnd());
+        $this->assertEquals(5, $sut->getTimesheetIncrementMinutes());
     }
 }

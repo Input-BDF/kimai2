@@ -13,26 +13,49 @@ use App\Entity\User;
 use App\Repository\Query\UserFormTypeQuery;
 use App\Repository\Query\VisibilityInterface;
 use App\Repository\UserRepository;
+use App\Utils\Color;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\FormInterface;
+use Symfony\Component\Form\FormView;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Custom form field type to select a user.
+ * @extends AbstractType<User>
  */
-class UserType extends AbstractType
+final class UserType extends AbstractType
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function __construct(private readonly UserRepository $userRepository)
+    {
+    }
+
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'class' => User::class,
-            'label' => 'label.user',
+            'label' => 'user',
             'choice_label' => function (User $user) {
                 return $user->getDisplayName();
+            },
+            'choice_attr' => function (User $user) {
+                $color = $user->getColor();
+
+                if ($color === null) {
+                    $color = (new Color())->getRandom($user->getDisplayName());
+                }
+
+                return [
+                    'data-id' => $user->getId(),
+                    'data-color' => $color,
+                    'data-title' => $user->getTitle(),
+                    'data-username' => $user->getUserIdentifier(),
+                    'data-alias' => $user->getAlias(),
+                    'data-initials' => $user->getInitials(),
+                    'data-accountNumber' => $user->getAccountNumber(),
+                    'data-display' => $user->getDisplayName(),
+                ];
             },
             'choice_translation_domain' => false,
             // whether disabled users should be included in the result list
@@ -41,41 +64,81 @@ class UserType extends AbstractType
             'ignore_users' => [],
             // an array of users, which will always be included in the result list
             // why? if the base entity could include disabled users, which should not be hidden in/removed from the list
-            // eg. when editing a team that has disabled users, these users would be removed silently
-            // see https://github.com/kevinpapst/kimai2/pull/1841
+            // e.g. when editing a team that has disabled users, these users would be removed silently
+            // see https://github.com/kimai/kimai/pull/1841
             'include_users' => [],
+            // includes the current user if it is a system-account, which is especially useful for forms pages,
+            // which have a user switcher and display the logged-in user by default
+            'include_current_user_if_system_account' => false,
             'documentation' => [
                 'type' => 'integer',
                 'description' => 'User ID',
             ],
         ]);
 
-        $resolver->setDefault('query_builder', function (Options $options) {
-            return function (UserRepository $repo) use ($options) {
-                $query = new UserFormTypeQuery();
-                $query->setUser($options['user']);
+        $resolver->setDefault('choices', function (Options $options) {
+            $query = new UserFormTypeQuery();
+            $query->setUser($options['user']);
 
-                if ($options['include_disabled'] === true) {
-                    $query->setVisibility(VisibilityInterface::SHOW_BOTH);
+            if ($options['include_disabled'] === true) {
+                $query->setVisibility(VisibilityInterface::SHOW_BOTH);
+            }
+
+            $qb = $this->userRepository->getQueryBuilderForFormType($query);
+            $users = $qb->getQuery()->getResult();
+
+            $ignoreIds = [];
+            /** @var User $user */
+            foreach ($options['ignore_users'] as $user) {
+                $ignoreIds[] = $user->getId();
+            }
+
+            $users = array_filter($users, function (User $user) use ($ignoreIds) {
+                if ($user->getId() === null) {
+                    return false;
                 }
 
-                foreach ($options['ignore_users'] as $userToIgnore) {
-                    $query->addUserToIgnore($userToIgnore);
-                }
+                return !\in_array($user->getId(), $ignoreIds, true);
+            });
 
-                if (!empty($options['include_users'])) {
-                    $query->setUsersAlwaysIncluded($options['include_users']);
-                }
+            /** @var array<int, User> $userById */
+            $userById = [];
+            /** @var User $user */
+            foreach ($users as $user) {
+                $userById[$user->getId()] = $user;
+            }
 
-                return $repo->getQueryBuilderForFormType($query);
-            };
+            $includeUsers = $options['include_users'];
+            if ($options['include_current_user_if_system_account'] === true) {
+                if ($options['user'] instanceof User && $options['user']->isSystemAccount()) {
+                    $includeUsers[] = $options['user'];
+                }
+            }
+
+            /** @var User $user */
+            foreach ($includeUsers as $user) {
+                if ($user->getId() !== null && !\array_key_exists($user->getId(), $userById)) {
+                    $userById[$user->getId()] = $user;
+                }
+            }
+
+            usort($userById, function (User $a, User $b) {
+                return $a->getDisplayName() <=> $b->getDisplayName();
+            });
+
+            return array_values($userById);
         });
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getParent()
+    public function buildView(FormView $view, FormInterface $form, array $options): void
+    {
+        $view->vars['attr'] = array_merge($view->vars['attr'], [
+            'data-select-attributes' => 'color,title,username,initials,accountNumber,alias',
+            'data-renderer' => 'color',
+        ]);
+    }
+
+    public function getParent(): string
     {
         return EntityType::class;
     }

@@ -13,19 +13,8 @@ use App\Entity\User;
 
 final class UserYear
 {
-    /**
-     * @var Year
-     */
-    private $year;
-    /**
-     * @var User
-     */
-    private $user;
-
-    public function __construct(User $user, Year $year)
+    public function __construct(private User $user, private Year $year)
     {
-        $this->user = $user;
-        $this->year = $year;
     }
 
     public function getYear(): Year
@@ -40,21 +29,26 @@ final class UserYear
 
     public function getDuration(): int
     {
-        $duration = 0;
-        foreach ($this->year->getMonths() as $month) {
-            $duration += $month->getDuration();
-        }
+        return $this->year->getDuration();
+    }
 
-        return $duration;
+    public function getBillableDuration(): int
+    {
+        return $this->year->getBillableDuration();
     }
 
     public function getRate(): float
     {
-        $rate = 0;
-        foreach ($this->year->getMonths() as $month) {
-            $rate += $month->getRate();
-        }
+        return $this->year->getRate();
+    }
 
-        return $rate;
+    public function getBillableRate(): float
+    {
+        return $this->year->getBillableRate();
+    }
+
+    public function getInternalRate(): float
+    {
+        return $this->year->getInternalRate();
     }
 }

@@ -10,59 +10,70 @@
 namespace App\Form;
 
 use App\Entity\Role;
-use FOS\RestBundle\Validator\Constraints\Regex;
+use App\Validator\Constraints\RoleName;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\CallbackTransformer;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\NotBlank;
 
-/**
- * The form used to edit roles.
- */
-class RoleType extends AbstractType
+final class RoleType extends AbstractType
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder
-            ->add('name', TextType::class, [
-                'label' => 'label.name',
-                'help' => 'Allowed character: A-Z and _',
-                'constraints' => [
-                    new Regex(['pattern' => '/^[a-zA-Z_]{5,}$/'])
-                ],
-                'attr' => [
-                    'maxlength' => 50
-                ]
-            ])
-        ;
+        $builder->add('name', TextType::class, [
+            'label' => 'name',
+            'help' => 'Allowed character: A-Z and _',
+            'constraints' => [
+                new NotBlank(),
+                new RoleName(),
+            ],
+            'attr' => [
+                'maxlength' => 50
+            ]
+        ]);
+
+        $replacer = function ($roleName): ?string {
+            if ($roleName === null) {
+                return null;
+            }
+
+            if (\is_string($roleName)) {
+                $roleName = preg_replace('/[^a-zA-Z_]/', '_', $roleName);
+                $roleName = preg_replace('/_+/', '_', $roleName ?? '');
+                $roleName = ltrim($roleName ?? '', '_');
+                $roleName = rtrim($roleName, '_');
+                $roleName = strtoupper($roleName);
+            }
+
+            return $roleName;
+        };
 
         // help the user to figure out the allowed name
         $builder->get('name')->addViewTransformer(
             new CallbackTransformer(
-                function ($roleName) {
-                    if (\is_string($roleName)) {
-                        $roleName = str_replace(' ', '_', $roleName);
-                        $roleName = str_replace('-', '_', $roleName);
-                        $roleName = strtoupper($roleName);
-                    }
-
-                    return $roleName;
+                function ($roleName) use ($replacer) {
+                    return $replacer($roleName);
                 },
                 function ($roleName) {
                     return $roleName;
                 }
             )
         );
+        $builder->get('name')->addModelTransformer(
+            new CallbackTransformer(
+                function ($roleName) {
+                    return $roleName;
+                },
+                function ($roleName) use ($replacer) {
+                    return $replacer($roleName);
+                }
+            )
+        );
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'data_class' => Role::class,

@@ -17,25 +17,23 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Custom form field type to select weekdays.
+ * @extends AbstractType<string>
  */
-class WeekDaysType extends AbstractType
+final class WeekDaysType extends AbstractType
 {
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder->addModelTransformer(new CallbackTransformer(
-            function ($weekdays) {
+            function ($weekdays): array {
                 return explode(',', $weekdays);
             },
-            function ($weekdays) {
+            function ($weekdays): string {
                 return implode(',', $weekdays);
             }
         ));
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $choices = [
             'Monday' => 'monday',
@@ -53,10 +51,7 @@ class WeekDaysType extends AbstractType
         ]);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getParent()
+    public function getParent(): string
     {
         return ChoiceType::class;
     }

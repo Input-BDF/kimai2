@@ -18,13 +18,16 @@ use App\Repository\Query\CustomerFormTypeQuery;
  */
 class CustomerFormTypeQueryTest extends BaseFormTypeQueryTest
 {
-    public function testQuery()
+    public function testQuery(): void
     {
         $sut = new CustomerFormTypeQuery();
 
         $this->assertBaseQuery($sut);
 
-        $customer = new Customer();
+        $customer = new Customer('foo');
+        self::assertFalse($sut->isAllowCustomerPreselect());
+        $sut->setAllowCustomerPreselect(true);
+        self::assertTrue($sut->isAllowCustomerPreselect());
         self::assertNull($sut->getCustomerToIgnore());
         self::assertInstanceOf(CustomerFormTypeQuery::class, $sut->setCustomerToIgnore($customer));
         self::assertSame($customer, $sut->getCustomerToIgnore());

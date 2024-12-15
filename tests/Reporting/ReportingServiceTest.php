@@ -26,6 +26,8 @@ class ReportingServiceTest extends TestCase
         $dispatcher = $this->createMock(EventDispatcherInterface::class);
         $dispatcher->expects($this->exactly($isGranted ? 1 : 0))->method('dispatch')->willReturnCallback(function ($event) {
             $this->assertInstanceOf(ReportingEvent::class, $event);
+
+            return $event;
         });
 
         $security = $this->createMock(AuthorizationCheckerInterface::class);
@@ -34,7 +36,7 @@ class ReportingServiceTest extends TestCase
         return new ReportingService($dispatcher, $security);
     }
 
-    public function testGetAvailableReports()
+    public function testGetAvailableReports(): void
     {
         $sut = $this->getSut();
         $reports = $sut->getAvailableReports(new User());
@@ -42,11 +44,11 @@ class ReportingServiceTest extends TestCase
         self::assertEmpty($reports);
     }
 
-    public function testGetAvailableReportsWithPermission()
+    public function testGetAvailableReportsWithPermission(): void
     {
         $sut = $this->getSut(true);
         $reports = $sut->getAvailableReports(new User());
         self::assertIsArray($reports);
-        self::assertCount(9, $reports);
+        self::assertCount(11, $reports);
     }
 }

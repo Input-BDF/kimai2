@@ -17,7 +17,7 @@ use Symfony\Component\Form\FormBuilderInterface;
 
 abstract class AbstractRateForm extends AbstractType
 {
-    protected function addFields(FormBuilderInterface $builder, ?string $currency)
+    protected function addFields(FormBuilderInterface $builder, ?string $currency): void
     {
         $builder
             ->add('user', UserType::class, [
@@ -29,7 +29,7 @@ abstract class AbstractRateForm extends AbstractType
                     'type' => 'number',
                     'description' => 'The rate (eg. 10.5)',
                 ],
-                'label' => 'label.rate',
+                'label' => 'rate',
                 'attr' => [
                     'autofocus' => 'autofocus'
                 ],
@@ -42,13 +42,13 @@ abstract class AbstractRateForm extends AbstractType
                     'type' => 'number',
                     'description' => 'The internal rate (eg. 10.0 or 10)',
                 ],
-                'label' => 'label.rate_internal',
+                'label' => 'internalRate',
                 'currency' => $currency,
                 'required' => false,
-                'help' => 'help.rate_internal',
+                'help' => 'help.internalRate',
             ])
             ->add('isFixed', YesNoType::class, [
-                'label' => 'label.fixedRate',
+                'label' => 'fixedRate',
                 'help' => 'help.fixedRate',
                 'documentation' => [
                     'type' => 'boolean',

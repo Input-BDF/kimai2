@@ -16,17 +16,42 @@ use App\Entity\User;
  */
 class ReportingControllerTest extends ControllerBaseTest
 {
-    public function testIsSecure()
+    public function testIsSecure(): void
     {
-        $this->assertUrlIsSecured('/reporting');
+        $this->assertUrlIsSecured('/reporting/');
     }
 
-    public function testRedirectForDefaultReportUrl()
+    public function testOverviewPage(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
+        $this->request($client, '/reporting/');
+        $nodes = $client->getCrawler()->filter('section.content div.row-cards a.card-link');
+        $this->assertCount(11, $nodes);
+    }
+
+    public function testAllReports(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_SUPER_ADMIN);
+        $this->request($client, '/reporting/');
+        $nodes = $client->getCrawler()->filter('section.content div.row-cards a.card-link');
+        $this->assertCount(11, $nodes);
+        foreach ($nodes as $node) {
+            self::assertNotNull($node->attributes);
+            $link = $node->attributes->getNamedItem('href');
+            self::assertNotNull($link);
+            $url = $link->nodeValue;
+            self::assertNotNull($url);
+            self::assertNotEmpty($url);
+            self::assertStringStartsWith('/en/reporting/', $url);
+            $this->request($client, $url);
+        }
+    }
+
+    public function testOverviewPageAsUser(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->request($client, '/reporting/');
-        $this->assertIsRedirect($client, $this->createUrl('/reporting/week_by_user'));
-        $client->followRedirect();
-        self::assertStringContainsString('<div class="box-body user-week-reporting-box', $client->getResponse()->getContent());
+        $nodes = $client->getCrawler()->filter('section.content div.row-cards a.card-link');
+        $this->assertCount(3, $nodes);
     }
 }

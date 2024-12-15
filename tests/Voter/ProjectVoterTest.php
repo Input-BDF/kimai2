@@ -22,20 +22,20 @@ use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
  */
 class ProjectVoterTest extends AbstractVoterTest
 {
-    protected function assertVote(User $user, $subject, $attribute, $result)
+    public function assertVote(User $user, $subject, $attribute, $result): void
     {
-        $token = new UsernamePasswordToken($user, 'foo', 'bar', $user->getRoles());
+        $token = new UsernamePasswordToken($user, 'bar', $user->getRoles());
         $sut = $this->getVoter(ProjectVoter::class);
 
         if ($subject instanceof Project && null === $subject->getCustomer()) {
-            $subject->setCustomer(new Customer());
+            $subject->setCustomer(new Customer('foo'));
         }
 
         $actual = $sut->vote($token, $subject, [$attribute]);
-        $this->assertEquals($result, $actual, sprintf('Failed voting "%s" for User with roles %s.', $attribute, implode(', ', $user->getRoles())));
+        $this->assertEquals($result, $actual, \sprintf('Failed voting "%s" for User with roles %s.', $attribute, implode(', ', $user->getRoles())));
     }
 
-    public function testVote()
+    public function testVote(): void
     {
         $userNoRole = $this->getUser(0, 'foo');
         $userStandard = $this->getUser(1, User::ROLE_USER);
@@ -51,7 +51,7 @@ class ProjectVoterTest extends AbstractVoterTest
             $this->assertVote($user, new Project(), 'delete', $result);
         }
 
-        $team = new Team();
+        $team = new Team('foo');
         $team->addTeamlead($userTeamlead);
         foreach ([$userTeamlead] as $user) {
             $project = new Project();
@@ -90,49 +90,49 @@ class ProjectVoterTest extends AbstractVoterTest
         }
     }
 
-    public function testTeamlead()
+    public function testTeamlead(): void
     {
-        $team = new Team();
+        $team = new Team('foo');
         $user = new User();
         $user->addRole(User::ROLE_TEAMLEAD);
         $team->addTeamlead($user);
 
         $project = new Project();
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $project->setCustomer($customer);
         $customer->addTeam($team);
 
         $this->assertVote($user, $project, 'edit', VoterInterface::ACCESS_GRANTED);
 
         $project = new Project();
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $project->setCustomer($customer);
         $project->addTeam($team);
 
         $this->assertVote($user, $project, 'edit', VoterInterface::ACCESS_GRANTED);
     }
 
-    public function testTeamMember()
+    public function testTeamMember(): void
     {
-        $team = new Team();
+        $team = new Team('foo');
         $user = new User();
         $user->addRole(User::ROLE_USER);
         $team->addTeamlead($user);
 
         $project = new Project();
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $customer->addTeam($team);
         $project->setCustomer($customer);
 
         $this->assertVote($user, $project, 'edit', VoterInterface::ACCESS_GRANTED);
 
-        $team = new Team();
+        $team = new Team('foo');
         $user = new User();
         $user->addRole(User::ROLE_USER);
         $team->addUser($user);
 
         $project = new Project();
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $project->addTeam($team);
         $project->setCustomer($customer);
 

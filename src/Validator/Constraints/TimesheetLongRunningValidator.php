@@ -17,28 +17,36 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 
 final class TimesheetLongRunningValidator extends ConstraintValidator
 {
-    private $systemConfiguration;
-
-    public function __construct(SystemConfiguration $systemConfiguration)
+    public function __construct(private readonly SystemConfiguration $systemConfiguration)
     {
-        $this->systemConfiguration = $systemConfiguration;
     }
 
-    /**
-     * @param TimesheetEntity $timesheet
-     * @param Constraint $constraint
-     */
-    public function validate($timesheet, Constraint $constraint)
+    public function validate(mixed $value, Constraint $constraint): void
     {
         if (!($constraint instanceof TimesheetLongRunning)) {
             throw new UnexpectedTypeException($constraint, TimesheetLongRunning::class);
         }
 
-        if (!\is_object($timesheet) || !($timesheet instanceof TimesheetEntity)) {
-            throw new UnexpectedTypeException($timesheet, TimesheetEntity::class);
+        if (!\is_object($value) || !($value instanceof TimesheetEntity)) {
+            throw new UnexpectedTypeException($value, TimesheetEntity::class);
         }
 
-        if ($timesheet->isRunning()) {
+        if ($value->isRunning()) {
+            return;
+        }
+
+        /** @var int $duration */
+        $duration = $value->getCalculatedDuration();
+
+        // one year is currently the maximum that can be logged (which is already not logically)
+        // the database column could hold more data, but let's limit it here
+        if ($duration > 31536000) {
+            $this->context->buildViolation($constraint->maximumMessage)
+                ->setTranslationDomain('validators')
+                ->atPath('duration')
+                ->setCode(TimesheetLongRunning::MAXIMUM)
+                ->addViolation();
+
             return;
         }
 
@@ -48,17 +56,17 @@ final class TimesheetLongRunningValidator extends ConstraintValidator
             return;
         }
 
-        $duration = $timesheet->getEnd()->getTimestamp() - $timesheet->getBegin()->getTimestamp();
-        $minutes = (int) $duration / 60;
+        // float on purpose, because one second more than the configured minutes is already too long
+        $minutes = $duration / 60;
 
-        if ($minutes < $maxMinutes) {
+        // allow maximum of the exact configured minutes
+        if ($minutes <= $maxMinutes) {
             return;
         }
 
         $format = new \App\Utils\Duration();
         $hours = $format->format($maxMinutes * 60);
 
-        // raise a violation for all entries before the start of lockdown period
         $this->context->buildViolation($constraint->message)
             ->setParameter('{{ value }}', $hours)
             ->setTranslationDomain('validators')

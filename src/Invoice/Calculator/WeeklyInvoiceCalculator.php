@@ -9,22 +9,25 @@
 
 namespace App\Invoice\Calculator;
 
+use App\Entity\ExportableItem;
 use App\Invoice\CalculatorInterface;
-use App\Invoice\InvoiceItemInterface;
 
 /**
  * A calculator that sums up the invoice item records per week.
  */
-class WeeklyInvoiceCalculator extends AbstractSumInvoiceCalculator implements CalculatorInterface
+final class WeeklyInvoiceCalculator extends AbstractSumInvoiceCalculator implements CalculatorInterface
 {
-    protected function calculateSumIdentifier(InvoiceItemInterface $invoiceItem): string
+    public function getIdentifiers(ExportableItem $invoiceItem): array
     {
-        return $invoiceItem->getBegin()->format('W');
+        if (null === $invoiceItem->getBegin()) {
+            throw new \Exception('Cannot handle invoice items without start date');
+        }
+
+        return [
+            $invoiceItem->getBegin()->format('W')
+        ];
     }
 
-    /**
-     * @return string
-     */
     public function getId(): string
     {
         return 'weekly';

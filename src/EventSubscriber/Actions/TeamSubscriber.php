@@ -12,7 +12,7 @@ namespace App\EventSubscriber\Actions;
 use App\Entity\Team;
 use App\Event\PageActionsEvent;
 
-class TeamSubscriber extends AbstractActionsSubscriber
+final class TeamSubscriber extends AbstractActionsSubscriber
 {
     public static function getActionName(): string
     {
@@ -31,17 +31,19 @@ class TeamSubscriber extends AbstractActionsSubscriber
         }
 
         if ($this->isGranted('edit', $team)) {
-            $event->addAction('edit', ['url' => $this->path('admin_team_edit', ['id' => $team->getId()])]);
+            if (!$event->isView('edit')) {
+                $event->addEdit($this->path('admin_team_edit', ['id' => $team->getId()]));
+            }
 
             if ($this->isGranted('create_team')) {
-                $event->addAction('copy', ['url' => $this->path('team_duplicate', ['id' => $team->getId()])]);
+                $event->addAction('copy', ['url' => $this->path('team_duplicate', ['id' => $team->getId()]), 'title' => 'copy', 'class' => 'modal-ajax-form']);
             }
         }
 
         if ($event->isIndexView() && $this->isGranted('delete', $team)) {
             $event->addAction('trash', [
                 'url' => $this->path('delete_team', ['id' => $team->getId()]),
-                'class' => 'api-link',
+                'class' => 'api-link text-red',
                 'attr' => [
                     'data-event' => 'kimai.teamDelete kimai.teamUpdate',
                     'data-method' => 'DELETE',

@@ -14,15 +14,22 @@ use Symfony\Component\Security\Http\Authentication\DefaultAuthenticationSuccessH
 
 final class SamlAuthenticationSuccessHandler extends DefaultAuthenticationSuccessHandler
 {
-    protected function determineTargetUrl(Request $request)
-    {
-        if ($this->options['always_use_default_target_path']) {
-            return $this->options['default_target_path'];
-        }
+    protected $defaultOptions = [
+        'always_use_default_target_path' => false,
+        'default_target_path' => '/',
+        'login_path' => 'saml_login',
+        'target_path_parameter' => '_target_path',
+        'use_referer' => false,
+    ];
 
+    protected function determineTargetUrl(Request $request): string
+    {
         $relayState = $request->get('RelayState');
-        if (null !== $relayState && $relayState !== $this->httpUtils->generateUri($request, $this->options['login_path'])) {
-            return $relayState;
+        if (\is_scalar($relayState)) {
+            $relayState = (string) $relayState;
+            if ($relayState !== $this->httpUtils->generateUri($request, (string) $this->options['login_path'])) {
+                return $relayState;
+            }
         }
 
         return parent::determineTargetUrl($request);

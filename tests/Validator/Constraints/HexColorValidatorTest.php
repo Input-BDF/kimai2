@@ -16,11 +16,13 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\HexColor
  * @covers \App\Validator\Constraints\HexColorValidator
+ * @extends ConstraintValidatorTestCase<HexColorValidator>
  */
 class HexColorValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator()
+    protected function createValidator(): HexColorValidator
     {
         return new HexColorValidator();
     }
@@ -37,7 +39,7 @@ class HexColorValidatorTest extends ConstraintValidatorTestCase
         yield [null];
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
@@ -48,7 +50,7 @@ class HexColorValidatorTest extends ConstraintValidatorTestCase
      * @dataProvider getValidColors
      * @param string $color
      */
-    public function testConstraintWithValidColor($color)
+    public function testConstraintWithValidColor($color): void
     {
         $constraint = new HexColor();
         $this->validator->validate($color, $constraint);
@@ -77,7 +79,7 @@ class HexColorValidatorTest extends ConstraintValidatorTestCase
      * @dataProvider getInvalidColors
      * @param mixed $color
      */
-    public function testValidationError($color, $parameterType = null)
+    public function testValidationError($color, $parameterType = null): void
     {
         $constraint = new HexColor();
 

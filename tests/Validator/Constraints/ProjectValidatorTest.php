@@ -9,7 +9,10 @@
 
 namespace App\Tests\Validator\Constraints;
 
+use App\Configuration\ConfigLoaderInterface;
 use App\Entity\Project;
+use App\Repository\ProjectRepository;
+use App\Tests\Mocks\SystemConfigurationFactory;
 use App\Validator\Constraints\Project as ProjectConstraint;
 use App\Validator\Constraints\ProjectValidator;
 use Symfony\Component\Validator\Constraints\NotBlank;
@@ -17,23 +20,29 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\Project
  * @covers \App\Validator\Constraints\ProjectValidator
+ * @extends ConstraintValidatorTestCase<ProjectValidator>
  */
 class ProjectValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator()
+    protected function createValidator(): ProjectValidator
     {
-        return new ProjectValidator();
+        $loader = $this->createMock(ConfigLoaderInterface::class);
+        $config = SystemConfigurationFactory::create($loader, []);
+        $repository = $this->createMock(ProjectRepository::class);
+
+        return new ProjectValidator($config, $repository);
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
         $this->validator->validate('foo', new NotBlank());
     }
 
-    public function testEndBeforeStartIsInvalid()
+    public function testEndBeforeStartIsInvalid(): void
     {
         $begin = new \DateTime();
         $end = new \DateTime('-1 hour');
@@ -47,5 +56,11 @@ class ProjectValidatorTest extends ConstraintValidatorTestCase
             ->atPath('property.path.end')
             ->setCode(ProjectConstraint::END_BEFORE_BEGIN_ERROR)
             ->assertRaised();
+    }
+
+    public function testGetTargets(): void
+    {
+        $constraint = new ProjectConstraint();
+        self::assertEquals('class', $constraint->getTargets());
     }
 }

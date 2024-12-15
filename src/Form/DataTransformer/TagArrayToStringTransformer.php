@@ -14,31 +14,45 @@ use App\Repository\TagRepository;
 use Symfony\Component\Form\DataTransformerInterface;
 use Symfony\Component\Form\Exception\TransformationFailedException;
 
-class TagArrayToStringTransformer implements DataTransformerInterface
+/**
+ * @implements DataTransformerInterface<array<Tag>, string>
+ */
+final class TagArrayToStringTransformer implements DataTransformerInterface
 {
-    /**
-     * @var TagRepository
-     */
-    private $tagRepository;
-
-    public function __construct(TagRepository $tagRepository)
+    public function __construct(
+        private readonly TagRepository $tagRepository,
+        private readonly bool $create
+    )
     {
-        $this->tagRepository = $tagRepository;
     }
 
     /**
      * Transforms an array of tags to a string.
      *
-     * @param Tag[]|null $tags
-     * @return string
+     * @param Tag[]|null $value
      */
-    public function transform($tags)
+    public function transform(mixed $value): string
     {
-        if (empty($tags)) {
+        if (empty($value)) {
             return '';
         }
 
-        return implode(', ', $tags);
+        if (!\is_array($value)) {
+            return '';
+        }
+
+        $result = [];
+        foreach ($value as $item) {
+            if ($item instanceof Tag) {
+                $result[] = $item->getName();
+            } elseif (\is_string($item)) {
+                $result[] = $item;
+            } else {
+                throw new TransformationFailedException('Tags must only contain a Tag or a string.');
+            }
+        }
+
+        return implode(',', $result);
     }
 
     /**
@@ -46,30 +60,44 @@ class TagArrayToStringTransformer implements DataTransformerInterface
      *
      * @see \Symfony\Bridge\Doctrine\Form\DataTransformer\CollectionToArrayTransformer::reverseTransform()
      *
-     * @param string|null $stringOfTags
+     * @param array<string>|string|null $value
      * @return Tag[]
      * @throws TransformationFailedException
      */
-    public function reverseTransform($stringOfTags)
+    public function reverseTransform(mixed $value): array
     {
         // check for empty tag list
-        if ('' === $stringOfTags || null === $stringOfTags) {
+        if ('' === $value || null === $value) {
             return [];
         }
 
-        $names = array_filter(array_unique(array_map('trim', explode(',', $stringOfTags))));
+        if (!\is_array($value)) {
+            $names = array_filter(array_unique(array_map('trim', explode(',', $value))));
+        } else {
+            $names = $value;
+        }
 
-        // get the current tags and find the new ones that should be created
-        $tags = $this->tagRepository->findBy(['name' => $names]);
-        // works, because of the implicit case: (string) $tag
-        $newNames = array_diff($names, $tags);
+        $tags = [];
+        foreach ($names as $tagName) {
+            if ($tagName === null || $tagName === '') {
+                continue;
+            }
 
-        foreach ($newNames as $name) {
-            $tag = new Tag();
-            $tag->setName($name);
-            $tags[] = $tag;
+            $tagName = trim($tagName);
 
-            // new tags persist automatically thanks to the cascade={"persist"}
+            // do not check for numeric values as ID, this form type only submits tag names
+            $tag = $this->tagRepository->findTagByName($tagName);
+
+            // get the current tags and find the new ones that should be created
+            if ($tag === null && $this->create) {
+                $tag = new Tag();
+                $tag->setName(mb_substr($tagName, 0, 100));
+                $this->tagRepository->saveTag($tag);
+            }
+
+            if ($tag !== null) {
+                $tags[] = $tag;
+            }
         }
 
         return $tags;

@@ -18,7 +18,6 @@ use App\Entity\UserPreference;
 use App\Timesheet\Util;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Bundle\FixturesBundle\FixtureGroupInterface;
-use Doctrine\Common\DataFixtures\DependentFixtureInterface;
 use Doctrine\Persistence\ObjectManager;
 use Faker\Factory;
 
@@ -26,20 +25,19 @@ use Faker\Factory;
  * Defines the sample data to load in the database when running the unit and
  * functional tests or while development.
  *
- * Execute this command to load the data:
+ * Execute this command to load add fixture data:
  * bin/console doctrine:fixtures:load
+ *
+ * Or simply append it to your running installation:
+ * bin/console doctrine:fixtures:load --append --group=timesheet
  *
  * @codeCoverageIgnore
  */
-class TimesheetFixtures extends Fixture implements DependentFixtureInterface, FixtureGroupInterface
+final class TimesheetFixtures extends Fixture implements FixtureGroupInterface
 {
-    public const MIN_TIMESHEETS_PER_USER = 50;
-    public const MAX_TIMESHEETS_PER_USER = 500;
-    public const MAX_TIMESHEETS_TOTAL = 5000;
-    public const MAX_RUNNING_TIMESHEETS_PER_USER = 1;
-    public const TIMERANGE_BEGIN_DAYS = 1; // yesterday
-    public const TIMERANGE_END_DAYS = 1095; // 3 years
-    public const TIMERANGE_RUNNING = 1047; // in minutes = 17:45 hours
+    public const MIN_TIMESHEETS_PER_USER = 100;
+    public const MAX_TIMESHEETS_PER_USER = 1000;
+    public const MAX_TIMESHEETS_TOTAL = 10000;
     public const MIN_MINUTES_PER_ENTRY = 15;
     public const MAX_MINUTES_PER_ENTRY = 840; // 14h
     public const MAX_DESCRIPTION_LENGTH = 200;
@@ -47,45 +45,30 @@ class TimesheetFixtures extends Fixture implements DependentFixtureInterface, Fi
     public const ADD_TAGS_MAX_ENTRIES = 1000;
     public const MAX_TAG_PER_ENTRY = 3;
 
-    public const BATCH_SIZE = 100;
-
-    /**
-     * @return class-string[]
-     */
-    public function getDependencies()
-    {
-        return [
-            UserFixtures::class,
-            CustomerFixtures::class,
-            TagFixtures::class,
-        ];
-    }
-
     public static function getGroups(): array
     {
         return ['timesheet'];
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function load(ObjectManager $manager)
+    public function getRandomFirstDay(): \DateTime
+    {
+        return new \DateTime(rand(-1095, 14) . ' days');
+    }
+
+    public function load(ObjectManager $manager): void
     {
         $allUser = $this->getAllUsers($manager);
-        $activities = $this->getAllActivities($manager);
-        $projects = $this->getAllProjects($manager);
-        $allTags = $this->getAllTags($manager);
-
         $faker = Factory::create();
-
-        // by using array_pop we make sure that at least one activity has NO entry!
-        array_pop($activities);
-
         $all = 0;
 
         foreach ($allUser as $user) {
+            $user = $manager->find(User::class, $user->getId());
             // random amount of timesheet entries for every user
             $timesheetForUser = rand(self::MIN_TIMESHEETS_PER_USER, self::MAX_TIMESHEETS_PER_USER);
+
+            $activities = $this->getAllActivities($manager);
+            $projects = $this->getAllProjects($manager);
+
             for ($i = 1; $i <= $timesheetForUser; $i++) {
                 if ($all > self::MAX_TIMESHEETS_TOTAL && $i > self::MIN_TIMESHEETS_PER_USER) {
                     break;
@@ -95,7 +78,7 @@ class TimesheetFixtures extends Fixture implements DependentFixtureInterface, Fi
                 if ($i % 3 === 0) {
                     $description = $faker->realText($faker->numberBetween(10, self::MAX_DESCRIPTION_LENGTH));
                 } elseif ($i % 7 === 0) {
-                    $description = substr($faker->text, 0, self::MAX_DESCRIPTION_LENGTH);
+                    $description = substr($faker->text(), 0, self::MAX_DESCRIPTION_LENGTH);
                 }
 
                 $entry = $this->createTimesheetEntry(
@@ -105,20 +88,13 @@ class TimesheetFixtures extends Fixture implements DependentFixtureInterface, Fi
                     $description,
                     true
                 );
-
                 $all++;
 
                 $manager->persist($entry);
-
-                if ($all % self::BATCH_SIZE === 0) {
-                    $manager->flush();
-                    $manager->clear(Timesheet::class);
-                }
             }
 
-            // create active recordings for test user
-            $activeEntries = rand(0, self::MAX_RUNNING_TIMESHEETS_PER_USER);
-            for ($i = 0; $i < $activeEntries; $i++) {
+            // create active records
+            if ($all % 3 === 0) {
                 $entry = $this->createTimesheetEntry(
                     $user,
                     $activities[array_rand($activities)],
@@ -132,11 +108,12 @@ class TimesheetFixtures extends Fixture implements DependentFixtureInterface, Fi
             }
 
             $manager->flush();
-            $manager->clear(Timesheet::class);
+            $manager->clear();
         }
-        $manager->flush();
 
-        $entries = $manager->getRepository(Timesheet::class)->findBy([], [], min($all, self::ADD_TAGS_MAX_ENTRIES));
+        $allTags = $this->getAllTags($manager);
+        /** @var array<Timesheet> $entries */
+        $entries = $this->findRandom($manager, Timesheet::class, min($all, self::ADD_TAGS_MAX_ENTRIES));
         foreach ($entries as $temp) {
             $tagAmount = rand(0, self::MAX_TAG_PER_ENTRY);
             for ($iTag = 0; $iTag < $tagAmount; $iTag++) {
@@ -146,33 +123,57 @@ class TimesheetFixtures extends Fixture implements DependentFixtureInterface, Fi
                 }
             }
         }
-        $manager->flush();
 
-        $manager->clear(Timesheet::class);
-        $manager->clear(Tag::class);
+        $manager->flush();
+        $manager->clear();
+    }
+
+    /**
+     * @template T of object
+     * @param ObjectManager $manager
+     * @param class-string<T> $class
+     * @param int $amount
+     * @return array<int, T>
+     */
+    private function findRandom(ObjectManager $manager, string $class, int $amount): array
+    {
+        $qb = $manager->getRepository($class)->createQueryBuilder('entity');
+        /** @var array<int> $limits */
+        $limits = $qb
+            ->select('MIN(entity.id)', 'MAX(entity.id)')
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        $ids = [];
+        for ($i = 0; $i < $amount; $i++) {
+            $rand = rand($limits[1], $limits[2]);
+            if (!\in_array($rand, $ids)) {
+                $ids[] = $rand;
+            }
+        }
+
+        $qb = $manager->getRepository($class)->createQueryBuilder('entity');
+
+        /** @var array<int, T> $result */
+        $result = $qb->where($qb->expr()->in('entity.id', $ids))->setMaxResults($amount)->getQuery()->getResult();
+
+        return $result;
     }
 
     /**
      * @param ObjectManager $manager
      * @return array<int|string, Tag>
      */
-    protected function getAllTags(ObjectManager $manager): array
+    private function getAllTags(ObjectManager $manager): array
     {
-        $all = [];
-        /** @var Tag[] $entries */
-        $entries = $manager->getRepository(Tag::class)->findAll();
-        foreach ($entries as $temp) {
-            $all[$temp->getId()] = $temp;
-        }
-
-        return $all;
+        return $this->findRandom($manager, Tag::class, 50);
     }
 
     /**
      * @param ObjectManager $manager
      * @return array<int|string, User>
      */
-    protected function getAllUsers(ObjectManager $manager): array
+    private function getAllUsers(ObjectManager $manager): array
     {
         $all = [];
         /** @var User[] $entries */
@@ -188,48 +189,32 @@ class TimesheetFixtures extends Fixture implements DependentFixtureInterface, Fi
      * @param ObjectManager $manager
      * @return array<int|string, Project>
      */
-    protected function getAllProjects(ObjectManager $manager): array
+    private function getAllProjects(ObjectManager $manager): array
     {
-        $all = [];
-        /** @var Project[] $entries */
-        $entries = $manager->getRepository(Project::class)->findAll();
-        foreach ($entries as $temp) {
-            $all[$temp->getId()] = $temp;
-        }
-
-        return $all;
+        return $this->findRandom($manager, Project::class, 50);
     }
 
     /**
      * @param ObjectManager $manager
      * @return array<int|string, Activity>
      */
-    protected function getAllActivities(ObjectManager $manager): array
+    private function getAllActivities(ObjectManager $manager): array
     {
-        $all = [];
-        /** @var Activity[] $entries */
-        $entries = $manager->getRepository(Activity::class)->findAll();
-        foreach ($entries as $temp) {
-            $all[$temp->getId()] = $temp;
-        }
-
-        return $all;
+        return $this->findRandom($manager, Activity::class, 50);
     }
 
-    private function createTimesheetEntry(User $user, Activity $activity, Project $project, ?string $description, bool $setEndDate)
+    private function createTimesheetEntry(User $user, Activity $activity, Project $project, ?string $description, bool $setEndDate): Timesheet
     {
-        $start = new \DateTime();
-        $start = $start->modify('- ' . (rand(self::TIMERANGE_BEGIN_DAYS, self::TIMERANGE_END_DAYS)) . ' days');
+        $start = $this->getRandomFirstDay();
         $start = $start->modify('- ' . (rand(1, 86400)) . ' seconds');
-        $start->setTimezone(new \DateTimeZone($user->getPreferenceValue(UserPreference::TIMEZONE, date_default_timezone_get())));
+        $start->setTimezone(new \DateTimeZone($user->getTimezone()));
 
         $entry = new Timesheet();
-        $entry
-            ->setActivity($activity)
-            ->setProject($activity->getProject() ?? $project)
-            ->setDescription($description)
-            ->setUser($user)
-            ->setBegin($start);
+        $entry->setActivity($activity);
+        $entry->setProject($activity->getProject() ?? $project);
+        $entry->setDescription($description);
+        $entry->setUser($user);
+        $entry->setBegin($start);
 
         if ($setEndDate) {
             $end = clone $start;
@@ -239,14 +224,13 @@ class TimesheetFixtures extends Fixture implements DependentFixtureInterface, Fi
             $hourlyRate = (float) $user->getPreferenceValue(UserPreference::HOURLY_RATE);
             $rate = Util::calculateRate($hourlyRate, $duration);
 
-            $entry
-                ->setEnd($end)
-                ->setRate($rate)
-                ->setDuration($duration);
+            $entry->setEnd($end);
+            $entry->setRate($rate);
+            $entry->setDuration($duration);
         } else {
             // running entries should be short
             $newBegin = clone $entry->getBegin();
-            $newBegin->setTimestamp(time())->modify('- ' . rand(10, self::TIMERANGE_RUNNING) . ' minutes');
+            $newBegin->setTimestamp(time())->modify('- ' . rand(self::MIN_MINUTES_PER_ENTRY, self::MAX_MINUTES_PER_ENTRY) . ' minutes');
             $entry->setBegin($newBegin);
         }
 

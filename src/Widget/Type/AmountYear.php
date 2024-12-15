@@ -10,26 +10,72 @@
 namespace App\Widget\Type;
 
 use App\Configuration\SystemConfiguration;
+use App\Event\RevenueStatisticEvent;
+use App\Model\Revenue;
 use App\Repository\TimesheetRepository;
+use App\Widget\WidgetException;
+use App\Widget\WidgetInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 
-final class AmountYear extends CounterYear
+final class AmountYear extends AbstractCounterYear
 {
-    public function __construct(TimesheetRepository $repository, SystemConfiguration $systemConfiguration)
+    public function __construct(private TimesheetRepository $repository, SystemConfiguration $systemConfiguration, private EventDispatcherInterface $dispatcher)
     {
-        parent::__construct($repository, $systemConfiguration);
-        $this->setId('amountYear');
-        $this->setOption('dataType', 'money');
-        $this->setOption('icon', 'money');
-        $this->setOption('color', 'yellow');
-        $this->setTitle('stats.amountYear');
+        parent::__construct($systemConfiguration);
     }
 
-    public function getData(array $options = [])
+    /**
+     * @param array<string, string|bool|int|null|array<string, mixed>> $options
+     @return array<string, string|bool|int|null|array<string, mixed>>
+     */
+    public function getOptions(array $options = []): array
     {
-        $this->titleYear = 'stats.amountFinancialYear';
-        $this->setQuery(TimesheetRepository::STATS_QUERY_RATE);
-        $this->setQueryWithUser(false);
+        return array_merge([
+            'icon' => 'money',
+            'color' => WidgetInterface::COLOR_YEAR,
+        ], parent::getOptions($options));
+    }
 
-        return parent::getData($options);
+    /**
+     * @param array<string, string|bool|int|null|array<string, mixed>> $options
+     */
+    protected function getYearData(\DateTimeInterface $begin, \DateTimeInterface $end, array $options = []): mixed
+    {
+        try {
+            /** @var array<Revenue> $data */
+            $data = $this->repository->getRevenue($begin, $end, null);
+
+            $event = new RevenueStatisticEvent($begin, $end);
+            foreach ($data as $row) {
+                $event->addRevenue($row->getCurrency(), $row->getAmount());
+            }
+            $this->dispatcher->dispatch($event);
+
+            return $event->getRevenue();
+        } catch (\Exception $ex) {
+            throw new WidgetException(
+                'Failed loading widget data: ' . $ex->getMessage()
+            );
+        }
+    }
+
+    public function getId(): string
+    {
+        return 'AmountYear';
+    }
+
+    protected function getFinancialYearTitle(): string
+    {
+        return 'stats.amountFinancialYear';
+    }
+
+    public function getTemplateName(): string
+    {
+        return 'widget/widget-counter-money.html.twig';
+    }
+
+    public function getPermissions(): array
+    {
+        return ['view_all_data'];
     }
 }

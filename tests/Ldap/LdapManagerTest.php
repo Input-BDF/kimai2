@@ -10,14 +10,13 @@
 namespace App\Tests\Ldap;
 
 use App\Configuration\LdapConfiguration;
-use App\Configuration\SystemConfiguration;
 use App\Entity\User;
 use App\Ldap\LdapDriver;
 use App\Ldap\LdapDriverException;
 use App\Ldap\LdapManager;
-use App\Ldap\LdapUserHydrator;
 use App\Tests\Configuration\TestConfigLoader;
 use App\Tests\Mocks\Security\RoleServiceFactory;
+use App\Tests\Mocks\SystemConfigurationFactory;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -51,21 +50,20 @@ class LdapManagerTest extends TestCase
             ],
             'role' => $roleConfig,
         ];
-        $systemConfig = new SystemConfiguration(new TestConfigLoader([]), ['ldap' => $conf]);
+        $systemConfig = SystemConfigurationFactory::create(new TestConfigLoader([]), ['ldap' => $conf]);
         $config = new LdapConfiguration($systemConfig);
 
         $roles = [
-            'ROLE_TEAMLEAD' => ['ROLE_USER'],
-            'ROLE_ADMIN' => ['ROLE_TEAMLEAD'],
-            'ROLE_SUPER_ADMIN' => ['ROLE_ADMIN']
+            'ROLE_USER',
+            'ROLE_TEAMLEAD',
+            'ROLE_ADMIN',
+            'ROLE_SUPER_ADMIN',
         ];
 
-        $hydrator = new LdapUserHydrator($config, (new RoleServiceFactory($this))->create($roles));
-
-        return new LdapManager($driver, $hydrator, $config);
+        return new LdapManager($driver, $config, (new RoleServiceFactory($this))->create($roles));
     }
 
-    public function testFindUserByUsernameOnZeroResults()
+    public function testFindUserByUsernameOnZeroResults(): void
     {
         $expected = [
             'count' => 0
@@ -84,7 +82,7 @@ class LdapManagerTest extends TestCase
         self::assertNull($actual);
     }
 
-    public function testFindUserByUsernameOnMultiResults()
+    public function testFindUserByUsernameOnMultiResults(): void
     {
         $this->expectException(LdapDriverException::class);
         $this->expectExceptionMessage('This search must only return a single user');
@@ -105,10 +103,10 @@ class LdapManagerTest extends TestCase
         $sut->findUserByUsername('foo');
     }
 
-    public function testFindUserByUsernameOnValidResult()
+    public function testFindUserByUsernameOnValidResult(): void
     {
         $expected = [
-            0 => ['dn' => 'foo'],
+            0 => ['dn' => 'foo', 'uid' => ['foo']],
             'count' => 1,
         ];
 
@@ -125,7 +123,7 @@ class LdapManagerTest extends TestCase
         self::assertInstanceOf(User::class, $actual);
     }
 
-    public function testFindUserByOnZeroResults()
+    public function testFindUserByOnZeroResults(): void
     {
         $expected = [
             'count' => 0
@@ -140,11 +138,11 @@ class LdapManagerTest extends TestCase
         });
 
         $sut = $this->getLdapManager($driver);
-        $actual = $sut->findUserBy(['uid' => 'foo']);
+        $actual = $sut->findUserByUsername('foo');
         self::assertNull($actual);
     }
 
-    public function testFindUserByOnMultiResults()
+    public function testFindUserByOnMultiResults(): void
     {
         $this->expectException(LdapDriverException::class);
         $this->expectExceptionMessage('This search must only return a single user');
@@ -162,53 +160,56 @@ class LdapManagerTest extends TestCase
         });
 
         $sut = $this->getLdapManager($driver);
-        $sut->findUserBy(['uid' => 'foo']);
+        $sut->findUserByUsername('foo');
     }
 
-    public function testFindUserByOnValidResult()
+    public function testFindUserByOnValidResult(): void
     {
         $expected = [
-            0 => ['dn' => 'foo'],
+            0 => ['dn' => 'foo', 'uid' => ['foo']],
             'count' => 1,
         ];
 
         $driver = $this->getMockBuilder(LdapDriver::class)->disableOriginalConstructor()->onlyMethods(['search'])->getMock();
         $driver->expects($this->once())->method('search')->willReturnCallback(function ($baseDn, $filter) use ($expected) {
             self::assertEquals('ou=users, dc=kimai, dc=org', $baseDn);
-            self::assertEquals('(&(&(objectClass=inetOrgPerson))(träl=alß#\\\aa=XY\5cZ0)(test=fu=n))', $filter);
+            self::assertEquals('(&(&(objectClass=inetOrgPerson))(uid=trä\5cl=alß#aa=XY\5cZ0))', $filter);
 
             return $expected;
         });
 
         $sut = $this->getLdapManager($driver);
-        $actual = $sut->findUserBy(['träl=alß#\\\aa' => 'XY\Z0', 'test' => 'fu=n']);
+        $actual = $sut->findUserByUsername('trä\l=alß#aa=XY\Z0');
         self::assertInstanceOf(User::class, $actual);
     }
 
-    public function testBind()
+    public function testBind(): void
     {
-        $user = (new User())->setUsername('foobar');
+        $user = new User();
+        $user->setUserIdentifier('foobar');
 
         $driver = $this->getMockBuilder(LdapDriver::class)->disableOriginalConstructor()->onlyMethods(['bind'])->getMock();
-        $driver->expects($this->once())->method('bind')->willReturnCallback(function ($bindUser, $password) use ($user) {
-            self::assertSame($user, $bindUser);
+        $driver->expects($this->once())->method('bind')->willReturnCallback(function ($bindUser, $password) {
+            self::assertEquals('foobar', $bindUser);
             self::assertEquals('a-very-secret-secret', $password);
 
             return true;
         });
 
         $sut = $this->getLdapManager($driver);
-        $actual = $sut->bind($user, 'a-very-secret-secret');
+        $actual = $sut->bind($user->getUserIdentifier(), 'a-very-secret-secret');
         self::assertTrue($actual);
     }
 
-    public function testUpdateUserOnZeroResults()
+    public function testUpdateUserOnZeroResults(): void
     {
-        $user = (new User())->setUsername('foobar');
-        $user->setPreferenceValue('ldap.dn', 'fooooooooooo');
+        $user = new User();
+        $user->setUserIdentifier('foobar');
+
+        $user->setPreferenceValue('ldap_dn', 'fooooooooooo');
         $expected = [
             [
-                0 => ['dn' => 'blub'],
+                0 => ['dn' => 'blub', 'uid' => ['blub']],
                 'count' => 1,
             ],
             [
@@ -227,7 +228,7 @@ class LdapManagerTest extends TestCase
 
                 return $expected[1];
             }
-            $this->fail(sprintf('Unexpected search with baseDn %s', $baseDn));
+            $this->fail(\sprintf('Unexpected search with baseDn %s', $baseDn));
         });
 
         $sut = $this->getLdapManager($driver);
@@ -237,17 +238,18 @@ class LdapManagerTest extends TestCase
         self::assertEquals($userOrig, $user);
     }
 
-    public function testUpdateUserOnMultiResults()
+    public function testUpdateUserOnMultiResults(): void
     {
         $this->expectException(LdapDriverException::class);
         $this->expectExceptionMessage('This search must only return a single user');
 
-        $user = (new User())->setUsername('foobar');
-        $user->setPreferenceValue('ldap.dn', 'xxxxxxx');
+        $user = new User();
+        $user->setUserIdentifier('foobar');
+        $user->setPreferenceValue('ldap_dn', 'xxxxxxx');
 
         $expected = [
             [
-                0 => ['dn' => 'blub'],
+                0 => ['dn' => 'blub', 'uid' => ['blub']],
                 'count' => 1,
             ],
             [
@@ -267,25 +269,26 @@ class LdapManagerTest extends TestCase
                 return $expected[1];
             }
 
-            $this->fail(sprintf('Unexpected search with baseDn %s', $baseDn));
+            $this->fail(\sprintf('Unexpected search with baseDn %s', $baseDn));
         });
 
         $sut = $this->getLdapManager($driver);
         $sut->updateUser($user);
     }
 
-    public function testUpdateUserOnValidResultWithEmptyRoleBaseDn()
+    public function testUpdateUserOnValidResultWithEmptyRoleBaseDn(): void
     {
-        $user = (new User())->setUsername('foobar');
-        $user->setPreferenceValue('ldap.dn', 'sssssss');
+        $user = new User();
+        $user->setUserIdentifier('foobar');
+        $user->setPreferenceValue('ldap_dn', 'sssssss');
 
         $expected = [
             [
-                0 => ['dn' => 'blub'],
+                0 => ['dn' => 'blub', 'uid' => ['blub']],
                 'count' => 1,
             ],
             [
-                0 => ['dn' => 'blub-updated'],
+                0 => ['dn' => 'blub-updated', 'uid' => ['foobar']],
                 'count' => 1,
             ],
         ];
@@ -302,7 +305,7 @@ class LdapManagerTest extends TestCase
                 return $expected[1];
             }
 
-            $this->fail(sprintf('Unexpected search with baseDn %s', $baseDn));
+            $this->fail(\sprintf('Unexpected search with baseDn %s', $baseDn));
         });
 
         $sut = $this->getLdapManager($driver, [
@@ -320,7 +323,7 @@ class LdapManagerTest extends TestCase
         $userOrig = clone $user;
         $sut->updateUser($user);
         self::assertEquals($userOrig->setEmail('foobar')->setAuth(User::AUTH_LDAP), $user);
-        self::assertEquals($user->getPreferenceValue('ldap.dn'), 'blub-updated');
+        self::assertEquals($user->getPreferenceValue('ldap_dn'), 'blub-updated');
     }
 
     public function getValidConfigsTestData()
@@ -388,10 +391,10 @@ class LdapManagerTest extends TestCase
     /**
      * @dataProvider getValidConfigsTestData
      */
-    public function testUpdateUserOnValidResultWithRolesResult(array $expectedUsers, array $groupConfig, string $expectedGroupQuery)
+    public function testUpdateUserOnValidResultWithRolesResult(array $expectedUsers, array $groupConfig, string $expectedGroupQuery): void
     {
         $expected = [
-            0 => ['dn' => 'blub'],
+            0 => ['dn' => 'blub', 'uid' => ['blub']],
             'count' => 1,
         ];
 
@@ -442,18 +445,301 @@ class LdapManagerTest extends TestCase
 
                 return $expectedGroups;
             }
-            $this->fail(sprintf('Unexpected search with baseDn %s', $baseDn));
+            $this->fail(\sprintf('Unexpected search with baseDn %s', $baseDn));
         });
 
         $sut = $this->getLdapManager($driver, $groupConfig);
 
-        $user = (new User())->setUsername('Karl-Heinz');
-        $user->setPreferenceValue('ldap.dn', 'blub');
+        $user = new User();
+        $user->setUserIdentifier('Karl-Heinz');
+        $user->setPreferenceValue('ldap_dn', 'blub');
         $userOrig = clone $user;
         $userOrig->setEmail('Karl-Heinz')->setRoles(['ROLE_TEAMLEAD', 'ROLE_ADMIN'])->setAuth(User::AUTH_LDAP);
 
         $sut->updateUser($user);
         self::assertEquals($userOrig, $user);
+        self::assertEquals(['ROLE_TEAMLEAD', 'ROLE_ADMIN', 'ROLE_USER'], $user->getRoles());
+    }
+
+    public function testEmptyHydrate(): void
+    {
+        $ldapConfig = [
+            'activate' => true,
+            'connection' => [
+                'host' => '1.1.1.1'
+            ],
+            'user' => [
+                'usernameAttribute' => 'foo',
+                'attributes' => []
+            ],
+            'role' => [],
+        ];
+        $systemConfig = SystemConfigurationFactory::create(new TestConfigLoader([]), ['ldap' => $ldapConfig]);
+
+        $config = new LdapConfiguration($systemConfig);
+
+        $sut = new LdapManager($this->createMock(LdapDriver::class), $config, (new RoleServiceFactory($this))->create([]));
+        $user = $sut->hydrate(['dn' => 'blub', 'foo' => ['blub']]);
+        self::assertInstanceOf(User::class, $user);
+        self::assertEquals('blub', $user->getUserIdentifier());
+        self::assertEquals('blub', $user->getUserIdentifier());
+        self::assertEquals('blub', $user->getEmail());
+    }
+
+    public function testEmptyHydrateThrowsException(): void
+    {
+        $this->expectException(LdapDriverException::class);
+        $this->expectExceptionMessage('Missing username in LDAP hydration');
+
+        $ldapConfig = [
+            'activate' => true,
+            'connection' => [
+                'host' => '1.1.1.1'
+            ],
+            'user' => [
+                'usernameAttribute' => 'foo',
+                'attributes' => []
+            ],
+            'role' => [],
+        ];
+        $systemConfig = SystemConfigurationFactory::create(new TestConfigLoader([]), ['ldap' => $ldapConfig]);
+
+        $config = new LdapConfiguration($systemConfig);
+
+        $sut = new LdapManager($this->createMock(LdapDriver::class), $config, (new RoleServiceFactory($this))->create([]));
+        $user = $sut->hydrate(['dn' => 'blub']);
+        self::assertInstanceOf(User::class, $user);
+    }
+
+    public function testHydrate(): void
+    {
+        $ldapConfig = [
+            'connection' => [
+                'host' => '1.1.1.1'
+            ],
+            'user' => [
+                'usernameAttribute' => 'foo',
+                'attributes' => [
+                    ['ldap_attr' => 'uid', 'user_method' => 'setUserIdentifier'],
+                    ['ldap_attr' => 'foo', 'user_method' => 'setAlias'],
+                    ['ldap_attr' => 'bar', 'user_method' => 'setTitle'],
+                    ['ldap_attr' => 'roles', 'user_method' => 'setRoles'],
+                    ['ldap_attr' => 'xxxxxxxx', 'user_method' => 'setAvatar'],
+                    ['ldap_attr' => 'blubXX', 'user_method' => 'setAvatar'],
+                ]
+            ],
+            'role' => [],
+        ];
+        $systemConfig = SystemConfigurationFactory::create(new TestConfigLoader([]), ['ldap' => $ldapConfig]);
+        $config = new LdapConfiguration($systemConfig);
+
+        $ldapEntry = [
+            'uid' => ['Karl-Heinz'],
+            'blub' => ['dfsdfsdf'],
+            'foo' => ['count' => 1, 0 => 'bar'],
+            'bar' => ['foo'],
+            'roles' => ['count' => 2, 0 => 'ROLE_TEAMLEAD', 1 => 'ROLE_ADMIN'],
+            'xxxxxxxx' => ['https://www.example.com'],
+            'blub1' => ['dfsdfsdf'],
+            'dn' => 'blub',
+        ];
+
+        $sut = new LdapManager($this->createMock(LdapDriver::class), $config, (new RoleServiceFactory($this))->create([]));
+        $user = $sut->hydrate($ldapEntry);
+
+        self::assertInstanceOf(User::class, $user);
+        self::assertEquals('Karl-Heinz', $user->getUserIdentifier());
+        self::assertEquals('bar', $user->getAlias());
+        self::assertEquals('foo', $user->getTitle());
+        self::assertEquals(['ROLE_TEAMLEAD', 'ROLE_ADMIN', 'ROLE_USER'], $user->getRoles());
+        self::assertEquals('https://www.example.com', $user->getAvatar());
+        self::assertEquals('Karl-Heinz', $user->getEmail());
+    }
+
+    public function testThrowsOnMissingMethod(): void
+    {
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Unknown mapping method: setAlias2');
+        $ldapConfig = [
+            'connection' => [
+                'host' => '1.1.1.1'
+            ],
+            'user' => [
+                'usernameAttribute' => 'foo',
+                'attributes' => [
+                    ['ldap_attr' => 'foo', 'user_method' => 'setAlias2'],
+                ]
+            ],
+            'role' => [],
+        ];
+        $systemConfig = SystemConfigurationFactory::create(new TestConfigLoader([]), ['ldap' => $ldapConfig]);
+        $config = new LdapConfiguration($systemConfig);
+
+        $ldapEntry = [
+            'foo' => ['count' => 1, 0 => 'bar'],
+        ];
+
+        $sut = new LdapManager($this->createMock(LdapDriver::class), $config, (new RoleServiceFactory($this))->create([]));
+        $user = $sut->hydrate($ldapEntry);
+    }
+
+    /**
+     * @group legacy
+     */
+    public function testHydrateWithDepercatedSetter(): void
+    {
+        $ldapConfig = [
+            'connection' => [
+                'host' => '1.1.1.1'
+            ],
+            'user' => [
+                'usernameAttribute' => 'foo',
+                'attributes' => [
+                    ['ldap_attr' => 'uid', 'user_method' => 'setUsername'], // use setUsername here for BC reasons!
+                    ['ldap_attr' => 'foo', 'user_method' => 'setAlias'],
+                    ['ldap_attr' => 'bar', 'user_method' => 'setTitle'],
+                    ['ldap_attr' => 'roles', 'user_method' => 'setRoles'],
+                    ['ldap_attr' => 'xxxxxxxx', 'user_method' => 'setAvatar'],
+                    ['ldap_attr' => 'blubXX', 'user_method' => 'setAvatar'],
+                ]
+            ],
+            'role' => [],
+        ];
+        $systemConfig = SystemConfigurationFactory::create(new TestConfigLoader([]), ['ldap' => $ldapConfig]);
+        $config = new LdapConfiguration($systemConfig);
+
+        $ldapEntry = [
+            'uid' => ['Karl-Heinz'],
+            'blub' => ['dfsdfsdf'],
+            'foo' => ['count' => 1, 0 => 'bar'],
+            'bar' => ['foo'],
+            'roles' => ['count' => 2, 0 => 'ROLE_TEAMLEAD', 1 => 'ROLE_ADMIN'],
+            'xxxxxxxx' => ['https://www.example.com'],
+            'blub1' => ['dfsdfsdf'],
+            'dn' => 'blub',
+        ];
+
+        $sut = new LdapManager($this->createMock(LdapDriver::class), $config, (new RoleServiceFactory($this))->create([]));
+        $user = $sut->hydrate($ldapEntry);
+
+        self::assertInstanceOf(User::class, $user);
+        self::assertEquals('Karl-Heinz', $user->getUserIdentifier());
+        self::assertEquals('bar', $user->getAlias());
+        self::assertEquals('foo', $user->getTitle());
+        self::assertEquals(['ROLE_TEAMLEAD', 'ROLE_ADMIN', 'ROLE_USER'], $user->getRoles());
+        self::assertEquals('https://www.example.com', $user->getAvatar());
+        self::assertEquals('Karl-Heinz', $user->getEmail());
+    }
+
+    public function testHydrateUser(): void
+    {
+        $ldapConfig = [
+            'connection' => [
+                'host' => '1.1.1.1'
+            ],
+            'user' => [
+                'usernameAttribute' => 'foo',
+                'attributes' => [
+                    ['ldap_attr' => 'uid', 'user_method' => 'setUserIdentifier'],
+                    ['ldap_attr' => 'email', 'user_method' => 'setEmail'],
+                    ['ldap_attr' => 'foo', 'user_method' => 'setAlias'],
+                    ['ldap_attr' => 'bar', 'user_method' => 'setTitle'],
+                    ['ldap_attr' => 'xxxxxxxx', 'user_method' => 'setAvatar'],
+                ]
+            ],
+            'role' => [],
+        ];
+        $systemConfig = SystemConfigurationFactory::create(new TestConfigLoader([]), ['ldap' => $ldapConfig]);
+        $config = new LdapConfiguration($systemConfig);
+
+        $ldapEntry = [
+            'uid' => ['Karl-Heinz'],
+            'email' => [['karl-heinz@example.com', 'foo@example.com', 'bar@example.com']],
+            'blub' => ['dfsdfsdf'],
+            'foo' => ['bar'],
+            'bar' => ['foo'],
+            'xxxxxxxx' => ['https://www.example.com'],
+            'blub1' => ['dfsdfsdf'],
+            'dn' => 'blub',
+        ];
+
+        $sut = new LdapManager($this->createMock(LdapDriver::class), $config, (new RoleServiceFactory($this))->create([]));
+
+        $user = new User();
+        $user->setPassword('foobar');
+        $sut->hydrateUser($user, $ldapEntry);
+        self::assertEquals('Karl-Heinz', $user->getUserIdentifier());
+        self::assertEquals('bar', $user->getAlias());
+        self::assertEquals('foo', $user->getTitle());
+        self::assertEquals('https://www.example.com', $user->getAvatar());
+        self::assertEquals('karl-heinz@example.com', $user->getEmail());
+
+        // make sure that the password was resetted in hydrate
+        $pwdCheck = clone $user;
+        $pwdCheck->setPassword('');
+        self::assertEquals($pwdCheck, $user);
+    }
+
+    public function testHydrateRoles(): void
+    {
+        $ldapConfig = [
+            'user' => [
+                'attributes' => []
+            ],
+            'role' => [
+                'nameAttribute' => 'cn',
+                'userDnAttribute' => 'member',
+                'groups' => [
+                    ['ldap_value' => 'group1', 'role' => 'ROLE_TEAMLEAD'],
+                    ['ldap_value' => 'group2', 'role' => 'ROLE_ADMIN'],
+                    ['ldap_value' => 'group3', 'role' => 'ROLE_CUSTOMER'], // not existing!
+                    ['ldap_value' => 'group4', 'role' => 'ROLE_SUPER_ADMIN'],
+                ],
+            ],
+        ];
+        $systemConfig = SystemConfigurationFactory::create(new TestConfigLoader([]), ['ldap' => $ldapConfig]);
+        $config = new LdapConfiguration($systemConfig);
+
+        $ldapGroups = [
+            // ROLE_TEAMLEAD
+            0 => [
+                'cn' => [0 => 'group1'],
+                'member' => [0 => 'uid=user1,ou=users,dc=kimai,dc=org', 1 => 'uid=user2,ou=users,dc=kimai,dc=org'],
+            ],
+            // ROLE_ADMIN
+            1 => [
+                'cn' => [0 => 'admin'],
+                'member' => [0 => 'uid=user2,ou=users,dc=kimai,dc=org', 1 => 'uid=user3,ou=users,dc=kimai,dc=org'],
+            ],
+            // will be ignored: unknown group
+            2 => [
+                'cn' => [0 => 'kimai_admin'],
+                'member' => [0 => 'uid=user2,ou=users,dc=kimai,dc=org', 1 => 'uid=user3,ou=users,dc=kimai,dc=org'],
+            ],
+            // will be ignored: unknown group
+            3 => [
+                'cn' => [0 => 'group3'],
+                'member' => [0 => 'uid=user2,ou=users,dc=kimai,dc=org', 1 => 'uid=user3,ou=users,dc=kimai,dc=org'],
+            ],
+            // will be ignored: the counter below does not announce this group!
+            4 => [
+                'cn' => [0 => 'group4'],
+                'member' => [0 => 'uid=user2,ou=users,dc=kimai,dc=org', 1 => 'uid=user3,ou=users,dc=kimai,dc=org'],
+            ],
+            'count' => 4
+        ];
+
+        $roles = [
+            'ROLE_USER',
+            'ROLE_TEAMLEAD',
+            'ROLE_ADMIN',
+            'ROLE_SUPER_ADMIN',
+        ];
+
+        $sut = new LdapManager($this->createMock(LdapDriver::class), $config, (new RoleServiceFactory($this))->create($roles));
+
+        $user = new User();
+        $sut->hydrateRoles($user, $ldapGroups);
         self::assertEquals(['ROLE_TEAMLEAD', 'ROLE_ADMIN', 'ROLE_USER'], $user->getRoles());
     }
 }

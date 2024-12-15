@@ -22,7 +22,7 @@ use PHPUnit\Framework\TestCase;
  */
 class MultiUpdateTableDTOTest extends TestCase
 {
-    public function testDefaultValues()
+    public function testDefaultValues(): void
     {
         $sut = new MultiUpdateTableDTO();
         self::assertEmpty($sut->getEntities());
@@ -31,7 +31,7 @@ class MultiUpdateTableDTOTest extends TestCase
         self::assertFalse($sut->hasAction());
     }
 
-    public function testSetterAndGetter()
+    public function testSetterAndGetter(): void
     {
         $sut = new MultiUpdateTableDTO();
 
@@ -43,7 +43,7 @@ class MultiUpdateTableDTOTest extends TestCase
             [
                 '' => '',
                 'action.edit' => 'foo',
-                'action.delete' => 'bar',
+                'delete' => 'bar',
                 'test' => 'hello/world'
             ],
             $sut->getActions()
@@ -54,7 +54,7 @@ class MultiUpdateTableDTOTest extends TestCase
 
         $activity = new Activity();
         $project = new Project();
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $timesheet = new Timesheet();
         $tag = new Tag();
 

@@ -10,6 +10,7 @@
 namespace App\EventSubscriber;
 
 use App\Entity\User;
+use App\Twig\LocaleFormatExtensions;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -18,19 +19,12 @@ use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 final class UserEnvironmentSubscriber implements EventSubscriberInterface
 {
-    /**
-     * @var TokenStorageInterface
-     */
-    private $storage;
-    /**
-     * @var AuthorizationCheckerInterface
-     */
-    private $auth;
-
-    public function __construct(TokenStorageInterface $tokenStorage, AuthorizationCheckerInterface $auth)
+    public function __construct(
+        private readonly TokenStorageInterface $tokenStorage,
+        private readonly AuthorizationCheckerInterface $auth,
+        private readonly LocaleFormatExtensions $localeFormatExtensions
+    )
     {
-        $this->storage = $tokenStorage;
-        $this->auth = $auth;
     }
 
     public static function getSubscribedEvents(): array
@@ -43,23 +37,25 @@ final class UserEnvironmentSubscriber implements EventSubscriberInterface
     public function prepareEnvironment(RequestEvent $event): void
     {
         // ignore sub-requests
-        if (!$event->isMasterRequest()) {
+        if (!$event->isMainRequest()) {
             return;
         }
 
-        // the locale depends on the request, not on the user configuration
-        \Locale::setDefault($event->getRequest()->getLocale());
+        $locale = $event->getRequest()->getLocale();
 
-        // ignore events like the toolbar where we do not have a token
-        if (null === ($token = $this->storage->getToken())) {
-            return;
+        // events like the toolbar might not have a token
+        if (null !== ($token = $this->tokenStorage->getToken())) {
+            $user = $token->getUser();
+
+            if ($user instanceof User) {
+                $locale = $user->getLocale();
+                date_default_timezone_set($user->getTimezone());
+                $user->initCanSeeAllData($this->auth->isGranted('view_all_data'));
+            }
         }
 
-        $user = $token->getUser();
-
-        if ($user instanceof User) {
-            date_default_timezone_set($user->getTimezone());
-            $user->initCanSeeAllData($this->auth->isGranted('view_all_data'));
-        }
+        // the locale is primarily used for formatting values, so we depend on the user locale if available
+        \Locale::setDefault($locale);
+        $this->localeFormatExtensions->setLocale($locale);
     }
 }

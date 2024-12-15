@@ -9,26 +9,54 @@
 
 namespace App\Security;
 
-use Doctrine\DBAL\Driver\PDOConnection;
+use Doctrine\DBAL\Connection;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\Storage\Handler\PdoSessionHandler;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
 
-class SessionHandler extends PdoSessionHandler
+final class SessionHandler extends PdoSessionHandler
 {
-    public function __construct($pdoOrDsn = null)
+    public function __construct(
+        Connection $connection,
+        private readonly RateLimiterFactory $sessionPredictionLimiter,
+        private readonly RequestStack $requestStack
+    )
     {
-        $lockMode = PdoSessionHandler::LOCK_NONE;
-
-        if ($pdoOrDsn instanceof PDOConnection && $pdoOrDsn->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'mysql') {
-            $lockMode = PdoSessionHandler::LOCK_ADVISORY;
-        }
-
-        parent::__construct($pdoOrDsn, [
+        parent::__construct($connection->getNativeConnection(), [
             'db_table' => 'kimai2_sessions',
             'db_id_col' => 'id',
             'db_data_col' => 'data',
             'db_lifetime_col' => 'lifetime',
             'db_time_col' => 'time',
-            'lock_mode' => $lockMode,
+            'lock_mode' => PdoSessionHandler::LOCK_ADVISORY,
         ]);
+    }
+
+    public function garbageCollection(): void
+    {
+        $connection = $this->getConnection();
+        $sql = 'DELETE FROM kimai2_sessions WHERE lifetime < :time';
+        $stmt = $connection->prepare($sql);
+        $stmt->bindValue(':time', time(), \PDO::PARAM_INT);
+        $stmt->execute();
+    }
+
+    public function validateId(#[\SensitiveParameter] string $sessionId): bool
+    {
+        $result = parent::validateId($sessionId);
+
+        if ($result === false) {
+            $limiter = $this->sessionPredictionLimiter->create($this->requestStack->getMainRequest()?->getClientIp());
+            $limit = $limiter->consume();
+
+            if (false === $limit->isAccepted()) {
+                throw new BadRequestHttpException('Too many requests with invalid Session ID. Prediction attack?');
+            }
+
+            usleep(250000); // slow down potential attacks
+        }
+
+        return $result;
     }
 }

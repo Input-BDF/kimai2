@@ -13,48 +13,49 @@ use App\Form\Type\CustomerType;
 use App\Form\Type\MonthPickerType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class ProjectDateRangeForm extends AbstractType
+/**
+ * @extends AbstractType<ProjectDateRangeQuery>
+ */
+final class ProjectDateRangeForm extends AbstractType
 {
-    /**
-     * Simplify cross linking between pages by removing the block prefix.
-     *
-     * @return null|string
-     */
-    public function getBlockPrefix()
-    {
-        return null;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder->add('customer', CustomerType::class, [
             'required' => false,
-            'label' => false,
             'width' => false,
         ]);
 
         $builder->add('month', MonthPickerType::class, [
+            'required' => true,
             'label' => false,
             'view_timezone' => $options['timezone'],
             'model_timezone' => $options['timezone'],
         ]);
 
-        $builder->add('includeNoBudget', CheckboxType::class, [
+        $builder->add('includeNoWork', CheckboxType::class, [
             'required' => false,
-            'label' => 'label.includeNoBudget',
+            'label' => 'includeNoWork',
+        ]);
+
+        $builder->add('budgetType', ChoiceType::class, [
+            'placeholder' => null,
+            'required' => false,
+            'multiple' => false,
+            'expanded' => true,
+            'choices' => [
+                'all' => null,
+                'includeNoBudget' => 'none',
+                'includeBudgetType_full' => 'full',
+                'includeBudgetType_month' => 'month',
+            ],
         ]);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'data_class' => ProjectDateRangeQuery::class,

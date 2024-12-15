@@ -9,74 +9,49 @@
 
 namespace App\Entity;
 
-use App\Export\ExportItemInterface;
+use App\Doctrine\Behavior\ModifiedAt;
+use App\Doctrine\Behavior\ModifiedTrait;
+use App\Repository\TimesheetRepository;
 use App\Validator\Constraints as Constraints;
 use DateTime;
 use DateTimeZone;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Gedmo\Mapping\Annotation as Gedmo;
 use JMS\Serializer\Annotation as Serializer;
-use Swagger\Annotations as SWG;
+use OpenApi\Attributes as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * @ORM\Table(name="kimai2_timesheet",
- *     indexes={
- *          @ORM\Index(columns={"user"}),
- *          @ORM\Index(columns={"activity_id"}),
- *          @ORM\Index(columns={"user","start_time"}),
- *          @ORM\Index(columns={"start_time"}),
- *          @ORM\Index(columns={"start_time","end_time"}),
- *          @ORM\Index(columns={"start_time","end_time","user"}),
- *          @ORM\Index(columns={"date_tz","user"}),
- *     }
- * )
- * @ORM\Entity(repositoryClass="App\Repository\TimesheetRepository")
- * @ORM\HasLifecycleCallbacks()
- * @Constraints\Timesheet
- *
- * @Serializer\ExclusionPolicy("all")
- * @Serializer\VirtualProperty(
- *      "ActivityAsId",
- *      exp="object.getActivity() === null ? null : object.getActivity().getId()",
- *      options={
- *          @Serializer\SerializedName("activity"),
- *          @Serializer\Type(name="integer"),
- *          @Serializer\Groups({"Not_Expanded"})
- *      }
- * )
- * @Serializer\VirtualProperty(
- *      "ProjectAsId",
- *      exp="object.getProject() === null ? null : object.getProject().getId()",
- *      options={
- *          @Serializer\SerializedName("project"),
- *          @Serializer\Type(name="integer"),
- *          @Serializer\Groups({"Not_Expanded"})
- *      }
- * )
- * @Serializer\VirtualProperty(
- *      "UserAsId",
- *      exp="object.getUser().getId()",
- *      options={
- *          @Serializer\SerializedName("user"),
- *          @Serializer\Type(name="integer"),
- *          @Serializer\Groups({"Default"})
- *      }
- * )
- * @Serializer\VirtualProperty(
- *      "TagsAsArray",
- *      exp="object.getTagsAsArray()",
- *      options={
- *          @Serializer\SerializedName("tags"),
- *          @Serializer\Type(name="array<string>"),
- *          @Serializer\Groups({"Default"})
- *      }
- * )
+ * Internal docs:
+ * - IDX_4F60C6B1415614018D93D649 (for ticktac in v1)
  */
-class Timesheet implements EntityWithMetaFields, ExportItemInterface
+#[ORM\Table(name: 'kimai2_timesheet')]
+#[ORM\Index(columns: ['user'], name: 'IDX_4F60C6B18D93D649')]
+#[ORM\Index(columns: ['activity_id'], name: 'IDX_4F60C6B181C06096')]
+#[ORM\Index(columns: ['user', 'start_time'], name: 'IDX_4F60C6B18D93D649502DF587')]
+#[ORM\Index(columns: ['start_time'], name: 'IDX_4F60C6B1502DF587')]
+#[ORM\Index(columns: ['start_time', 'end_time'], name: 'IDX_4F60C6B1502DF58741561401')]
+#[ORM\Index(columns: ['start_time', 'end_time', 'user'], name: 'IDX_4F60C6B1502DF587415614018D93D649')]
+#[ORM\Index(columns: ['end_time', 'user'], name: 'IDX_4F60C6B1415614018D93D649')]
+#[ORM\Index(columns: ['date_tz', 'user'], name: 'IDX_4F60C6B1BDF467148D93D649')]
+#[ORM\Index(columns: ['end_time', 'user', 'start_time'], name: 'IDX_TIMESHEET_TICKTAC')]
+#[ORM\Index(columns: ['user', 'project_id', 'activity_id'], name: 'IDX_TIMESHEET_RECENT_ACTIVITIES')]
+#[ORM\Index(columns: ['user', 'id', 'duration'], name: 'IDX_TIMESHEET_RESULT_STATS')]
+#[ORM\Entity(repositoryClass: TimesheetRepository::class)]
+#[ORM\ChangeTrackingPolicy('DEFERRED_EXPLICIT')]
+#[ORM\HasLifecycleCallbacks]
+#[Serializer\ExclusionPolicy('all')]
+#[Serializer\VirtualProperty('ActivityAsId', exp: 'object.getActivity() === null ? null : object.getActivity().getId()', options: [new Serializer\SerializedName('activity'), new Serializer\Type(name: 'integer'), new Serializer\Groups(['Not_Expanded'])])]
+#[Serializer\VirtualProperty('ProjectAsId', exp: 'object.getProject() === null ? null : object.getProject().getId()', options: [new Serializer\SerializedName('project'), new Serializer\Type(name: 'integer'), new Serializer\Groups(['Not_Expanded'])])]
+#[Serializer\VirtualProperty('UserAsId', exp: 'object.getUser().getId()', options: [new Serializer\SerializedName('user'), new Serializer\Type(name: 'integer'), new Serializer\Groups(['Not_Expanded'])])]
+#[Serializer\VirtualProperty('TagsAsArray', exp: 'object.getTagsAsArray()', options: [new Serializer\SerializedName('tags'), new Serializer\Type(name: 'array<string>'), new Serializer\Groups(['Default'])])]
+#[Constraints\Timesheet]
+#[Constraints\TimesheetDeactivated]
+class Timesheet implements EntityWithMetaFields, ExportableItem, ModifiedAt
 {
+    use ModifiedTrait;
+
     /**
      * Category: Normal work-time (default category)
      */
@@ -98,237 +73,162 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
      */
     public const OVERTIME = 'overtime';
 
+    public const BILLABLE_AUTOMATIC = 'auto';
+    public const BILLABLE_YES = 'yes';
+    public const BILLABLE_NO = 'no';
+    public const BILLABLE_DEFAULT = 'default';
+
     /**
-     * @var int|null
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Default"})
-     *
-     * @ORM\Column(name="id", type="integer")
-     * @ORM\Id
-     * @ORM\GeneratedValue(strategy="IDENTITY")
+     * Unique Timesheet ID
      */
-    private $id;
+    #[ORM\Column(name: 'id', type: 'integer')]
+    #[ORM\Id]
+    #[ORM\GeneratedValue(strategy: 'IDENTITY')]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    private ?int $id = null;
     /**
-     * Reflects the date in the users timezone (not in UTC).
+     * Reflects the date in the user timezone (not in UTC).
      * This value is automatically set through the begin column and ONLY used in statistic queries.
-     *
-     * @var \DateTime
-     *
-     * @ORM\Column(name="date_tz", type="date", nullable=false)
-     * @Assert\NotNull()
      */
-    private $date;
+    #[ORM\Column(name: 'date_tz', type: 'date_immutable', nullable: false)]
+    #[Assert\NotNull]
+    private ?\DateTimeImmutable $date = null;
     /**
-     * @var DateTime
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Default"})
-     * @Serializer\Type(name="DateTime")
-     * @Serializer\Accessor(getter="getBegin")
+     * Time records start date-time.
      *
      * Attention: Accessor MUST be used, otherwise date will be serialized in UTC.
-     *
-     * @ORM\Column(name="start_time", type="datetime", nullable=false)
-     * @Assert\NotNull()
      */
-    private $begin;
+    #[ORM\Column(name: 'start_time', type: 'datetime', nullable: false)]
+    #[Assert\NotNull]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    #[Serializer\Type(name: 'DateTime')]
+    #[Serializer\Accessor(getter: 'getBegin')]
+    private ?DateTime $begin = null;
     /**
-     * @var DateTime
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Default"})
-     * @Serializer\Type(name="DateTime")
-     * @Serializer\Accessor(getter="getEnd")
+     * Time records end date-time.
      *
      * Attention: Accessor MUST be used, otherwise date will be serialized in UTC.
-     *
-     * @ORM\Column(name="end_time", type="datetime", nullable=true)
      */
-    private $end;
+    #[ORM\Column(name: 'end_time', type: 'datetime', nullable: true)]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    #[Serializer\Type(name: 'DateTime')]
+    #[Serializer\Accessor(getter: 'getEnd')]
+    private ?\DateTime $end = null;
     /**
-     * @var string
      * @internal for storing the timezone of "begin" and "end" date
-     *
-     * @ORM\Column(name="timezone", type="string", length=64, nullable=false)
-     * @Assert\Timezone
      */
-    private $timezone;
+    #[ORM\Column(name: 'timezone', type: 'string', length: 64, nullable: false)]
+    #[Assert\Timezone]
+    private ?string $timezone = null;
     /**
-     * @var bool
      * @internal for storing the localized state of dates (see $timezone)
      */
-    private $localized = false;
+    private bool $localized = false;
+    #[ORM\Column(name: 'duration', type: 'integer', nullable: true)]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    private ?int $duration = 0;
+    #[ORM\Column(name: 'break', type: 'integer', nullable: true)]
+    private ?int $break = 0;
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(name: '`user`', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
+    #[Assert\NotNull]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Subresource', 'Expanded'])]
+    #[OA\Property(ref: '#/components/schemas/User')]
+    private ?User $user = null;
+    #[ORM\ManyToOne(targetEntity: Activity::class)]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[Assert\NotNull]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Subresource', 'Expanded'])]
+    #[OA\Property(ref: '#/components/schemas/ActivityExpanded')]
+    private ?Activity $activity = null;
+    #[ORM\ManyToOne(targetEntity: Project::class)]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[Assert\NotNull]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Subresource', 'Expanded'])]
+    #[OA\Property(ref: '#/components/schemas/ProjectExpanded')]
+    private ?Project $project = null;
+    #[ORM\Column(name: 'description', type: 'text', nullable: true)]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    private ?string $description = null;
+    #[ORM\Column(name: 'rate', type: 'float', nullable: false)]
+    #[Assert\GreaterThanOrEqual(0)]
+    #[Assert\NotNull]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    private float $rate = 0.00;
+    #[ORM\Column(name: 'internal_rate', type: 'float', nullable: true)]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    private ?float $internalRate = null;
+    #[ORM\Column(name: 'fixed_rate', type: 'float', nullable: true)]
+    #[Assert\GreaterThanOrEqual(0)]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Entity'])]
+    private ?float $fixedRate = null;
+    #[ORM\Column(name: 'hourly_rate', type: 'float', nullable: true)]
+    #[Assert\GreaterThanOrEqual(0)]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Entity'])]
+    private ?float $hourlyRate = null;
+    #[ORM\Column(name: 'exported', type: 'boolean', nullable: false, options: ['default' => false])]
+    #[Assert\NotNull]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    private bool $exported = false;
+    #[ORM\Column(name: 'billable', type: 'boolean', nullable: false, options: ['default' => true])]
+    #[Assert\NotNull]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    private bool $billable = true;
     /**
-     * @var int
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Default"})
-     *
-     * @ORM\Column(name="duration", type="integer", nullable=true)
-     * @Assert\GreaterThanOrEqual(0)
+     * Internal property used to determine whether the billable field should be calculated automatically.
      */
-    private $duration = 0;
-    /**
-     * @var User
-     *
-     * @ORM\ManyToOne(targetEntity="App\Entity\User")
-     * @ORM\JoinColumn(name="`user`", referencedColumnName="id", onDelete="CASCADE", nullable=false)
-     * @Assert\NotNull()
-     */
-    private $user;
-    /**
-     * @var Activity
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Subresource", "Expanded"})
-     * @SWG\Property(ref="#/definitions/ActivityExpanded")
-     *
-     * @ORM\ManyToOne(targetEntity="App\Entity\Activity")
-     * @ORM\JoinColumn(onDelete="CASCADE", nullable=false)
-     * @Assert\NotNull()
-     */
-    private $activity;
-    /**
-     * @var Project
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Subresource", "Expanded"})
-     * @SWG\Property(ref="#/definitions/ProjectExpanded")
-     *
-     * @ORM\ManyToOne(targetEntity="App\Entity\Project")
-     * @ORM\JoinColumn(onDelete="CASCADE", nullable=false)
-     * @Assert\NotNull()
-     */
-    private $project;
-    /**
-     * @var string
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Default"})
-     *
-     * @ORM\Column(name="description", type="text", nullable=true)
-     */
-    private $description;
-    /**
-     * @var float
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Default"})
-     *
-     * @ORM\Column(name="rate", type="float", nullable=false)
-     * @Assert\GreaterThanOrEqual(0)
-     */
-    private $rate = 0.00;
-    /**
-     * @var float|null
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Default"})
-     *
-     * @ORM\Column(name="internal_rate", type="float", nullable=true)
-     */
-    private $internalRate;
-    /**
-     * @var float|null
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Entity"})
-     *
-     * @ORM\Column(name="fixed_rate", type="float", nullable=true)
-     * @Assert\GreaterThanOrEqual(0)
-     */
-    private $fixedRate = null;
-    /**
-     * @var float
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Entity"})
-     *
-     * @ORM\Column(name="hourly_rate", type="float", nullable=true)
-     * @Assert\GreaterThanOrEqual(0)
-     */
-    private $hourlyRate = null;
-    /**
-     * @var bool
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Default"})
-     *
-     * @ORM\Column(name="exported", type="boolean", nullable=false, options={"default": false})
-     * @Assert\NotNull()
-     */
-    private $exported = false;
-    /**
-     * @var bool
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Default"})
-     *
-     * @ORM\Column(name="billable", type="boolean", nullable=false, options={"default": true})
-     * @Assert\NotNull()
-     */
-    private $billable = true;
-    /**
-     * @var string
-     *
-     * @ORM\Column(name="category", type="string", length=10, nullable=false, options={"default": "work"})
-     * @Assert\NotNull()
-     */
-    private $category = self::WORK;
-    /**
-     * @var DateTime|null
-     * @internal used for limiting queries, eg. via API sync
-     *
-     * @Gedmo\Timestampable
-     * @ORM\Column(name="modified_at", type="datetime", nullable=true)
-     */
-    private $modifiedAt;
+    #[Assert\NotNull]
+    private ?string $billableMode = self::BILLABLE_DEFAULT;
+    #[ORM\Column(name: 'category', type: 'string', length: 10, nullable: false, options: ['default' => 'work'])]
+    #[Assert\NotNull]
+    private ?string $category = self::WORK;
     /**
      * Tags
      *
-     * @var Tag[]|ArrayCollection
-     *
-     * @ORM\ManyToMany(targetEntity="App\Entity\Tag", inversedBy="timesheets", cascade={"persist"})
-     * @ORM\JoinTable(
-     *  name="kimai2_timesheet_tags",
-     *  joinColumns={
-     *      @ORM\JoinColumn(name="timesheet_id", referencedColumnName="id", onDelete="CASCADE")
-     *  },
-     *  inverseJoinColumns={
-     *      @ORM\JoinColumn(name="tag_id", referencedColumnName="id", onDelete="CASCADE")
-     *  }
-     * )
-     * @Assert\Valid()
+     * @var Collection<Tag>
      */
-    private $tags;
+    #[ORM\JoinTable(name: 'kimai2_timesheet_tags')]
+    #[ORM\JoinColumn(name: 'timesheet_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'tag_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\ManyToMany(targetEntity: Tag::class, cascade: ['persist'])]
+    #[Assert\Valid]
+    private Collection $tags;
     /**
-     * Meta fields
+     * Meta fields registered with the timesheet
      *
-     * All visible meta (custom) fields registered with this timesheet
-     *
-     * @var TimesheetMeta[]|Collection
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Timesheet"})
-     * @Serializer\Type(name="array<App\Entity\TimesheetMeta>")
-     * @Serializer\SerializedName("metaFields")
-     * @Serializer\Accessor(getter="getVisibleMetaFields")
-     *
-     * @ORM\OneToMany(targetEntity="App\Entity\TimesheetMeta", mappedBy="timesheet", cascade={"persist"})
+     * @var Collection<TimesheetMeta>
      */
-    private $meta;
+    #[ORM\OneToMany(mappedBy: 'timesheet', targetEntity: TimesheetMeta::class, cascade: ['persist'])]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Timesheet'])]
+    #[Serializer\Type(name: 'array<App\Entity\TimesheetMeta>')]
+    #[Serializer\SerializedName('metaFields')]
+    #[Serializer\Accessor(getter: 'getVisibleMetaFields')]
+    private Collection $meta;
 
     public function __construct()
     {
         $this->tags = new ArrayCollection();
         $this->meta = new ArrayCollection();
+        $this->setModifiedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
     }
 
     /**
      * Get entry id, returns null for new entities which were not persisted.
-     *
-     * @return int|null
      */
     public function getId(): ?int
     {
@@ -339,18 +239,18 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
      * Make sure begin and end date have the correct timezone.
      * This will be called once for each item after being loaded from the database.
      */
-    protected function localizeDates()
+    protected function localizeDates(): void
     {
         if ($this->localized) {
             return;
         }
 
         if (null !== $this->begin) {
-            $this->begin->setTimeZone(new DateTimeZone($this->timezone));
+            $this->begin->setTimezone(new DateTimeZone($this->timezone));
         }
 
         if (null !== $this->end) {
-            $this->end->setTimeZone(new DateTimeZone($this->timezone));
+            $this->end->setTimezone(new DateTimeZone($this->timezone));
         }
 
         $this->localized = true;
@@ -363,16 +263,12 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         return $this->begin;
     }
 
-    /**
-     * @param DateTime $begin
-     * @return Timesheet
-     */
     public function setBegin(DateTime $begin): Timesheet
     {
         $this->begin = $begin;
         $this->timezone = $begin->getTimezone()->getName();
-        // make sure that the original date is always
-        $this->date = new DateTime($begin->format('Y-m-d 00:00:00'), new DateTimeZone('UTC'));
+        // make sure that the original date is always kept in UTC
+        $this->date = new \DateTimeImmutable($begin->format('Y-m-d 00:00:00'), new DateTimeZone('UTC'));
 
         return $this;
     }
@@ -389,10 +285,6 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         return $this->end === null;
     }
 
-    /**
-     * @param DateTime $end
-     * @return Timesheet
-     */
     public function setEnd(?DateTime $end): Timesheet
     {
         $this->end = $end;
@@ -407,10 +299,6 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         return $this;
     }
 
-    /**
-     * @param int|null $duration
-     * @return Timesheet
-     */
     public function setDuration(?int $duration): Timesheet
     {
         $this->duration = $duration;
@@ -420,24 +308,37 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
 
     /**
      * Do not rely on the results of this method for running records.
-     *
-     * @return int|null
      */
-    public function getDuration(): ?int
+    public function getDuration(bool $calculate = true): ?int
     {
         // only auto calculate if manually set duration is null - the result is important for eg. validations
-        if ($this->duration === null && $this->begin !== null && $this->end !== null) {
-            return $this->end->getTimestamp() - $this->begin->getTimestamp();
+        if ($calculate && $this->duration === null && $this->begin !== null && $this->end !== null) {
+            return $this->getCalculatedDuration();
         }
 
         return $this->duration;
     }
 
-    /**
-     * @param User $user
-     * @return Timesheet
-     */
-    public function setUser(User $user): Timesheet
+    public function getCalculatedDuration(): ?int
+    {
+        if ($this->begin !== null && $this->end !== null) {
+            return $this->end->getTimestamp() - $this->begin->getTimestamp() - $this->getBreak();
+        }
+
+        return null;
+    }
+
+    public function getBreak(): int
+    {
+        return $this->break ?? 0;
+    }
+
+    public function setBreak(?int $break): void
+    {
+        $this->break = $break ?? 0;
+    }
+
+    public function setUser(?User $user): Timesheet
     {
         $this->user = $user;
 
@@ -449,11 +350,7 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         return $this->user;
     }
 
-    /**
-     * @param Activity $activity
-     * @return Timesheet
-     */
-    public function setActivity($activity): Timesheet
+    public function setActivity(?Activity $activity): Timesheet
     {
         $this->activity = $activity;
 
@@ -470,22 +367,14 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         return $this->project;
     }
 
-    /**
-     * @param Project $project
-     * @return Timesheet
-     */
-    public function setProject(Project $project): Timesheet
+    public function setProject(?Project $project): Timesheet
     {
         $this->project = $project;
 
         return $this;
     }
 
-    /**
-     * @param string $description
-     * @return Timesheet
-     */
-    public function setDescription($description): Timesheet
+    public function setDescription(?string $description): Timesheet
     {
         $this->description = $description;
 
@@ -497,11 +386,7 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         return $this->description;
     }
 
-    /**
-     * @param float $rate
-     * @return Timesheet
-     */
-    public function setRate($rate): Timesheet
+    public function setRate(float $rate): Timesheet
     {
         $this->rate = $rate;
 
@@ -525,31 +410,22 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         return $this->internalRate;
     }
 
-    /**
-     * @param Tag $tag
-     * @return Timesheet
-     */
     public function addTag(Tag $tag): Timesheet
     {
         if ($this->tags->contains($tag)) {
             return $this;
         }
         $this->tags->add($tag);
-        $tag->addTimesheet($this);
 
         return $this;
     }
 
-    /**
-     * @param Tag $tag
-     */
-    public function removeTag(Tag $tag)
+    public function removeTag(Tag $tag): void
     {
         if (!$this->tags->contains($tag)) {
             return;
         }
         $this->tags->removeElement($tag);
-        $tag->removeTimesheet($this);
     }
 
     /**
@@ -565,26 +441,22 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
      */
     public function getTagsAsArray(): array
     {
+        /** @var array<Tag> $tags */
+        $tags = $this->getTags()->toArray();
+
         return array_map(
-            function (Tag $element) {
-                return $element->getName();
+            function ($element) {
+                return (string) $element->getName();
             },
-            $this->getTags()->toArray()
+            $tags
         );
     }
 
-    /**
-     * @return bool
-     */
     public function isExported(): bool
     {
         return $this->exported;
     }
 
-    /**
-     * @param bool $exported
-     * @return Timesheet
-     */
     public function setExported(bool $exported): Timesheet
     {
         $this->exported = $exported;
@@ -592,9 +464,6 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getTimezone(): ?string
     {
         return $this->timezone;
@@ -605,8 +474,6 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
      * It is reserved for some very rare use-cases.
      *
      * @internal
-     * @param string $timezone
-     * @return Timesheet
      */
     public function setTimezone(string $timezone): Timesheet
     {
@@ -617,12 +484,15 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
 
     /**
      * This method returns ALWAYS: "timesheet"
-     *
-     * @return string
      */
     public function getType(): string
     {
         return 'timesheet';
+    }
+
+    public function getAmount(): float
+    {
+        return 1.0;
     }
 
     public function getCategory(): string
@@ -635,7 +505,7 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         $allowed = [self::WORK, self::HOLIDAY, self::SICKNESS, self::PARENTAL, self::OVERTIME];
 
         if (!\in_array($category, $allowed)) {
-            throw new \InvalidArgumentException(sprintf('Invalid timesheet category "%s" given, expected one of: %s', $category, implode(', ', $allowed)));
+            throw new \InvalidArgumentException(\sprintf('Invalid timesheet category "%s" given, expected one of: %s', $category, implode(', ', $allowed)));
         }
 
         $this->category = $category;
@@ -648,11 +518,26 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         return $this->billable;
     }
 
+    public function getBillable(): bool
+    {
+        return $this->billable;
+    }
+
     public function setBillable(bool $billable): Timesheet
     {
         $this->billable = $billable;
 
         return $this;
+    }
+
+    public function getBillableMode(): ?string
+    {
+        return $this->billableMode;
+    }
+
+    public function setBillableMode(?string $billableMode): void
+    {
+        $this->billableMode = $billableMode;
     }
 
     public function getFixedRate(): ?float
@@ -679,11 +564,6 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         return $this;
     }
 
-    public function getModifiedAt(): ?DateTime
-    {
-        return $this->modifiedAt;
-    }
-
     /**
      * @return Collection|MetaTableTypeInterface[]
      */
@@ -707,6 +587,15 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         return $all;
     }
 
+    public function resetRates(): void
+    {
+        $this->setRate(0.00);
+        $this->setInternalRate(null);
+        $this->setHourlyRate(null);
+        $this->setFixedRate(null);
+        $this->setBillableMode(Timesheet::BILLABLE_AUTOMATIC);
+    }
+
     public function getMetaField(string $name): ?MetaTableTypeInterface
     {
         foreach ($this->meta as $field) {
@@ -720,6 +609,10 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
 
     public function setMetaField(MetaTableTypeInterface $meta): EntityWithMetaFields
     {
+        // this needs to be done, otherwise doctrine will not see the item as changed
+        // and the calculators will not run
+        $this->setModifiedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
+
         if (null === ($current = $this->getMetaField($meta->getName()))) {
             $meta->setEntity($this);
             $this->meta->add($meta);
@@ -732,11 +625,9 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
         return $this;
     }
 
-    public function createCopy(?Timesheet $timesheet = null): Timesheet
+    public function createCopy(): Timesheet
     {
-        if (null === $timesheet) {
-            $timesheet = new Timesheet();
-        }
+        $timesheet = new Timesheet();
 
         $values = get_object_vars($this);
         foreach ($values as $k => $v) {
@@ -747,7 +638,9 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
 
         /** @var TimesheetMeta $meta */
         foreach ($this->meta as $meta) {
-            $timesheet->setMetaField(clone $meta);
+            $tmp = clone $meta;
+            $tmp->setEntity($timesheet);
+            $timesheet->setMetaField($tmp);
         }
 
         $timesheet->tags = new ArrayCollection();
@@ -766,6 +659,7 @@ class Timesheet implements EntityWithMetaFields, ExportItemInterface
             $this->id = null;
         }
 
+        $this->setModifiedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
         $this->exported = false;
 
         $currentMeta = $this->meta;

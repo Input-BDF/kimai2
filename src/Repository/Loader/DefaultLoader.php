@@ -9,11 +9,12 @@
 
 namespace App\Repository\Loader;
 
+/**
+ * @deprecated use QueryBuilderPaginator instead
+ * @implements LoaderInterface<mixed>
+ */
 final class DefaultLoader implements LoaderInterface
 {
-    /**
-     * @param array $results
-     */
     public function loadResults(array $results): void
     {
         // nothing to do here, the results are already fully populated

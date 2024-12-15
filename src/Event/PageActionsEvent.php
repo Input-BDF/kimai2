@@ -10,19 +10,23 @@
 namespace App\Event;
 
 use App\Entity\User;
-use App\Repository\Query\BaseQuery;
 
 /**
- * This event is triggered once per side load.
- * It stores all toolbar items, which should be rendered in the upper right corner.
+ * This event is triggered for every action:
+ * - once per side load for page actions
+ * - once for every entity item (table row)
+ *
+ * @property array{actions: array<string, string|array<mixed>>, view: string} $payload
  */
 class PageActionsEvent extends ThemeEvent
 {
-    private $action;
-    private $view;
-    private $divider = 0;
+    private int $divider = 0;
+    private ?string $locale = null;
 
-    public function __construct(User $user, array $payload, string $action, string $view)
+    /**
+     * @param array<mixed> $payload
+     */
+    public function __construct(User $user, array $payload, private readonly string $action, private readonly string $view)
     {
         // only for BC reasons, do not access it directly!
         if (!\array_key_exists('actions', $payload)) {
@@ -33,13 +37,16 @@ class PageActionsEvent extends ThemeEvent
             $payload['view'] = $view;
         }
         parent::__construct($user, $payload);
-        $this->action = $action;
-        $this->view = $view;
     }
 
     public function getActionName(): string
     {
         return $this->action;
+    }
+
+    public function getEventName(): string
+    {
+        return 'actions.' . $this->getActionName();
     }
 
     public function isView(string $view): bool
@@ -52,11 +59,22 @@ class PageActionsEvent extends ThemeEvent
         return $this->isView('index');
     }
 
+    /**
+     * Custom view can only be table listings.
+     */
+    public function isCustomView(): bool
+    {
+        return $this->isView('custom');
+    }
+
     public function getView(): string
     {
         return $this->view;
     }
 
+    /**
+     * @return array<string, array<mixed>>
+     */
     public function getActions(): array
     {
         $actions = $this->payload['actions'];
@@ -92,31 +110,41 @@ class PageActionsEvent extends ThemeEvent
         return \array_key_exists('children', $this->payload['actions'][$submenu]);
     }
 
+    /**
+     * @param array<string, mixed> $action
+     */
     public function addActionToSubmenu(string $submenu, string $key, array $action): void
     {
-        if (\array_key_exists($submenu, $this->payload['actions'])) {
-            if (!\array_key_exists('children', $this->payload['actions'][$submenu])) {
-                $this->payload['actions'][$submenu]['children'] = [];
-            }
+        if (!\array_key_exists($submenu, $this->payload['actions'])) {
+            $this->payload['actions'][$submenu] = ['children' => []];
+        }
+        if (!\array_key_exists('children', $this->payload['actions'][$submenu])) {
+            $this->payload['actions'][$submenu]['children'] = [];
         }
         $this->payload['actions'][$submenu]['children'][$key] = $action;
     }
 
+    /**
+     * @param array<string, mixed> $action
+     */
     public function replaceAction(string $key, array $action): void
     {
         $this->payload['actions'][$key] = $action;
     }
 
+    /**
+     * @param array<string, mixed> $action
+     */
     public function addAction(string $key, array $action): void
     {
-        if (!\array_key_exists($key, $this->payload['actions'])) {
+        if (!$this->hasAction($key)) {
             $this->payload['actions'][$key] = $action;
         }
     }
 
     public function removeAction(string $key): void
     {
-        if (\array_key_exists($key, $this->payload['actions'])) {
+        if ($this->hasAction($key)) {
             unset($this->payload['actions'][$key]);
         }
     }
@@ -127,53 +155,52 @@ class PageActionsEvent extends ThemeEvent
         $this->payload['actions'][$key] = null;
     }
 
-    public function addSearchToggle(?BaseQuery $query = null): void
+    public function addQuickImport(string $url): void
     {
-        $label = null;
-
-        if ($query !== null) {
-            $label = $query->countFilter();
-            if ($label < 1) {
-                $label = null;
-            }
-        }
-
-        $this->addAction('search', ['modal' => '#modal_search', 'label' => $label]);
+        $this->addAction('import', ['url' => $url, 'class' => 'toolbar-action', 'title' => 'import', 'icon' => 'upload']);
     }
 
     public function addQuickExport(string $url): void
     {
-        $this->addAction('download', ['url' => $url, 'class' => 'toolbar-action']);
+        $this->addAction('download', ['url' => $url, 'class' => 'toolbar-action', 'title' => 'export']);
     }
 
     public function addCreate(string $url, bool $modal = true): void
     {
-        $this->addAction('create', ['url' => $url, 'class' => ($modal ? 'modal-ajax-form' : '')]);
+        $this->addAction('create', ['url' => $url, 'class' => ($modal ? 'modal-ajax-form' : ''), 'title' => 'create', 'accesskey' => 'a']);
     }
 
-    public function addHelp(string $url): void
+    public function addEdit(string $url, bool $modal = true, string $class = ''): void
     {
-        $this->addAction('help', ['url' => $url, 'target' => '_blank']);
+        $this->addAction('edit', ['url' => $url, 'class' => ($modal ? 'modal-ajax-form' . ($class === '' ? '' : ' ' . $class) : $class), 'title' => 'edit']);
     }
 
-    public function addBack(string $url): void
+    /**
+     * Link to a configuration section.
+     */
+    public function addSettings(string $url): void
     {
-        $this->addAction('back', ['url' => $url, 'translation_domain' => 'actions']);
+        $this->addAction('settings', ['url' => $url, 'class' => 'modal-ajax-form', 'title' => 'settings', 'accesskey' => 'h']);
+    }
+
+    public function addConfig(string $url): void
+    {
+        $this->addAction('settings', ['url' => $url, 'title' => 'settings']);
     }
 
     public function addDelete(string $url, bool $remoteConfirm = true): void
     {
         if ($remoteConfirm) {
-            $this->addAction('trash', ['url' => $url, 'class' => 'modal-ajax-form text-red']);
+            $this->addAction('trash', ['url' => $url, 'class' => 'modal-ajax-form text-red', 'title' => 'trash']);
         } else {
-            $this->addAction('trash', ['url' => $url, 'class' => 'confirmation-link text-red', 'attr' => ['data-question' => 'confirm.delete']]);
+            $this->addAction('trash', ['url' => $url, 'class' => 'confirmation-link text-red', 'attr' => ['data-question' => 'confirm.delete'], 'title' => 'trash']);
         }
     }
 
     public function addColumnToggle(string $modal): void
     {
         $modal = '#' . ltrim($modal, '#');
-        $this->addAction('visibility', ['modal' => $modal]);
+        $this->addAction('columns', ['modal' => $modal, 'title' => 'modal.columns.title']);
     }
 
     public function countActions(?string $submenu = null): int
@@ -187,5 +214,15 @@ class PageActionsEvent extends ThemeEvent
         }
 
         return \count($this->payload['actions']);
+    }
+
+    public function getLocale(): ?string
+    {
+        return $this->locale;
+    }
+
+    public function setLocale(?string $locale): void
+    {
+        $this->locale = $locale;
     }
 }

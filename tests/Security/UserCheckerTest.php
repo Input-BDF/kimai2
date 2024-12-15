@@ -13,38 +13,37 @@ use App\Entity\User;
 use App\Security\UserChecker;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Exception\DisabledException;
-use Symfony\Component\Security\Core\User\User as SymfonyUser;
 
 /**
  * @covers \App\Security\UserChecker
  */
 class UserCheckerTest extends TestCase
 {
-    public function testCheckPreAuthReturnsOnUnknownUserClass()
+    public function testCheckPreAuthReturnsOnUnknownUserClass(): void
     {
         $sut = new UserChecker();
 
         try {
-            $sut->checkPreAuth(new SymfonyUser('sdf', null));
+            $sut->checkPreAuth(new TestUserEntity());
         } catch (\Exception $ex) {
             $this->fail('UserChecker should not throw exception in checkPreAuth(), ' . $ex->getMessage());
         }
-        $this->assertTrue(true);
+        $this->expectNotToPerformAssertions();
     }
 
-    public function testCheckPostAuthReturnsOnUnknownUserClass()
+    public function testCheckPostAuthReturnsOnUnknownUserClass(): void
     {
         $sut = new UserChecker();
 
         try {
-            $sut->checkPostAuth(new SymfonyUser('sdf', null));
+            $sut->checkPostAuth(new TestUserEntity());
         } catch (\Exception $ex) {
             $this->fail('UserChecker should not throw exception in checkPostAuth(), ' . $ex->getMessage());
         }
-        $this->assertTrue(true);
+        $this->expectNotToPerformAssertions();
     }
 
-    public function testDisabledCannotLoginInCheckPreAuth()
+    public function testDisabledCannotLoginInCheckPreAuth(): void
     {
         $this->expectException(DisabledException::class);
         $this->expectExceptionMessage('User account is disabled.');
@@ -52,7 +51,7 @@ class UserCheckerTest extends TestCase
         (new UserChecker())->checkPreAuth((new User())->setEnabled(false));
     }
 
-    public function testDisabledCannotLoginInCheckPostAuth()
+    public function testDisabledCannotLoginInCheckPostAuth(): void
     {
         $this->expectException(DisabledException::class);
         $this->expectExceptionMessage('User account is disabled.');

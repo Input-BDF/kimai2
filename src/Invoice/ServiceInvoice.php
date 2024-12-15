@@ -9,21 +9,22 @@
 
 namespace App\Invoice;
 
-use App\Configuration\LanguageFormattings;
-use App\Constants;
+use App\Configuration\LocaleService;
+use App\Entity\ExportableItem;
 use App\Entity\Invoice;
-use App\Entity\InvoiceDocument;
 use App\Event\InvoiceCreatedEvent;
+use App\Event\InvoiceDeleteEvent;
 use App\Event\InvoicePostRenderEvent;
 use App\Event\InvoicePreRenderEvent;
+use App\Export\Base\DispositionInlineInterface;
+use App\Model\InvoiceDocument;
 use App\Repository\InvoiceDocumentRepository;
 use App\Repository\InvoiceRepository;
 use App\Repository\Query\InvoiceQuery;
-use App\Timesheet\DateTimeFactory;
 use App\Utils\FileHelper;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Service to manage invoice dependencies.
@@ -33,42 +34,27 @@ final class ServiceInvoice
     /**
      * @var CalculatorInterface[]
      */
-    private $calculator = [];
+    private array $calculator = [];
     /**
      * @var RendererInterface[]
      */
-    private $renderer = [];
+    private array $renderer = [];
     /**
      * @var NumberGeneratorInterface[]
      */
-    private $numberGenerator = [];
+    private array $numberGenerator = [];
     /**
      * @var array InvoiceItemRepositoryInterface[]
      */
-    private $invoiceItemRepositories = [];
-    /**
-     * @var InvoiceDocumentRepository
-     */
-    private $documents;
-    /**
-     * @var FileHelper
-     */
-    private $fileHelper;
-    /**
-     * @var LanguageFormattings
-     */
-    private $formatter;
-    /**
-     * @var InvoiceRepository
-     */
-    private $invoiceRepository;
+    private array $invoiceItemRepositories = [];
 
-    public function __construct(InvoiceDocumentRepository $repository, FileHelper $fileHelper, InvoiceRepository $invoiceRepository, LanguageFormattings $formatter)
-    {
-        $this->documents = $repository;
-        $this->fileHelper = $fileHelper;
-        $this->invoiceRepository = $invoiceRepository;
-        $this->formatter = $formatter;
+    public function __construct(
+        private InvoiceDocumentRepository $documents,
+        private FileHelper $fileHelper,
+        private InvoiceRepository $invoiceRepository,
+        private LocaleService $formatter,
+        private InvoiceModelFactory $invoiceModelFactory
+    ) {
     }
 
     public function addNumberGenerator(NumberGeneratorInterface $generator): ServiceInvoice
@@ -211,20 +197,26 @@ final class ServiceInvoice
                 if (stripos($part, 'filename=') === false) {
                     continue;
                 }
-                $filename = explode('filename=', $part);
-                if (\count($filename) > 1) {
-                    $filename = $filename[1];
+                $tmp = explode('filename=', $part);
+                if (\count($tmp) > 1) {
+                    $filename = $tmp[1];
                 }
             }
         } else {
             $disposition = $event->getResponse()->headers->get('Content-Type');
             $parts = explode(';', $disposition);
             $parts = explode('/', $parts[0]);
-            $filename .= '.' . $parts[1];
+            if (\count($parts) > 1) {
+                $filename .= '.' . $parts[1];
+            }
+        }
+
+        if (mb_strlen($filename) >= 150) {
+            throw new \Exception(\sprintf('Invoice filename "%s" is too long, max. 150 characters allowed', $filename));
         }
 
         if (is_file($invoiceDirectory . $filename)) {
-            throw new \Exception(sprintf('Invoice "%s" already exists', $filename));
+            throw new \Exception(\sprintf('Invoice "%s" already exists', $filename));
         }
 
         if ($response instanceof BinaryFileResponse) {
@@ -237,12 +229,8 @@ final class ServiceInvoice
         return $filename;
     }
 
-    public function changeInvoiceStatus(Invoice $invoice, string $status)
+    public function changeInvoiceStatus(Invoice $invoice, string $status): void
     {
-        if (!\in_array($status, [Invoice::STATUS_NEW, Invoice::STATUS_PENDING, Invoice::STATUS_PAID])) {
-            throw new \InvalidArgumentException('Unknown invoice status');
-        }
-
         switch ($status) {
             case Invoice::STATUS_NEW:
                 $invoice->setIsNew();
@@ -255,31 +243,20 @@ final class ServiceInvoice
             case Invoice::STATUS_PAID:
                 $invoice->setIsPaid();
                 break;
+
+            case Invoice::STATUS_CANCELED:
+                $invoice->setIsCanceled();
+                break;
+
+            default:
+                throw new \InvalidArgumentException('Unknown invoice status');
         }
 
         $this->invoiceRepository->saveInvoice($invoice);
     }
 
     /**
-     * @param InvoiceQuery $query
-     * @return InvoiceItemInterface[]
-     * @deprecated since 1.14 and will be removed with 2.0
-     */
-    public function findInvoiceItems(InvoiceQuery $query): array
-    {
-        @trigger_error('Using findInvoiceItems() is deprecated since 1.14 and will be removed with 2.0', E_USER_DEPRECATED);
-
-        // customer needs to be defined, as we need the currency for the invoice
-        if (!$query->hasCustomers()) {
-            return [];
-        }
-
-        return $this->getInvoiceItems($query);
-    }
-
-    /**
-     * @param InvoiceQuery $query
-     * @return InvoiceItemInterface[]
+     * @return ExportableItem[]
      */
     public function getInvoiceItems(InvoiceQuery $query): array
     {
@@ -292,39 +269,30 @@ final class ServiceInvoice
         return $items;
     }
 
-    private function getDateTimeFactory(InvoiceQuery $query): DateTimeFactory
-    {
-        $timezone = date_default_timezone_get();
-        $sunday = false;
-
-        if (null !== ($user = $query->getCurrentUser())) {
-            $timezone = $user->getTimezone();
-            $sunday = $user->isFirstDayOfWeekSunday();
-        }
-
-        return new DateTimeFactory(new \DateTimeZone($timezone), $sunday);
-    }
-
     /**
-     * @param InvoiceItemInterface[] $entries
+     * @param ExportableItem[] $entries
      */
-    private function markEntriesAsExported(array $entries)
+    private function markEntriesAsExported(array $entries): void
     {
         foreach ($this->getInvoiceItemRepositories() as $repository) {
             $repository->setExported($entries);
         }
     }
 
-    public function renderInvoiceWithModel(InvoiceModel $model, EventDispatcherInterface $dispatcher): Response
+    public function renderInvoice(InvoiceModel $model, EventDispatcherInterface $dispatcher, bool $dispositionInline = false): Response
     {
         $document = $this->getDocumentByName($model->getTemplate()->getRenderer());
         if (null === $document) {
-            throw new \Exception('Unknown invoice document: ' . $model->getTemplate()->getRenderer());
+            throw new \Exception('Please adjust your invoice template, the renderer is invalid: ' . $model->getTemplate()->getRenderer());
         }
 
         foreach ($this->getRenderer() as $renderer) {
             if ($renderer->supports($document)) {
                 $dispatcher->dispatch(new InvoicePreRenderEvent($model, $document, $renderer));
+
+                if ($renderer instanceof DispositionInlineInterface) {
+                    $renderer->setDispositionInline($dispositionInline);
+                }
 
                 $response = $renderer->render($document, $model);
 
@@ -335,24 +303,14 @@ final class ServiceInvoice
         }
 
         throw new \Exception(
-            sprintf('Cannot render invoice: %s (%s)', $model->getTemplate()->getRenderer(), $document->getName())
+            \sprintf('Cannot render invoice: %s (%s)', $model->getTemplate()->getRenderer(), $document->getName())
         );
     }
 
-    public function renderInvoice(InvoiceQuery $query, EventDispatcherInterface $dispatcher): Response
-    {
-        $model = $this->createModel($query);
-
-        return $this->renderInvoiceWithModel($model, $dispatcher);
-    }
-
     /**
-     * @param InvoiceModel $model
-     * @param EventDispatcherInterface $dispatcher
-     * @return Invoice
      * @throws \Exception
      */
-    public function createInvoiceFromModel(InvoiceModel $model, EventDispatcherInterface $dispatcher): Invoice
+    public function createInvoice(InvoiceModel $model, EventDispatcherInterface $dispatcher): Invoice
     {
         $document = $this->getDocumentByName($model->getTemplate()->getRenderer());
         if (null === $document) {
@@ -361,13 +319,18 @@ final class ServiceInvoice
 
         foreach ($this->getRenderer() as $renderer) {
             if ($renderer->supports($document)) {
-                $dispatcher->dispatch(new InvoicePreRenderEvent($model, $document, $renderer));
+                $preEvent = new InvoicePreRenderEvent($model, $document, $renderer);
+                $dispatcher->dispatch($preEvent);
+
+                if ($preEvent->isPropagationStopped()) {
+                    continue;
+                }
+
+                if ($this->invoiceRepository->hasInvoice($model->getInvoiceNumber())) {
+                    throw new DuplicateInvoiceNumberException($model->getInvoiceNumber());
+                }
 
                 $response = $renderer->render($document, $model);
-
-                if ($model->getQuery()->isMarkAsExported()) {
-                    $this->markEntriesAsExported($model->getEntries());
-                }
 
                 $event = new InvoicePostRenderEvent($model, $document, $renderer, $response);
                 $dispatcher->dispatch($event);
@@ -377,62 +340,39 @@ final class ServiceInvoice
                 $invoice = new Invoice();
                 $invoice->setModel($model);
                 $invoice->setFilename($invoiceFilename);
+
+                if (!$invoice->getCustomer()->hasInvoiceTemplate()) {
+                    $invoice->getCustomer()->setInvoiceTemplate($model->getTemplate());
+                }
                 $this->invoiceRepository->saveInvoice($invoice);
 
-                $dispatcher->dispatch(new InvoiceCreatedEvent($invoice));
+                $this->markEntriesAsExported($model->getEntries());
+                $dispatcher->dispatch(new InvoiceCreatedEvent($invoice, $model));
 
                 return $invoice;
             }
         }
 
         throw new \Exception(
-            sprintf('Cannot render invoice: %s (%s)', $model->getTemplate()->getRenderer(), $document->getName())
+            \sprintf('Cannot render invoice: %s (%s)', $model->getTemplate()->getRenderer(), $document->getName())
         );
     }
 
-    /**
-     * @param InvoiceQuery $query
-     * @param EventDispatcherInterface $dispatcher
-     * @return Invoice[]
-     * @throws \Exception
-     */
-    public function createInvoices(InvoiceQuery $query, EventDispatcherInterface $dispatcher): array
-    {
-        $invoices = [];
-
-        $models = $this->createModels($query);
-        foreach ($models as $model) {
-            $invoices[] = $this->createInvoiceFromModel($model, $dispatcher);
-        }
-
-        return $invoices;
-    }
-
-    /**
-     * @param InvoiceQuery $query
-     * @param EventDispatcherInterface $dispatcher
-     * @return Invoice
-     * @throws \Exception
-     */
-    public function createInvoice(InvoiceQuery $query, EventDispatcherInterface $dispatcher): Invoice
-    {
-        $model = $this->createModel($query);
-
-        return $this->createInvoiceFromModel($model, $dispatcher);
-    }
-
-    public function deleteInvoice(Invoice $invoice)
+    public function deleteInvoice(Invoice $invoice, EventDispatcherInterface $dispatcher): void
     {
         $invoiceDirectory = $this->getInvoicesDirectory();
+
         if (is_file($invoiceDirectory . $invoice->getInvoiceFilename())) {
             $this->fileHelper->removeFile($invoiceDirectory . $invoice->getInvoiceFilename());
         }
+
+        $event = new InvoiceDeleteEvent($invoice);
+        $dispatcher->dispatch($event);
+
         $this->invoiceRepository->deleteInvoice($invoice);
     }
 
     /**
-     * @param InvoiceQuery $query
-     * @return InvoiceModel
      * @throws \Exception
      */
     public function createModel(InvoiceQuery $query): InvoiceModel
@@ -447,42 +387,46 @@ final class ServiceInvoice
 
     private function createModelWithoutEntries(InvoiceQuery $query): InvoiceModel
     {
+        $customer = $query->getCustomer();
+        if ($customer === null) {
+            throw new \Exception('Cannot create invoice model without customer');
+        }
+
         $template = $query->getTemplate();
 
-        if (!$query->hasCustomers()) {
-            throw new \Exception('Cannot create invoice model without customer');
+        if ($query->isAllowTemplateOverwrite() && $customer->hasInvoiceTemplate()) {
+            $template = $customer->getInvoiceTemplate();
         }
 
         if (null === $template) {
             throw new \Exception('Cannot create invoice model without template');
         }
 
-        if (null === $template->getLanguage()) {
-            $template->setLanguage(Constants::DEFAULT_LOCALE);
-            @trigger_error('Using invoice templates without a language is is deprecated and trigger and will throw an exception with 2.0', E_USER_DEPRECATED);
-        }
+        $formatter = new DefaultInvoiceFormatter($this->formatter, $template->getLanguage());
 
-        $model = new InvoiceModel(new DefaultInvoiceFormatter($this->formatter, $template->getLanguage()));
-        $model
-            ->setTemplate($template)
-            ->setInvoiceDate($this->getDateTimeFactory($query)->createDateTime())
-            ->setQuery($query)
-        ;
+        $model = $this->invoiceModelFactory->createModel(
+            $formatter,
+            $customer,
+            $template,
+            $query
+        );
+
+        if ($query->getInvoiceDate() !== null) {
+            $model->setInvoiceDate($query->getInvoiceDate());
+        }
 
         if (null !== $query->getCurrentUser()) {
             $model->setUser($query->getCurrentUser());
         }
 
-        $model->setCustomer($query->getCustomers()[0]);
-
-        $generator = $this->getNumberGeneratorByName($query->getTemplate()->getNumberGenerator());
+        $generator = $this->getNumberGeneratorByName($template->getNumberGenerator());
         if (null === $generator) {
-            throw new \Exception('Unknown number generator: ' . $query->getTemplate()->getNumberGenerator());
+            throw new \Exception('Please adjust your invoice template, the number generator is invalid: ' . $template->getNumberGenerator());
         }
 
-        $calculator = $this->getCalculatorByName($query->getTemplate()->getCalculator());
+        $calculator = $this->getCalculatorByName($template->getCalculator());
         if (null === $calculator) {
-            throw new \Exception('Unknown invoice calculator: ' . $query->getTemplate()->getCalculator());
+            throw new \Exception('Please adjust your invoice template, the sum calculator is invalid: ' . $template->getCalculator());
         }
 
         $model->setCalculator($calculator);
@@ -491,10 +435,10 @@ final class ServiceInvoice
         return $model;
     }
 
-    private function prepareModelQueryDates(InvoiceModel $model)
+    private function prepareModelQueryDates(InvoiceModel $model): void
     {
-        $begin = $model->getQuery()->getBegin();
-        $end = $model->getQuery()->getEnd();
+        $begin = $model->getQuery()?->getBegin();
+        $end = $model->getQuery()?->getEnd();
 
         if ($begin !== null && $end !== null) {
             return;
@@ -535,7 +479,6 @@ final class ServiceInvoice
     }
 
     /**
-     * @param InvoiceQuery $query
      * @return InvoiceModel[]
      * @throws \Exception
      */
@@ -547,6 +490,9 @@ final class ServiceInvoice
 
         foreach ($items as $entry) {
             $customer = $entry->getProject()->getCustomer();
+            if ($customer === null || !$customer->isVisible()) { // generating invoices for hidden customers does not yet work
+                continue;
+            }
             $id = $customer->getId();
             if (!\array_key_exists($id, $customerEntries)) {
                 $customerEntries[$id] = [
@@ -561,15 +507,24 @@ final class ServiceInvoice
             return [];
         }
 
-        uasort($customerEntries, function ($a, $b) {
-            return strcmp($a['customer']->getName(), $b['customer']->getName());
-        });
+        uasort($customerEntries, function ($a, $b): int {
+            $nameA = $a['customer']->getName();
+            $nameB = $b['customer']->getName();
 
-        foreach ($customerEntries as $id => $settings) {
-            if (empty($settings['entries'])) {
-                continue;
+            if ($nameA === null && $nameB === null) {
+                $result = 0;
+            } elseif ($nameA === null && $nameB !== null) {
+                $result = 1;
+            } elseif ($nameA !== null && $nameB === null) {
+                $result = -1;
+            } else {
+                $result = strcmp($nameA, $nameB);
             }
 
+            return $result;
+        });
+
+        foreach ($customerEntries as $settings) {
             $customerQuery = clone $query;
             $customerQuery->setCustomers([$settings['customer']]);
             $model = $this->createModelWithoutEntries($customerQuery);

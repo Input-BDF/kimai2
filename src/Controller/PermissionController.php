@@ -16,53 +16,40 @@ use App\Event\PermissionSectionsEvent;
 use App\Event\PermissionsEvent;
 use App\Form\RoleType;
 use App\Model\PermissionSection;
-use App\Repository\RolePermissionRepository;
+use App\Repository\Query\UserQuery;
 use App\Repository\RoleRepository;
 use App\Repository\UserRepository;
 use App\Security\RolePermissionManager;
 use App\Security\RoleService;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use App\User\PermissionService;
+use App\Utils\PageSetup;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
  * Controller used to manage user roles and role permissions.
- *
- * @Route(path="/admin/permissions")
- * @Security("is_granted('role_permissions')")
  */
+#[Route(path: '/admin/permissions')]
+#[IsGranted('IS_AUTHENTICATED_FULLY')]
+#[IsGranted('role_permissions')]
 final class PermissionController extends AbstractController
 {
     public const TOKEN_NAME = 'user_role_permissions';
-    /**
-     * @var RoleService
-     */
-    private $roleService;
-    /**
-     * @var RolePermissionManager
-     */
-    private $manager;
-    /**
-     * @var RoleRepository
-     */
-    private $roleRepository;
 
-    public function __construct(RoleService $roleService, RolePermissionManager $manager, RoleRepository $roleRepository)
+    public function __construct(
+        private readonly RolePermissionManager $manager,
+        private readonly RoleRepository $roleRepository
+    )
     {
-        $this->roleService = $roleService;
-        $this->manager = $manager;
-        $this->roleRepository = $roleRepository;
     }
 
-    /**
-     * @Route(path="", name="admin_user_permissions", methods={"GET", "POST"})
-     * @Security("is_granted('role_permissions')")
-     */
-    public function permissions(EventDispatcherInterface $dispatcher, CsrfTokenManagerInterface $csrfTokenManager)
+    #[Route(path: '', name: 'admin_user_permissions', methods: ['GET', 'POST'])]
+    public function permissions(EventDispatcherInterface $dispatcher, CsrfTokenManagerInterface $csrfTokenManager, RoleService $roleService, UserRepository $userRepository): Response
     {
         $all = $this->roleRepository->findAll();
         $existing = [];
@@ -74,8 +61,7 @@ final class PermissionController extends AbstractController
         $existing = array_map('strtoupper', $existing);
 
         // automatically import all hard coded (default) roles into the database table
-        foreach ($this->roleService->getAvailableNames() as $roleName) {
-            $roleName = strtoupper($roleName);
+        foreach ($roleService->getAvailableNames() as $roleName) {
             if (!\in_array($roleName, $existing)) {
                 $role = new Role();
                 $role->setName($roleName);
@@ -86,6 +72,7 @@ final class PermissionController extends AbstractController
         }
 
         // be careful, the order of the search keys is important!
+        // @CloudRequired (names should not change)
         $permissionOrder = [
             new PermissionSection('Export', '_export'),
             new PermissionSection('Invoice', '_invoice'),
@@ -152,6 +139,9 @@ final class PermissionController extends AbstractController
         foreach ($all as $role) {
             $roles[$role->getName()] = $role;
         }
+        $default = $roles['ROLE_USER'];
+        unset($roles['ROLE_USER']);
+        $roles['ROLE_USER'] = $default;
 
         $event = new PermissionsEvent();
         foreach ($permissionSorted as $title => $permissions) {
@@ -160,20 +150,25 @@ final class PermissionController extends AbstractController
 
         $dispatcher->dispatch($event);
 
+        $page = new PageSetup('profile.roles');
+        $page->setHelp('permissions.html');
+        $page->setActionName('user_permissions');
+
+        $users = $userRepository->getUsersForQuery(new UserQuery());
+
         return $this->render('permission/permissions.html.twig', [
+            'users' => $users,
+            'page_setup' => $page,
             'token' => $csrfTokenManager->refreshToken(self::TOKEN_NAME)->getValue(),
             'roles' => array_values($roles),
             'sorted' => $event->getPermissions(),
             'manager' => $this->manager,
-            'system_roles' => $this->roleService->getSystemRoles(),
-            'always_apply_superadmin' => RolePermissionManager::SUPER_ADMIN_PERMISSIONS,
+            'system_roles' => $roleService->getSystemRoles(),
+            'always_apply_superadmin' => array_keys(RolePermissionManager::SUPER_ADMIN_PERMISSIONS),
         ]);
     }
 
-    /**
-     * @Route(path="/roles/create", name="admin_user_roles", methods={"GET", "POST"})
-     * @Security("is_granted('role_permissions')")
-     */
+    #[Route(path: '/roles/create', name: 'admin_user_roles', methods: ['GET', 'POST'])]
     public function createRole(Request $request): Response
     {
         $role = new Role();
@@ -196,20 +191,21 @@ final class PermissionController extends AbstractController
             return $this->redirectToRoute('admin_user_permissions');
         }
 
+        $page = new PageSetup('profile.roles');
+        $page->setHelp('permissions.html');
+
         return $this->render('permission/edit_role.html.twig', [
+            'page_setup' => $page,
             'form' => $form->createView(),
             'role' => $role,
         ]);
     }
 
-    /**
-     * @Route(path="/roles/{id}/delete/{token}", name="admin_user_role_delete", methods={"GET", "POST"})
-     * @Security("is_granted('role_permissions')")
-     */
-    public function deleteRole(Role $role, string $token, UserRepository $userRepository, CsrfTokenManagerInterface $csrfTokenManager): Response
+    #[Route(path: '/roles/{role}/delete/{csrfToken}', name: 'admin_user_role_delete', methods: ['GET', 'POST'])]
+    public function deleteRole(Role $role, string $csrfToken, UserRepository $userRepository, CsrfTokenManagerInterface $csrfTokenManager): Response
     {
-        if (!$this->isCsrfTokenValid(self::TOKEN_NAME, $token)) {
-            $this->flashUpdateException(new \Exception('Invalid CSRF token'));
+        if (!$this->isCsrfTokenValid(self::TOKEN_NAME, $csrfToken)) {
+            $this->flashError('action.csrf.error');
 
             return $this->redirectToRoute('admin_user_permissions');
         }
@@ -234,13 +230,10 @@ final class PermissionController extends AbstractController
         return $this->redirectToRoute('admin_user_permissions');
     }
 
-    /**
-     * @Route(path="/roles/{id}/{name}/{value}/{token}", name="admin_user_permission_save", methods={"POST"})
-     * @Security("is_granted('role_permissions')")
-     */
-    public function savePermission(Role $role, string $name, bool $value, string $token, RolePermissionRepository $rolePermissionRepository, CsrfTokenManagerInterface $csrfTokenManager): Response
+    #[Route(path: '/roles/{role}/{name}/{value}/{csrfToken}', name: 'admin_user_permission_save', methods: ['POST'])]
+    public function savePermission(Role $role, string $name, bool $value, string $csrfToken, PermissionService $permissionService, CsrfTokenManagerInterface $csrfTokenManager): Response
     {
-        if (!$this->isCsrfTokenValid(self::TOKEN_NAME, $token)) {
+        if (!$this->isCsrfTokenValid(self::TOKEN_NAME, $csrfToken)) {
             throw new BadRequestHttpException('Invalid CSRF token');
         }
 
@@ -248,20 +241,20 @@ final class PermissionController extends AbstractController
             throw $this->createNotFoundException('Unknown permission: ' . $name);
         }
 
-        if (false === $value && $role->getName() === User::ROLE_SUPER_ADMIN && \in_array($name, RolePermissionManager::SUPER_ADMIN_PERMISSIONS)) {
-            throw $this->createAccessDeniedException(sprintf('Permission "%s" cannot be deactivated for role "%s"', $name, $role->getName()));
+        if (false === $value && $role->getName() === User::ROLE_SUPER_ADMIN && \array_key_exists($name, RolePermissionManager::SUPER_ADMIN_PERMISSIONS)) {
+            throw new BadRequestHttpException(\sprintf('Permission "%s" cannot be deactivated for role "%s"', $name, $role->getName()));
         }
 
         try {
-            $permission = $rolePermissionRepository->findRolePermission($role, $name);
+            $permission = $permissionService->findRolePermission($role, $name);
             if (null === $permission) {
                 $permission = new RolePermission();
                 $permission->setRole($role);
                 $permission->setPermission($name);
             }
-            $permission->setAllowed((bool) $value);
+            $permission->setAllowed($value);
 
-            $rolePermissionRepository->saveRolePermission($permission);
+            $permissionService->saveRolePermission($permission);
 
             // refreshToken instead of getToken for more security but worse UX
             // fast clicking with slow response times would fail, as the token cannot be replaced fast enough

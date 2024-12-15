@@ -19,19 +19,20 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  */
 class ReloadCommandTest extends KernelTestCase
 {
-    /**
-     * @var Application
-     */
-    protected $application;
+    protected Application $application;
 
     protected function setUp(): void
     {
+        parent::setUp();
         $kernel = self::bootKernel();
         $this->application = new Application($kernel);
-        $this->application->add(new ReloadCommand());
+        $this->application->add(new ReloadCommand(
+            $this->application->getKernel()->getProjectDir(),
+            $this->application->getKernel()->getEnvironment()
+        ));
     }
 
-    public function testCommandName()
+    public function testCommandName(): void
     {
         $command = $this->application->find('kimai:reload');
         self::assertInstanceOf(ReloadCommand::class, $command);

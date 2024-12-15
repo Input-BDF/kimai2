@@ -17,7 +17,7 @@ use PHPUnit\Framework\TestCase;
  */
 class InvoiceTemplateTest extends TestCase
 {
-    public function testDefaultValues()
+    public function testDefaultValues(): void
     {
         $sut = new InvoiceTemplate();
 
@@ -35,11 +35,9 @@ class InvoiceTemplateTest extends TestCase
         self::assertEquals('default', $sut->getNumberGenerator());
         self::assertEquals('default', $sut->getRenderer());
         self::assertEquals(30, $sut->getDueDays());
-        self::assertFalse($sut->isDecimalDuration());
-        self::assertNull($sut->getLanguage());
     }
 
-    public function testSetNullForOptionalValues()
+    public function testSetNullForOptionalValues(): void
     {
         $sut = new InvoiceTemplate();
 
@@ -48,10 +46,9 @@ class InvoiceTemplateTest extends TestCase
         self::assertInstanceOf(InvoiceTemplate::class, $sut->setContact(null));
         self::assertInstanceOf(InvoiceTemplate::class, $sut->setAddress(null));
         self::assertInstanceOf(InvoiceTemplate::class, $sut->setPaymentTerms(null));
-        self::assertInstanceOf(InvoiceTemplate::class, $sut->setLanguage(null));
     }
 
-    public function testSetterAndGetter()
+    public function testSetterAndGetter(): void
     {
         $sut = new InvoiceTemplate();
 
@@ -70,9 +67,6 @@ class InvoiceTemplateTest extends TestCase
         self::assertInstanceOf(InvoiceTemplate::class, $sut->setVatId('1234567890'));
         self::assertEquals('1234567890', $sut->getVatId());
 
-        self::assertInstanceOf(InvoiceTemplate::class, $sut->setDecimalDuration(true));
-        self::assertTrue($sut->isDecimalDuration());
-
         self::assertInstanceOf(InvoiceTemplate::class, $sut->setLanguage('de'));
         self::assertEquals('de', $sut->getLanguage());
 
@@ -88,7 +82,7 @@ class InvoiceTemplateTest extends TestCase
         self::assertEquals($sut, clone $sut);
     }
 
-    public function testToString()
+    public function testToString(): void
     {
         $sut = new InvoiceTemplate();
 

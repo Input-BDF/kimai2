@@ -18,21 +18,20 @@ use App\Timesheet\TrackingMode\DefaultMode;
  */
 class DefaultModeTest extends AbstractTrackingModeTest
 {
-    protected function assertDefaultBegin(Timesheet $timesheet)
+    public function assertDefaultBegin(Timesheet $timesheet): void
     {
         self::assertNotNull($timesheet->getBegin());
-        self::assertInstanceOf(\DateTime::class, $timesheet->getBegin());
     }
 
     /**
      * @return DefaultMode
      */
-    protected function createSut()
+    protected function createSut(): DefaultMode
     {
         return new DefaultMode((new RoundingServiceFactory($this))->create());
     }
 
-    public function testDefaultValues()
+    public function testDefaultValues(): void
     {
         $sut = $this->createSut();
 

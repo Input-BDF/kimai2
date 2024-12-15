@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /*
  * This file is part of the Kimai time-tracking app.
  *
@@ -11,6 +9,7 @@ declare(strict_types=1);
 
 namespace App\API;
 
+use App\Activity\ActivityService;
 use App\Entity\Activity;
 use App\Entity\ActivityRate;
 use App\Entity\User;
@@ -19,95 +18,68 @@ use App\Form\API\ActivityApiEditForm;
 use App\Form\API\ActivityRateApiForm;
 use App\Repository\ActivityRateRepository;
 use App\Repository\ActivityRepository;
+use App\Repository\ProjectRepository;
 use App\Repository\Query\ActivityQuery;
 use App\Utils\SearchTerm;
 use FOS\RestBundle\Controller\Annotations as Rest;
 use FOS\RestBundle\Request\ParamFetcherInterface;
 use FOS\RestBundle\View\View;
 use FOS\RestBundle\View\ViewHandlerInterface;
-use HandcraftedInTheAlps\RestRoutingBundle\Controller\Annotations\RouteResource;
-use Nelmio\ApiDocBundle\Annotation\Security as ApiSecurity;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
-use Swagger\Annotations as SWG;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use OpenApi\Attributes as OA;
+use Psr\EventDispatcher\EventDispatcherInterface;
+use Symfony\Bridge\Doctrine\Attribute\MapEntity;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-/**
- * @RouteResource("Activity")
- * @SWG\Tag(name="Activity")
- *
- * @Security("is_granted('IS_AUTHENTICATED_REMEMBERED')")
- */
-class ActivityController extends BaseApiController
+#[Route(path: '/activities')]
+#[IsGranted('API')]
+#[OA\Tag(name: 'Activity')]
+final class ActivityController extends BaseApiController
 {
     public const GROUPS_ENTITY = ['Default', 'Entity', 'Activity', 'Activity_Entity'];
     public const GROUPS_FORM = ['Default', 'Entity', 'Activity'];
     public const GROUPS_COLLECTION = ['Default', 'Collection', 'Activity'];
     public const GROUPS_RATE = ['Default', 'Entity', 'Activity_Rate'];
 
-    /**
-     * @var ActivityRepository
-     */
-    private $repository;
-    /**
-     * @var ViewHandlerInterface
-     */
-    private $viewHandler;
-    /**
-     * @var EventDispatcherInterface
-     */
-    private $dispatcher;
-    /**
-     * @var ActivityRateRepository
-     */
-    private $activityRateRepository;
-
-    public function __construct(ViewHandlerInterface $viewHandler, ActivityRepository $repository, EventDispatcherInterface $dispatcher, ActivityRateRepository $activityRateRepository)
-    {
-        $this->viewHandler = $viewHandler;
-        $this->repository = $repository;
-        $this->dispatcher = $dispatcher;
-        $this->activityRateRepository = $activityRateRepository;
+    public function __construct(
+        private readonly ViewHandlerInterface $viewHandler,
+        private readonly ActivityRepository $repository,
+        private readonly EventDispatcherInterface $dispatcher,
+        private readonly ActivityRateRepository $activityRateRepository,
+        private readonly ActivityService $activityService
+    ) {
     }
 
     /**
-     * Returns a collection of activities
-     *
-     * @SWG\Response(
-     *      response=200,
-     *      description="Returns a collection of activity entities",
-     *      @SWG\Schema(
-     *          type="array",
-     *          @SWG\Items(ref="#/definitions/ActivityCollection")
-     *      )
-     * )
-     * @Rest\QueryParam(name="project", requirements="\d+", strict=true, nullable=true, description="Project ID to filter activities")
-     * @Rest\QueryParam(name="projects", requirements="[\d|,]+", strict=true, nullable=true, description="Comma separated list of project IDs to filter activities")
-     * @Rest\QueryParam(name="visible", requirements="1|2|3", strict=true, nullable=true, description="Visibility status to filter activities. Allowed values: 1=visible, 2=hidden, 3=all (default: 1)")
-     * @Rest\QueryParam(name="globals", requirements="true", strict=true, nullable=true, description="Use if you want to fetch only global activities. Allowed values: true (default: false)")
-     * @Rest\QueryParam(name="globalsFirst", requirements="true|false", strict=true, nullable=true, description="Deprecated parameter, value is not used any more")
-     * @Rest\QueryParam(name="orderBy", requirements="id|name|project", strict=true, nullable=true, description="The field by which results will be ordered. Allowed values: id, name, project (default: name)")
-     * @Rest\QueryParam(name="order", requirements="ASC|DESC", strict=true, nullable=true, description="The result order. Allowed values: ASC, DESC (default: ASC)")
-     * @Rest\QueryParam(name="term", description="Free search term")
-     *
-     * @ApiSecurity(name="apiUser")
-     * @ApiSecurity(name="apiToken")
+     * Returns a collection of activities (which are visible to the user)
      */
-    public function cgetAction(ParamFetcherInterface $paramFetcher): Response
+    #[OA\Response(response: 200, description: 'Returns a collection of activities', content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/ActivityCollection')))]
+    #[Route(methods: ['GET'], path: '', name: 'get_activities')]
+    #[Rest\QueryParam(name: 'project', requirements: '\d+', strict: true, nullable: true, description: 'Project ID to filter activities')]
+    #[Rest\QueryParam(name: 'projects', map: true, requirements: '\d+', strict: true, nullable: true, default: [], description: 'List of project IDs to filter activities, e.g.: projects[]=1&projects[]=2')]
+    #[Rest\QueryParam(name: 'visible', requirements: '1|2|3', default: 1, strict: true, nullable: true, description: 'Visibility status to filter activities: 1=visible, 2=hidden, 3=all')]
+    #[Rest\QueryParam(name: 'globals', strict: true, nullable: true, description: 'Use if you want to fetch only global activities. Allowed values: true (default: false)')]
+    #[Rest\QueryParam(name: 'orderBy', requirements: 'id|name|project', strict: true, nullable: true, description: 'The field by which results will be ordered. Allowed values: id, name, project (default: name)')]
+    #[Rest\QueryParam(name: 'order', requirements: 'ASC|DESC', strict: true, nullable: true, description: 'The result order. Allowed values: ASC, DESC (default: ASC)')]
+    #[Rest\QueryParam(name: 'term', description: 'Free search term')]
+    public function cgetAction(ParamFetcherInterface $paramFetcher, ProjectRepository $projectRepository): Response
     {
         /** @var User $user */
         $user = $this->getUser();
 
         $query = new ActivityQuery();
+        $query->loadTeams();
         $query->setCurrentUser($user);
 
-        if (null !== ($order = $paramFetcher->get('order'))) {
+        $order = $paramFetcher->get('order');
+        if (\is_string($order) && $order !== '') {
             $query->setOrder($order);
         }
 
-        if (null !== ($orderBy = $paramFetcher->get('orderBy'))) {
+        $orderBy = $paramFetcher->get('orderBy');
+        if (\is_string($orderBy) && $orderBy !== '') {
             $query->setOrderBy($orderBy);
         }
 
@@ -115,31 +87,32 @@ class ActivityController extends BaseApiController
             $query->setGlobalsOnly(true);
         }
 
-        if (null !== $paramFetcher->get('globalsFirst')) {
-            @trigger_error('API parameter globalsFirst is deprecated and will be removed with 2.0', E_USER_DEPRECATED);
+        /** @var array<int> $projects */
+        $projects = $paramFetcher->get('projects');
+        $project = $paramFetcher->get('project');
+        if (\is_string($project) && $project !== '') {
+            $projects[] = $project;
         }
 
-        if (!empty($projects = $paramFetcher->get('projects'))) {
-            if (!\is_array($projects)) {
-                $projects = explode(',', $projects);
+        foreach (array_unique($projects) as $projectId) {
+            $project = $projectRepository->find($projectId);
+            if ($project === null) {
+                throw $this->createNotFoundException('Unknown project: ' . $projectId);
             }
-            if (!empty($projects)) {
-                $query->setProjects($projects);
-            }
-        }
-
-        if (!empty($project = $paramFetcher->get('project'))) {
             $query->addProject($project);
         }
 
-        if (null !== ($visible = $paramFetcher->get('visible'))) {
-            $query->setVisibility($visible);
+        $visible = $paramFetcher->get('visible');
+        if (\is_string($visible) && $visible !== '') {
+            $query->setVisibility((int) $visible);
         }
 
-        if (!empty($term = $paramFetcher->get('term'))) {
+        $term = $paramFetcher->get('term');
+        if (\is_string($term) && $term !== '') {
             $query->setSearchTerm(new SearchTerm($term));
         }
 
+        $query->setIsApiCall(true);
         $data = $this->repository->getActivitiesForQuery($query);
         $view = new View($data, 200);
         $view->getContext()->setGroups(self::GROUPS_COLLECTION);
@@ -149,32 +122,14 @@ class ActivityController extends BaseApiController
 
     /**
      * Returns one activity
-     *
-     * @SWG\Response(
-     *      response=200,
-     *      description="Returns one activity entity",
-     *      @SWG\Schema(ref="#/definitions/ActivityEntity"),
-     * )
-     * @SWG\Parameter(
-     *      name="id",
-     *      in="path",
-     *      type="integer",
-     *      description="Activity ID to fetch",
-     *      required=true,
-     * )
-     *
-     * @ApiSecurity(name="apiUser")
-     * @ApiSecurity(name="apiToken")
      */
-    public function getAction(int $id): Response
+    #[OA\Response(response: 200, description: 'Returns one activity entity', content: new OA\JsonContent(ref: '#/components/schemas/ActivityEntity'))]
+    #[OA\Parameter(name: 'id', in: 'path', description: 'Activity ID to fetch', required: true)]
+    #[Route(methods: ['GET'], path: '/{id}', name: 'get_activity', requirements: ['id' => '\d+'])]
+    #[IsGranted('view', 'activity')]
+    public function getAction(Activity $activity): Response
     {
-        $data = $this->repository->find($id);
-
-        if (null === $data) {
-            throw new NotFoundException();
-        }
-
-        $view = new View($data, 200);
+        $view = new View($activity, 200);
         $view->getContext()->setGroups(self::GROUPS_ENTITY);
 
         return $this->viewHandler->handle($view);
@@ -182,29 +137,14 @@ class ActivityController extends BaseApiController
 
     /**
      * Creates a new activity
-     *
-     * @SWG\Post(
-     *      description="Creates a new activity and returns it afterwards",
-     *      @SWG\Response(
-     *          response=200,
-     *          description="Returns the new created activity",
-     *          @SWG\Schema(ref="#/definitions/ActivityEntity"),
-     *      )
-     * )
-     * @SWG\Parameter(
-     *      name="body",
-     *      in="body",
-     *      required=true,
-     *      @SWG\Schema(ref="#/definitions/ActivityEditForm")
-     * )
-     *
-     * @ApiSecurity(name="apiUser")
-     * @ApiSecurity(name="apiToken")
      */
+    #[OA\Post(description: 'Creates a new activity and returns it afterwards', responses: [new OA\Response(response: 200, description: 'Returns the new created activity', content: new OA\JsonContent(ref: '#/components/schemas/ActivityEntity'))])]
+    #[OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/ActivityEditForm'))]
+    #[Route(methods: ['POST'], path: '', name: 'post_activity')]
     public function postAction(Request $request): Response
     {
         if (!$this->isGranted('create_activity')) {
-            throw new AccessDeniedHttpException('User cannot create activities');
+            throw $this->createAccessDeniedException('User cannot create activities');
         }
 
         $activity = new Activity();
@@ -214,6 +154,7 @@ class ActivityController extends BaseApiController
 
         $form = $this->createForm(ActivityApiEditForm::class, $activity, [
             'include_budget' => $this->isGranted('budget', $activity),
+            'include_time' => $this->isGranted('time', $activity),
         ]);
 
         $form->submit($request->request->all());
@@ -235,49 +176,20 @@ class ActivityController extends BaseApiController
 
     /**
      * Update an existing activity
-     *
-     * @SWG\Patch(
-     *      description="Update an existing activity, you can pass all or just a subset of all attributes",
-     *      @SWG\Response(
-     *          response=200,
-     *          description="Returns the updated activity",
-     *          @SWG\Schema(ref="#/definitions/ActivityEntity")
-     *      )
-     * )
-     * @SWG\Parameter(
-     *      name="body",
-     *      in="body",
-     *      required=true,
-     *      @SWG\Schema(ref="#/definitions/ActivityEditForm")
-     * )
-     * @SWG\Parameter(
-     *      name="id",
-     *      in="path",
-     *      type="integer",
-     *      description="Activity ID to update",
-     *      required=true,
-     * )
-     *
-     * @ApiSecurity(name="apiUser")
-     * @ApiSecurity(name="apiToken")
      */
-    public function patchAction(Request $request, int $id): Response
+    #[IsGranted('edit', 'activity')]
+    #[OA\Patch(description: 'Update an existing activity, you can pass all or just a subset of all attributes', responses: [new OA\Response(response: 200, description: 'Returns the updated activity', content: new OA\JsonContent(ref: '#/components/schemas/ActivityEntity'))])]
+    #[OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/ActivityEditForm'))]
+    #[OA\Parameter(name: 'id', in: 'path', description: 'Activity ID to update', required: true)]
+    #[Route(methods: ['PATCH'], path: '/{id}', name: 'patch_activity', requirements: ['id' => '\d+'])]
+    public function patchAction(Request $request, Activity $activity): Response
     {
-        $activity = $this->repository->find($id);
-
-        if (null === $activity) {
-            throw new NotFoundException();
-        }
-
-        if (!$this->isGranted('edit', $activity)) {
-            throw new AccessDeniedHttpException('User cannot update activity');
-        }
-
         $event = new ActivityMetaDefinitionEvent($activity);
         $this->dispatcher->dispatch($event);
 
         $form = $this->createForm(ActivityApiEditForm::class, $activity, [
             'include_budget' => $this->isGranted('budget', $activity),
+            'include_time' => $this->isGranted('time', $activity),
         ]);
 
         $form->setData($activity);
@@ -299,38 +211,35 @@ class ActivityController extends BaseApiController
     }
 
     /**
-     * Sets the value of a meta-field for an existing activity
+     * Delete an existing activity
      *
-     * @SWG\Response(
-     *      response=200,
-     *      description="Sets the value of an existing/configured meta-field. You cannot create unknown meta-fields, if the given name is not a configured meta-field, this will return an exception.",
-     *      @SWG\Schema(ref="#/definitions/ActivityEntity")
-     * )
-     * @SWG\Parameter(
-     *      name="id",
-     *      in="path",
-     *      type="integer",
-     *      description="Activity record ID to set the meta-field value for",
-     *      required=true,
-     * )
-     * @Rest\RequestParam(name="name", strict=true, nullable=false, description="The meta-field name")
-     * @Rest\RequestParam(name="value", strict=true, nullable=false, description="The meta-field value")
-     *
-     * @ApiSecurity(name="apiUser")
-     * @ApiSecurity(name="apiToken")
+     * [DANGER] This will also delete ALL linked timesheets.
+     * Maybe use `PATCH` instead and mark it as inactive with `visible=false`?
      */
-    public function metaAction(int $id, ParamFetcherInterface $paramFetcher): Response
+    #[IsGranted('delete', 'activity')]
+    #[OA\Delete(responses: [new OA\Response(response: 204, description: 'Delete one activity')])]
+    #[OA\Parameter(name: 'id', description: 'Activity ID to delete', in: 'path', required: true)]
+    #[Route(path: '/{id}', name: 'delete_activity', requirements: ['id' => '\d+'], methods: ['DELETE'])]
+    public function deleteAction(Activity $activity): Response
     {
-        $activity = $this->repository->find($id);
+        $this->activityService->deleteActivity($activity);
 
-        if (null === $activity) {
-            throw new NotFoundException();
-        }
+        $view = new View(null, Response::HTTP_NO_CONTENT);
 
-        if (!$this->isGranted('edit', $activity)) {
-            throw new AccessDeniedHttpException('You are not allowed to update this activity');
-        }
+        return $this->viewHandler->handle($view);
+    }
 
+    /**
+     * Sets the value of a meta-field for an existing activity
+     */
+    #[IsGranted('edit', 'activity')]
+    #[OA\Response(response: 200, description: 'Sets the value of an existing/configured meta-field. You cannot create unknown meta-fields, if the given name is not a configured meta-field, this will return an exception.', content: new OA\JsonContent(ref: '#/components/schemas/ActivityEntity'))]
+    #[OA\Parameter(name: 'id', in: 'path', description: 'Activity record ID to set the meta-field value for', required: true)]
+    #[Route(methods: ['PATCH'], path: '/{id}/meta', requirements: ['id' => '\d+'])]
+    #[Rest\RequestParam(name: 'name', strict: true, nullable: false, description: 'The meta-field name')]
+    #[Rest\RequestParam(name: 'value', strict: true, nullable: false, description: 'The meta-field value')]
+    public function metaAction(Activity $activity, ParamFetcherInterface $paramFetcher): Response
+    {
         $event = new ActivityMetaDefinitionEvent($activity);
         $this->dispatcher->dispatch($event);
 
@@ -338,7 +247,7 @@ class ActivityController extends BaseApiController
         $value = $paramFetcher->get('value');
 
         if (null === ($meta = $activity->getMetaField($name))) {
-            throw new \InvalidArgumentException('Unknown meta-field requested');
+            throw $this->createNotFoundException('Unknown meta-field requested');
         }
 
         $meta->setValue($value);
@@ -353,39 +262,13 @@ class ActivityController extends BaseApiController
 
     /**
      * Returns a collection of all rates for one activity
-     *
-     * @SWG\Response(
-     *      response=200,
-     *      description="Returns a collection of activity rate entities",
-     *      @SWG\Schema(
-     *          type="array",
-     *          @SWG\Items(ref="#/definitions/ActivityRate")
-     *      )
-     * )
-     * @SWG\Parameter(
-     *      name="id",
-     *      in="path",
-     *      type="integer",
-     *      description="The activity whose rates will be returned",
-     *      required=true,
-     * )
-     *
-     * @ApiSecurity(name="apiUser")
-     * @ApiSecurity(name="apiToken")
      */
-    public function getRatesAction(int $id): Response
+    #[IsGranted('edit', 'activity')]
+    #[OA\Response(response: 200, description: 'Returns a collection of activity rate entities', content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/ActivityRate')))]
+    #[OA\Parameter(name: 'id', in: 'path', description: 'The activity whose rates will be returned', required: true)]
+    #[Route(methods: ['GET'], path: '/{id}/rates', name: 'get_activity_rates', requirements: ['id' => '\d+'])]
+    public function getRatesAction(Activity $activity): Response
     {
-        /** @var Activity|null $activity */
-        $activity = $this->repository->find($id);
-
-        if (null === $activity) {
-            throw new NotFoundException();
-        }
-
-        if (!$this->isGranted('edit', $activity)) {
-            throw new AccessDeniedHttpException('Access denied.');
-        }
-
         $rates = $this->activityRateRepository->getRatesForActivity($activity);
 
         $view = new View($rates, 200);
@@ -396,49 +279,16 @@ class ActivityController extends BaseApiController
 
     /**
      * Deletes one rate for an activity
-     *
-     * @SWG\Delete(
-     *      @SWG\Response(
-     *          response=204,
-     *          description="Returns no content: 204 on successful delete"
-     *      )
-     * )
-     * @SWG\Parameter(
-     *      name="id",
-     *      in="path",
-     *      type="integer",
-     *      description="The activity whose rate will be removed",
-     *      required=true,
-     * )
-     * @SWG\Parameter(
-     *      name="rateId",
-     *      in="path",
-     *      type="integer",
-     *      description="The rate to remove",
-     *      required=true,
-     * )
-     *
-     * @ApiSecurity(name="apiUser")
-     * @ApiSecurity(name="apiToken")
      */
-    public function deleteRateAction(string $id, string $rateId): Response
+    #[IsGranted('edit', 'activity')]
+    #[OA\Delete(responses: [new OA\Response(response: 204, description: 'Returns no content: 204 on successful delete')])]
+    #[OA\Parameter(name: 'id', in: 'path', description: 'The activity whose rate will be removed', required: true)]
+    #[OA\Parameter(name: 'rateId', in: 'path', description: 'The rate to remove', required: true)]
+    #[Route(methods: ['DELETE'], path: '/{id}/rates/{rateId}', name: 'delete_activity_rate', requirements: ['id' => '\d+', 'rateId' => '\d+'])]
+    public function deleteRateAction(Activity $activity, #[MapEntity(mapping: ['rateId' => 'id'])] ActivityRate $rate): Response
     {
-        /** @var Activity|null $activity */
-        $activity = $this->repository->find($id);
-
-        if (null === $activity) {
-            throw new NotFoundException();
-        }
-
-        if (!$this->isGranted('edit', $activity)) {
-            throw new AccessDeniedHttpException('Access denied.');
-        }
-
-        /** @var ActivityRate|null $rate */
-        $rate = $this->activityRateRepository->find($rateId);
-
-        if (null === $rate || $rate->getActivity() !== $activity) {
-            throw new NotFoundException();
+        if ($rate->getActivity() !== $activity) {
+            throw $this->createNotFoundException();
         }
 
         $this->activityRateRepository->deleteRate($rate);
@@ -450,44 +300,14 @@ class ActivityController extends BaseApiController
 
     /**
      * Adds a new rate to an activity
-     *
-     * @SWG\Post(
-     *  @SWG\Response(
-     *      response=200,
-     *      description="Returns the new created rate",
-     *      @SWG\Schema(ref="#/definitions/ActivityRate")
-     *  )
-     * )
-     * @SWG\Parameter(
-     *      name="id",
-     *      in="path",
-     *      type="integer",
-     *      description="The activity to add the rate for",
-     *      required=true,
-     * )
-     * @SWG\Parameter(
-     *      name="body",
-     *      in="body",
-     *      required=true,
-     *      @SWG\Schema(ref="#/definitions/ActivityRateForm")
-     * )
-     *
-     * @ApiSecurity(name="apiUser")
-     * @ApiSecurity(name="apiToken")
      */
-    public function postRateAction(int $id, Request $request): Response
+    #[IsGranted('edit', 'activity')]
+    #[OA\Post(responses: [new OA\Response(response: 200, description: 'Returns the new created rate', content: new OA\JsonContent(ref: '#/components/schemas/ActivityRate'))])]
+    #[OA\Parameter(name: 'id', in: 'path', description: 'The activity to add the rate for', required: true)]
+    #[OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/ActivityRateForm'))]
+    #[Route(methods: ['POST'], path: '/{id}/rates', name: 'post_activity_rate', requirements: ['id' => '\d+'])]
+    public function postRateAction(Activity $activity, Request $request): Response
     {
-        /** @var Activity|null $activity */
-        $activity = $this->repository->find($id);
-
-        if (null === $activity) {
-            throw new NotFoundException();
-        }
-
-        if (!$this->isGranted('edit', $activity)) {
-            throw new AccessDeniedHttpException('Access denied.');
-        }
-
         $rate = new ActivityRate();
         $rate->setActivity($activity);
 

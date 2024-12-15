@@ -12,74 +12,61 @@ namespace App\Repository;
 use App\Entity\Activity;
 use App\Entity\Project;
 use App\Entity\ProjectComment;
+use App\Entity\ProjectMeta;
 use App\Entity\Team;
 use App\Entity\Timesheet;
 use App\Entity\User;
-use App\Model\ProjectStatistic;
 use App\Repository\Loader\ProjectLoader;
-use App\Repository\Paginator\LoaderPaginator;
+use App\Repository\Paginator\LoaderQueryPaginator;
 use App\Repository\Paginator\PaginatorInterface;
 use App\Repository\Query\ProjectFormTypeQuery;
 use App\Repository\Query\ProjectQuery;
+use App\Repository\Query\ProjectQueryHydrate;
+use App\Utils\Pagination;
 use DateTime;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityRepository;
-use Doctrine\ORM\ORMException;
+use Doctrine\ORM\Exception\ORMException;
+use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Query;
+use Doctrine\ORM\Query\Expr\Andx;
 use Doctrine\ORM\QueryBuilder;
-use Pagerfanta\Pagerfanta;
 
 /**
  * @extends \Doctrine\ORM\EntityRepository<Project>
  */
 class ProjectRepository extends EntityRepository
 {
-    /**
-     * @param mixed $id
-     * @param null $lockMode
-     * @param null $lockVersion
-     * @return Project|null
-     */
-    public function find($id, $lockMode = null, $lockVersion = null)
-    {
-        /** @var Project|null $project */
-        $project = parent::find($id, $lockMode, $lockVersion);
-        if (null === $project) {
-            return null;
-        }
-
-        $loader = new ProjectLoader($this->getEntityManager(), true);
-        $loader->loadResults([$project]);
-
-        return $project;
-    }
+    use RepositorySearchTrait;
 
     /**
      * @param int[] $projectIds
-     * @return Project[]
+     * @return array<Project>
      */
-    public function findByIds(array $projectIds)
+    public function findByIds(array $projectIds): array
     {
+        $ids = array_filter(
+            array_unique($projectIds),
+            function ($value) {
+                return $value > 0;
+            }
+        );
+
+        if (\count($ids) === 0) {
+            return [];
+        }
+
         $qb = $this->createQueryBuilder('p');
         $qb
             ->where($qb->expr()->in('p.id', ':id'))
-            ->setParameter('id', $projectIds)
+            ->setParameter('id', $ids)
         ;
 
-        $projects = $qb->getQuery()->getResult();
-
-        $loader = new ProjectLoader($qb->getEntityManager(), true);
-        $loader->loadResults($projects);
-
-        return $projects;
+        return $this->getProjects($this->prepareProjectQuery($qb->getQuery()));
     }
 
-    /**
-     * @param Project $project
-     * @throws ORMException
-     * @throws \Doctrine\ORM\OptimisticLockException
-     */
-    public function saveProject(Project $project)
+    public function saveProject(Project $project): void
     {
         $entityManager = $this->getEntityManager();
         $entityManager->persist($project);
@@ -87,111 +74,43 @@ class ProjectRepository extends EntityRepository
     }
 
     /**
-     * @param null|bool $visible
-     * @return int
+     * @return int<0, max>
      */
-    public function countProject($visible = null)
+    public function countProject(?bool $visible = null): int
     {
         if (null !== $visible) {
-            return $this->count(['visible' => (bool) $visible]);
+            return $this->count(['visible' => $visible]);
         }
 
         return $this->count([]);
     }
 
     /**
-     * @deprecated since 1.15 use ProjectStatisticService::getProjectStatistics() instead - will be removed with 2.0
-     * @codeCoverageIgnore
-     *
-     * @param Project $project
-     * @param DateTime|null $begin
-     * @param DateTime|null $end
-     * @return ProjectStatistic
-     * @throws \Doctrine\ORM\NonUniqueResultException
+     * @param array<Team> $teams
      */
-    public function getProjectStatistics(Project $project, ?DateTime $begin = null, ?DateTime $end = null): ProjectStatistic
+    public function addPermissionCriteria(QueryBuilder $qb, ?User $user = null, array $teams = []): void
     {
-        $qb = $this->getEntityManager()->createQueryBuilder();
-        $qb
-            ->from(Timesheet::class, 't')
-            ->addSelect('COUNT(t.id) as amount')
-            ->addSelect('COALESCE(SUM(t.duration), 0) as duration')
-            ->addSelect('COALESCE(SUM(t.rate), 0) as rate')
-            ->addSelect('COALESCE(SUM(t.internalRate), 0) as internal_rate')
-            ->andWhere('t.project = :project')
-            ->setParameter('project', $project)
-        ;
-
-        // to calculate a budget at a certain point in time
-        if (null !== $end) {
-            $qb->andWhere($qb->expr()->lte('t.end', ':end'))
-                ->setParameter('end', $end);
+        $permissions = $this->getPermissionCriteria($qb, $user, $teams);
+        if ($permissions->count() > 0) {
+            $qb->andWhere($permissions);
         }
-
-        $timesheetResult = $qb->getQuery()->getOneOrNullResult();
-
-        $stats = new ProjectStatistic();
-
-        if (null !== $timesheetResult) {
-            $stats->setCounter($timesheetResult['amount']);
-            $stats->setRecordDuration($timesheetResult['duration']);
-            $stats->setRecordRate($timesheetResult['rate']);
-            $stats->setRecordInternalRate($timesheetResult['internal_rate']);
-        }
-
-        $qb = $this->getEntityManager()->createQueryBuilder();
-        $qb
-            ->from(Timesheet::class, 't')
-            ->addSelect('COUNT(t.id) as amount')
-            ->addSelect('COALESCE(SUM(t.duration), 0) as duration')
-            ->addSelect('COALESCE(SUM(t.rate), 0) as rate')
-            ->andWhere('t.project = :project')
-            ->andWhere('t.billable = :billable')
-            ->setParameter('project', $project)
-            ->setParameter('billable', true, Types::BOOLEAN)
-        ;
-
-        // to calculate a budget at a certain point in time
-        if (null !== $end) {
-            $qb->andWhere($qb->expr()->lte('t.end', ':end'))
-                ->setParameter('end', $end);
-        }
-
-        $timesheetResult = $qb->getQuery()->getOneOrNullResult();
-
-        if (null !== $timesheetResult) {
-            $stats->setDurationBillable($timesheetResult['duration']);
-            $stats->setRateBillable($timesheetResult['rate']);
-            $stats->setRecordAmountBillable($timesheetResult['amount']);
-        }
-
-        $qb = $this->getEntityManager()->createQueryBuilder();
-        $qb
-            ->from(Activity::class, 'a')
-            ->select('COUNT(a.id) as amount')
-            ->andWhere('a.project = :project')
-            ->setParameter('project', $project)
-        ;
-
-        $resultActivities = $qb->getQuery()->getOneOrNullResult();
-
-        if (null !== $resultActivities) {
-            $stats->setActivityAmount($resultActivities['amount']);
-        }
-
-        return $stats;
     }
 
-    public function addPermissionCriteria(QueryBuilder $qb, ?User $user = null, array $teams = [])
+    /**
+     * @param array<Team> $teams
+     */
+    private function getPermissionCriteria(QueryBuilder $qb, ?User $user = null, array $teams = []): Andx
     {
+        $andX = $qb->expr()->andX();
+
         // make sure that all queries without a user see all projects
         if (null === $user && empty($teams)) {
-            return;
+            return $andX;
         }
 
         // make sure that admins see all projects
         if (null !== $user && $user->canSeeAllData()) {
-            return;
+            return $andX;
         }
 
         if (null !== $user) {
@@ -199,49 +118,37 @@ class ProjectRepository extends EntityRepository
         }
 
         if (empty($teams)) {
-            $qb->andWhere('SIZE(c.teams) = 0');
-            $qb->andWhere('SIZE(p.teams) = 0');
+            $andX->add('SIZE(c.teams) = 0');
+            $andX->add('SIZE(p.teams) = 0');
 
-            return;
+            return $andX;
         }
 
         $orProject = $qb->expr()->orX(
             'SIZE(p.teams) = 0',
             $qb->expr()->isMemberOf(':teams', 'p.teams')
         );
-        $qb->andWhere($orProject);
+        $andX->add($orProject);
 
         $orCustomer = $qb->expr()->orX(
             'SIZE(c.teams) = 0',
             $qb->expr()->isMemberOf(':teams', 'c.teams')
         );
-        $qb->andWhere($orCustomer);
+        $andX->add($orCustomer);
 
         $ids = array_values(array_unique(array_map(function (Team $team) {
             return $team->getId();
         }, $teams)));
 
         $qb->setParameter('teams', $ids);
-    }
 
-    /**
-     * @deprecated since 1.1 - use getQueryBuilderForFormType() istead - will be removed with 2.0
-     * @codeCoverageIgnore
-     */
-    public function builderForEntityType($project, $customer)
-    {
-        $query = new ProjectFormTypeQuery();
-        $query->addProject($project);
-        $query->addCustomer($customer);
-
-        return $this->getQueryBuilderForFormType($query);
+        return $andX;
     }
 
     /**
      * Returns a query builder that is used for ProjectType and your own 'query_builder' option.
      *
-     * @param ProjectFormTypeQuery $query
-     * @return QueryBuilder
+     * @internal
      */
     public function getQueryBuilderForFormType(ProjectFormTypeQuery $query): QueryBuilder
     {
@@ -259,57 +166,46 @@ class ProjectRepository extends EntityRepository
             $qb->addSelect('c');
         }
 
-        $qb->andWhere($qb->expr()->eq('p.visible', ':visible'));
-        $qb->andWhere($qb->expr()->eq('c.visible', ':customer_visible'));
+        $mainQuery = $qb->expr()->andX();
+
+        $mainQuery->add($qb->expr()->eq('p.visible', ':visible'));
+        $qb->setParameter('visible', true, ParameterType::BOOLEAN);
+
+        $mainQuery->add($qb->expr()->eq('c.visible', ':customer_visible'));
+        $qb->setParameter('customer_visible', true, ParameterType::BOOLEAN);
 
         if (!$query->isIgnoreDate()) {
-            $now = new DateTime();
-            $qb->andWhere(
-                $qb->expr()->andX(
-                    $qb->expr()->orX(
-                        $qb->expr()->lte('p.start', ':start'),
-                        $qb->expr()->isNull('p.start')
-                    ),
-                    $qb->expr()->orX(
-                        $qb->expr()->gte('p.end', ':start'),
-                        $qb->expr()->isNull('p.end')
-                    )
-                )
-            )->setParameter('start', $now);
-
-            $qb->andWhere(
-                $qb->expr()->andX(
-                    $qb->expr()->orX(
-                        $qb->expr()->gte('p.end', ':end'),
-                        $qb->expr()->isNull('p.end')
-                    ),
-                    $qb->expr()->orX(
-                        $qb->expr()->lte('p.start', ':end'),
-                        $qb->expr()->isNull('p.start')
-                    )
-                )
-            )->setParameter('end', $now);
-        }
-
-        $qb->setParameter('visible', true, \PDO::PARAM_BOOL);
-        $qb->setParameter('customer_visible', true, \PDO::PARAM_BOOL);
-
-        if ($query->hasProjects()) {
-            $qb->orWhere($qb->expr()->in('p.id', ':project'))
-                ->setParameter('project', $query->getProjects());
+            $andx = $this->addProjectStartAndEndDate($qb, $query->getProjectStart(), $query->getProjectEnd());
+            $mainQuery->add($andx);
         }
 
         if ($query->hasCustomers()) {
-            $qb->andWhere($qb->expr()->in('p.customer', ':customer'))
-                ->setParameter('customer', $query->getCustomers());
+            $mainQuery->add($qb->expr()->in('p.customer', ':customer'));
+            $qb->setParameter('customer', $query->getCustomers());
+        }
+
+        $permissions = $this->getPermissionCriteria($qb, $query->getUser(), $query->getTeams());
+        if ($permissions->count() > 0) {
+            $mainQuery->add($permissions);
+        }
+
+        $outerQuery = $qb->expr()->orX();
+
+        if ($query->hasProjects()) {
+            $outerQuery->add($qb->expr()->in('p.id', ':project'));
+            $qb->setParameter('project', $query->getProjects());
         }
 
         if (null !== $query->getProjectToIgnore()) {
-            $qb->andWhere($qb->expr()->neq('p.id', ':ignored'));
+            $mainQuery = $qb->expr()->andX(
+                $mainQuery,
+                $qb->expr()->neq('p.id', ':ignored')
+            );
             $qb->setParameter('ignored', $query->getProjectToIgnore());
         }
 
-        $this->addPermissionCriteria($qb, $query->getUser(), $query->getTeams());
+        $outerQuery->add($mainQuery);
+        $qb->andWhere($outerQuery);
 
         return $qb;
     }
@@ -323,6 +219,10 @@ class ProjectRepository extends EntityRepository
             ->from(Project::class, 'p')
             ->leftJoin('p.customer', 'c')
         ;
+
+        if (\count($query->getProjectIds()) > 0) {
+            $qb->andWhere($qb->expr()->in('p.id', ':id'))->setParameter('id', $query->getProjectIds());
+        }
 
         foreach ($query->getOrderGroups() as $orderBy => $order) {
             switch ($orderBy) {
@@ -349,17 +249,22 @@ class ProjectRepository extends EntityRepository
             ;
 
             if ($query->isShowVisible()) {
-                $qb->setParameter('visible', true, \PDO::PARAM_BOOL);
+                $qb->setParameter('visible', true, ParameterType::BOOLEAN);
             } elseif ($query->isShowHidden()) {
-                $qb->setParameter('visible', false, \PDO::PARAM_BOOL);
+                $qb->setParameter('visible', false, ParameterType::BOOLEAN);
             }
 
-            $qb->setParameter('customer_visible', true, \PDO::PARAM_BOOL);
+            $qb->setParameter('customer_visible', true, ParameterType::BOOLEAN);
         }
 
         if ($query->hasCustomers()) {
             $qb->andWhere($qb->expr()->in('p.customer', ':customer'))
-                ->setParameter('customer', $query->getCustomers());
+                ->setParameter('customer', $query->getCustomerIds());
+        }
+
+        if ($query->getGlobalActivities() !== null) {
+            $qb->andWhere($qb->expr()->eq('p.globalActivities', ':globalActivities'))
+                ->setParameter('globalActivities', $query->getGlobalActivities(), Types::BOOLEAN);
         }
 
         // this is far from being perfect, possible enhancements:
@@ -369,77 +274,78 @@ class ProjectRepository extends EntityRepository
         // begin < to and end = null
         // begin > from and end < to
         // ... and more ...
-
-        $begin = $query->getProjectStart();
-        $end = $query->getProjectEnd();
-
-        if (null !== $begin) {
-            $qb->andWhere(
-                $qb->expr()->andX(
-                    $qb->expr()->orX(
-                        $qb->expr()->lte('p.start', ':start'),
-                        $qb->expr()->isNull('p.start')
-                    ),
-                    $qb->expr()->orX(
-                        $qb->expr()->gte('p.end', ':start'),
-                        $qb->expr()->isNull('p.end')
-                    )
-                )
-            )->setParameter('start', $query->getProjectStart());
-        }
-
-        if (null !== $end) {
-            $qb->andWhere(
-                $qb->expr()->andX(
-                    $qb->expr()->orX(
-                        $qb->expr()->gte('p.end', ':end'),
-                        $qb->expr()->isNull('p.end')
-                    ),
-                    $qb->expr()->orX(
-                        $qb->expr()->lte('p.start', ':end'),
-                        $qb->expr()->isNull('p.start')
-                    )
-                )
-            )->setParameter('end', $query->getProjectEnd());
+        $times = $this->addProjectStartAndEndDate($qb, $query->getProjectStart(), $query->getProjectEnd());
+        if ($times->count() > 0) {
+            $qb->andWhere($times);
         }
 
         $this->addPermissionCriteria($qb, $query->getCurrentUser());
 
-        if ($query->hasSearchTerm()) {
-            $searchAnd = $qb->expr()->andX();
-            $searchTerm = $query->getSearchTerm();
-
-            foreach ($searchTerm->getSearchFields() as $metaName => $metaValue) {
-                $qb->leftJoin('p.meta', 'meta');
-                $searchAnd->add(
-                    $qb->expr()->andX(
-                        $qb->expr()->eq('meta.name', ':metaName'),
-                        $qb->expr()->like('meta.value', ':metaValue')
-                    )
-                );
-                $qb->setParameter('metaName', $metaName);
-                $qb->setParameter('metaValue', '%' . $metaValue . '%');
-            }
-
-            if ($searchTerm->hasSearchTerm()) {
-                $searchAnd->add(
-                    $qb->expr()->orX(
-                        $qb->expr()->like('p.name', ':searchTerm'),
-                        $qb->expr()->like('p.comment', ':searchTerm'),
-                        $qb->expr()->like('p.orderNumber', ':searchTerm')
-                    )
-                );
-                $qb->setParameter('searchTerm', '%' . $searchTerm->getSearchTerm() . '%');
-            }
-
-            if ($searchAnd->count() > 0) {
-                $qb->andWhere($searchAnd);
-            }
-        }
+        $this->addSearchTerm($qb, $query);
 
         return $qb;
     }
 
+    private function getMetaFieldClass(): string
+    {
+        return ProjectMeta::class;
+    }
+
+    private function getMetaFieldName(): string
+    {
+        return 'project';
+    }
+
+    /**
+     * @return array<string>
+     */
+    private function getSearchableFields(): array
+    {
+        return ['p.name', 'p.comment', 'p.orderNumber', 'p.number'];
+    }
+
+    private function addProjectStartAndEndDate(QueryBuilder $qb, ?DateTime $begin, ?DateTime $end): Andx
+    {
+        $and = $qb->expr()->andX();
+
+        if (null !== $begin) {
+            $and->add(
+                $qb->expr()->andX(
+                    $qb->expr()->orX(
+                        $qb->expr()->lte('DATE(p.start)', 'DATE(:start)'),
+                        $qb->expr()->isNull('p.start')
+                    ),
+                    $qb->expr()->orX(
+                        $qb->expr()->gte('DATE(p.end)', 'DATE(:start)'),
+                        $qb->expr()->isNull('p.end')
+                    )
+                )
+            );
+            $qb->setParameter('start', $begin);
+        }
+
+        if (null !== $end) {
+            $and->add(
+                $qb->expr()->andX(
+                    $qb->expr()->orX(
+                        $qb->expr()->gte('DATE(p.end)', 'DATE(:end)'),
+                        $qb->expr()->isNull('p.end')
+                    ),
+                    $qb->expr()->orX(
+                        $qb->expr()->lte('DATE(p.start)', 'DATE(:end)'),
+                        $qb->expr()->isNull('p.start')
+                    )
+                )
+            );
+            $qb->setParameter('end', $end);
+        }
+
+        return $and;
+    }
+
+    /**
+     * @return int<0, max>
+     */
     public function countProjectsForQuery(ProjectQuery $query): int
     {
         $qb = $this->getQueryBuilderForQuery($query);
@@ -450,46 +356,49 @@ class ProjectRepository extends EntityRepository
             ->select($qb->expr()->countDistinct('p.id'))
         ;
 
-        return (int) $qb->getQuery()->getSingleScalarResult();
+        return (int) $qb->getQuery()->getSingleScalarResult(); // @phpstan-ignore-line
     }
 
-    public function getPagerfantaForQuery(ProjectQuery $query): Pagerfanta
+    public function getPagerfantaForQuery(ProjectQuery $query): Pagination
     {
-        $paginator = new Pagerfanta($this->getPaginatorForQuery($query));
-        $paginator->setMaxPerPage($query->getPageSize());
-        $paginator->setCurrentPage($query->getPage());
-
-        return $paginator;
-    }
-
-    private function getPaginatorForQuery(ProjectQuery $query): PaginatorInterface
-    {
-        $counter = $this->countProjectsForQuery($query);
-        $qb = $this->getQueryBuilderForQuery($query);
-
-        return new LoaderPaginator(new ProjectLoader($qb->getEntityManager()), $qb, $counter);
+        return new Pagination($this->getPaginatorForQuery($query), $query);
     }
 
     /**
-     * @param ProjectQuery $query
+     * @return PaginatorInterface<Project>
+     */
+    private function getPaginatorForQuery(ProjectQuery $projectQuery): PaginatorInterface
+    {
+        $counter = $this->countProjectsForQuery($projectQuery);
+        $query = $this->createProjectQuery($projectQuery);
+
+        return new LoaderQueryPaginator(new ProjectLoader($this->getEntityManager(), false, true), $query, $counter);
+    }
+
+    /**
      * @return Project[]
      */
-    public function getProjectsForQuery(ProjectQuery $query): iterable
+    public function getProjectsForQuery(ProjectQuery $query): array
     {
-        $qb = $this->getQueryBuilderForQuery($query);
-        $results = $qb->getQuery()->execute();
-        $loader = new ProjectLoader($qb->getEntityManager());
-        $loader->loadResults($results);
-
-        return $results;
+        return $this->getProjects($this->createProjectQuery($query));
     }
 
     /**
-     * @param Project $delete
-     * @param Project|null $replace
-     * @throws \Doctrine\ORM\ORMException
+     * @param Query<Project> $query
+     * @return Project[]
      */
-    public function deleteProject(Project $delete, ?Project $replace = null)
+    public function getProjects(Query $query): array
+    {
+        /** @var array<Project> $projects */
+        $projects = $query->execute();
+
+        $loader = new ProjectLoader($this->getEntityManager(), false, true);
+        $loader->loadResults($projects);
+
+        return $projects;
+    }
+
+    public function deleteProject(Project $delete, ?Project $replace = null): void
     {
         $em = $this->getEntityManager();
         $em->beginTransaction();
@@ -526,6 +435,9 @@ class ProjectRepository extends EntityRepository
         }
     }
 
+    /**
+     * @return array<ProjectComment>
+     */
     public function getComments(Project $project): array
     {
         $qb = $this->getEntityManager()->createQueryBuilder();
@@ -541,17 +453,58 @@ class ProjectRepository extends EntityRepository
         return $qb->getQuery()->getResult();
     }
 
-    public function saveComment(ProjectComment $comment)
+    public function saveComment(ProjectComment $comment): void
     {
         $entityManager = $this->getEntityManager();
         $entityManager->persist($comment);
         $entityManager->flush();
     }
 
-    public function deleteComment(ProjectComment $comment)
+    public function deleteComment(ProjectComment $comment): void
     {
         $entityManager = $this->getEntityManager();
         $entityManager->remove($comment);
         $entityManager->flush();
+    }
+
+    /**
+     * @return Query<Project>
+     */
+    private function createProjectQuery(ProjectQuery $projectQuery): Query
+    {
+        $query = $this->getQueryBuilderForQuery($projectQuery)->getQuery();
+        $query = $this->prepareProjectQuery($query);
+
+        foreach ($projectQuery->getHydrate() as $hydrate) {
+            switch ($hydrate) {
+                case ProjectQueryHydrate::TEAMS:
+                    // does not yet work, see https://github.com/doctrine/orm/pull/8391
+                    // $query->setFetchMode(Project::class, 'teams', ClassMetadata::FETCH_EAGER);
+                    break;
+
+                case ProjectQueryHydrate::TEAM_MEMBER:
+                    // does not yet work, see https://github.com/doctrine/orm/issues/11254
+                    // $query->setFetchMode(Project::class, 'teams', ClassMetadata::FETCH_EAGER);
+                    // $query->setFetchMode(Team::class, 'members', ClassMetadata::FETCH_EAGER);
+                    // $query->setFetchMode(TeamMember::class, 'user', ClassMetadata::FETCH_EAGER);
+                    break;
+            }
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param Query<Project> $query
+     * @return Query<Project>
+     */
+    public function prepareProjectQuery(Query $query): Query
+    {
+        $this->getEntityManager()->getConfiguration()->setEagerFetchBatchSize(300);
+
+        $query->setFetchMode(Project::class, 'meta', ClassMetadata::FETCH_EAGER);
+        $query->setFetchMode(Project::class, 'customer', ClassMetadata::FETCH_EAGER);
+
+        return $query;
     }
 }

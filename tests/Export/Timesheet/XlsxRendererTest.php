@@ -21,14 +21,15 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
  */
 class XlsxRendererTest extends AbstractRendererTest
 {
-    public function testConfiguration()
+    public function testConfiguration(): void
     {
         $sut = $this->getAbstractRenderer(XlsxRenderer::class);
 
         $this->assertEquals('xlsx', $sut->getId());
+        $this->assertEquals('xlsx', $sut->getTitle());
     }
 
-    public function testRender()
+    public function testRender(): void
     {
         $sut = $this->getAbstractRenderer(XlsxRenderer::class);
 
@@ -36,8 +37,9 @@ class XlsxRendererTest extends AbstractRendererTest
         $response = $this->render($sut);
 
         $file = $response->getFile();
+        $prefix = date('Ymd');
         $this->assertEquals('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $response->headers->get('Content-Type'));
-        $this->assertEquals('attachment; filename=kimai-export.xlsx', $response->headers->get('Content-Disposition'));
+        $this->assertEquals('attachment; filename=' . $prefix . '-Customer_Name-project_name.xlsx', $response->headers->get('Content-Disposition'));
 
         $this->assertTrue(file_exists($file->getRealPath()));
 

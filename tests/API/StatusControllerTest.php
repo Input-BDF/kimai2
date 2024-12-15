@@ -17,22 +17,22 @@ use App\Entity\User;
  */
 class StatusControllerTest extends APIControllerBaseTest
 {
-    public function testIsSecurePing()
+    public function testIsSecurePing(): void
     {
         $this->assertUrlIsSecured('/api/ping');
     }
 
-    public function testIsSecureVersion()
+    public function testIsSecureVersion(): void
     {
         $this->assertUrlIsSecured('/api/version');
     }
 
-    public function testIsSecurePlugins()
+    public function testIsSecurePlugins(): void
     {
         $this->assertUrlIsSecured('/api/plugins');
     }
 
-    public function testPing()
+    public function testPing(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->assertAccessIsGranted($client, '/api/ping');
@@ -42,7 +42,7 @@ class StatusControllerTest extends APIControllerBaseTest
         $this->assertEquals(['message' => 'pong'], $result);
     }
 
-    public function testVersion()
+    public function testVersion(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->assertAccessIsGranted($client, '/api/version');
@@ -52,28 +52,23 @@ class StatusControllerTest extends APIControllerBaseTest
 
         $this->assertArrayHasKey('version', $result);
         $this->assertArrayHasKey('versionId', $result);
-        $this->assertArrayHasKey('candidate', $result);
-        $this->assertArrayHasKey('semver', $result);
-        $this->assertArrayHasKey('name', $result);
         $this->assertArrayHasKey('copyright', $result);
 
         $this->assertSame(Constants::VERSION, $result['version']);
         $this->assertSame(Constants::VERSION_ID, $result['versionId']);
-        $this->assertEquals(Constants::STATUS, $result['candidate']);
-        $this->assertEquals(Constants::VERSION . '-' . Constants::STATUS, $result['semver']);
-        $this->assertEquals(Constants::NAME, $result['name']);
         $this->assertEquals(
-            'Kimai ' . Constants::VERSION . ' by Kevin Papst and contributors.',
+            'Kimai ' . Constants::VERSION . ' by Kevin Papst.',
             $result['copyright']
         );
     }
 
-    public function testPlugins()
+    public function testPlugins(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->assertAccessIsGranted($client, '/api/plugins');
         $result = json_decode($client->getResponse()->getContent(), true);
 
         $this->assertIsArray($result);
+        // no asserts, as plugins are disabled in tests
     }
 }

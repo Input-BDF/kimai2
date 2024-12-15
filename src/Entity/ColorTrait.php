@@ -18,23 +18,15 @@ use JMS\Serializer\Annotation as Serializer;
 trait ColorTrait
 {
     /**
-     * The assigned color in HTML hex format, eg. #dd1d00
-     *
-     * @var string
-     *
-     * @Serializer\Expose()
-     * @Serializer\Groups({"Default"})
-     *
-     * @Exporter\Expose(label="label.color")
-     *
-     * @ORM\Column(name="color", type="string", length=7, nullable=true)
-     * @Constraints\HexColor()
+     * The assigned color in HTML hex format, e.g. #dd1d00
      */
-    private $color = null;
+    #[ORM\Column(name: 'color', type: 'string', length: 7, nullable: true)]
+    #[Serializer\Expose]
+    #[Serializer\Groups(['Default'])]
+    #[Exporter\Expose(label: 'color')]
+    #[Constraints\HexColor]
+    private ?string $color = null;
 
-    /**
-     * @return string
-     */
     public function getColor(): ?string
     {
         if ($this->color === Constants::DEFAULT_COLOR) {
@@ -49,9 +41,6 @@ trait ColorTrait
         return null !== $this->color && $this->color !== Constants::DEFAULT_COLOR;
     }
 
-    /**
-     * @param string $color
-     */
     public function setColor(?string $color = null): void
     {
         $this->color = $color;

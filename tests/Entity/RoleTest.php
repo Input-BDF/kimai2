@@ -17,18 +17,27 @@ use PHPUnit\Framework\TestCase;
  */
 class RoleTest extends TestCase
 {
-    public function testDefaultValues()
+    public function testDefaultValues(): void
     {
         $sut = new Role();
         self::assertNull($sut->getId());
         self::assertNull($sut->getName());
+        self::assertFalse($sut->isUser());
     }
 
-    public function testSetterAndGetter()
+    public function testSetterAndGetter(): void
     {
         $sut = new Role();
 
-        self::assertInstanceOf(Role::class, $sut->setName('foo'));
-        self::assertEquals('foo', $sut->getName());
+        $sut->setName('foo');
+        self::assertEquals('FOO', $sut->getName());
+        self::assertFalse($sut->isUser());
+
+        $sut->setName('BAR');
+        self::assertEquals('BAR', $sut->getName());
+        self::assertFalse($sut->isUser());
+
+        $sut->setName('ROLE_USER');
+        self::assertTrue($sut->isUser());
     }
 }

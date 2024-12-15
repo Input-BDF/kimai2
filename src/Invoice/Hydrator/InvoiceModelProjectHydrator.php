@@ -10,44 +10,65 @@
 namespace App\Invoice\Hydrator;
 
 use App\Entity\Project;
-use App\Invoice\InvoiceFormatter;
 use App\Invoice\InvoiceModel;
 use App\Invoice\InvoiceModelHydrator;
+use App\Project\ProjectStatisticService;
 
-class InvoiceModelProjectHydrator implements InvoiceModelHydrator
+final class InvoiceModelProjectHydrator implements InvoiceModelHydrator
 {
+    use BudgetHydratorTrait;
+
+    public function __construct(private ProjectStatisticService $projectStatistic)
+    {
+    }
+
     public function hydrate(InvoiceModel $model): array
     {
-        if (!$model->getQuery()->hasProjects()) {
+        $projects = [];
+
+        foreach ($model->getEntries() as $entry) {
+            if ($entry->getProject() === null) {
+                continue;
+            }
+
+            $key = 'P_' . $entry->getProject()->getId();
+            if (!\array_key_exists($key, $projects)) {
+                $projects[$key] = $entry->getProject();
+            }
+        }
+
+        if (\count($projects) === 0) {
             return [];
         }
 
-        $formatter = $model->getFormatter();
-        $currency = $model->getCurrency();
+        $projects = array_values($projects);
 
         $values = [];
         $i = 0;
 
-        foreach ($model->getQuery()->getProjects() as $project) {
+        foreach ($projects as $project) {
             $prefix = '';
             if ($i > 0) {
                 $prefix = $i . '.';
             }
-            $values = array_merge($values, $this->getValuesFromProject($project, $formatter, $currency, $prefix));
+            $values = array_merge($values, $this->getValuesFromProject($model, $project, $prefix));
             $i++;
         }
 
         return $values;
     }
 
-    private function getValuesFromProject(Project $project, InvoiceFormatter $formatter, string $currency, string $prefix): array
+    private function getValuesFromProject(InvoiceModel $model, Project $project, string $prefix): array
     {
         $prefix = 'project.' . $prefix;
 
+        $formatter = $model->getFormatter();
+        $currency = $model->getCurrency();
+
         $values = [
             $prefix . 'id' => $project->getId(),
-            $prefix . 'name' => $project->getName(),
-            $prefix . 'comment' => $project->getComment(),
+            $prefix . 'name' => $project->getName() ?? '',
+            $prefix . 'comment' => $project->getComment() ?? '',
             $prefix . 'order_number' => $project->getOrderNumber(),
             $prefix . 'start_date' => null !== $project->getStart() ? $formatter->getFormattedDateTime($project->getStart()) : '',
             $prefix . 'end_date' => null !== $project->getEnd() ? $formatter->getFormattedDateTime($project->getEnd()) : '',
@@ -58,9 +79,17 @@ class InvoiceModelProjectHydrator implements InvoiceModelHydrator
             $prefix . 'budget_time' => $project->getTimeBudget(),
             $prefix . 'budget_time_decimal' => $formatter->getFormattedDecimalDuration($project->getTimeBudget()),
             $prefix . 'budget_time_minutes' => (int) ($project->getTimeBudget() / 60),
+            $prefix . 'number' => $project->getNumber() ?? '',
+            $prefix . 'invoice_text' => $project->getInvoiceText() ?? '',
         ];
 
-        foreach ($project->getVisibleMetaFields() as $metaField) {
+        if ($model->getQuery()?->getEnd() !== null) {
+            $statistic = $this->projectStatistic->getBudgetStatisticModel($project, $model->getQuery()->getEnd());
+
+            $values = array_merge($values, $this->getBudgetValues($prefix, $statistic, $model));
+        }
+
+        foreach ($project->getMetaFields() as $metaField) {
             $values = array_merge($values, [
                 $prefix . 'meta.' . $metaField->getName() => $metaField->getValue(),
             ]);

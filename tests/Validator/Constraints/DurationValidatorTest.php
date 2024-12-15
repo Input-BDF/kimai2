@@ -17,16 +17,21 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\Duration
  * @covers \App\Validator\Constraints\DurationValidator
+ * @extends ConstraintValidatorTestCase<DurationValidator>
  */
 class DurationValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator()
+    protected function createValidator(): DurationValidator
     {
         return new DurationValidator();
     }
 
-    public function getValidData()
+    /**
+     * @return array<array<string|int|null>>
+     */
+    public function getValidData(): array
     {
         return [
             ['2h'],
@@ -53,7 +58,7 @@ class DurationValidatorTest extends ConstraintValidatorTestCase
         ];
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
@@ -62,17 +67,21 @@ class DurationValidatorTest extends ConstraintValidatorTestCase
 
     /**
      * @dataProvider getValidData
-     * @param string $input
      */
-    public function testConstraintWithValidData($input)
+    public function testConstraintWithValidData(string|int|null $input): void
     {
         $constraint = new Duration();
         $this->validator->validate($input, $constraint);
-        $this->validator->validate(strtoupper($input), $constraint);
+        if ($input !== null) {
+            $this->validator->validate(strtoupper($input), $constraint);
+        }
         $this->assertNoViolation();
     }
 
-    public function getInvalidData()
+    /**
+     * @return array<array<string>>
+     */
+    public function getInvalidData(): array
     {
         return [
             ['13-13'],
@@ -92,9 +101,8 @@ class DurationValidatorTest extends ConstraintValidatorTestCase
 
     /**
      * @dataProvider getInvalidData
-     * @param mixed $input
      */
-    public function testValidationError($input)
+    public function testValidationError(string $input): void
     {
         $constraint = new Duration([
             'message' => 'myMessage',
@@ -104,15 +112,15 @@ class DurationValidatorTest extends ConstraintValidatorTestCase
 
         $this->buildViolation('myMessage')
             ->setParameter('{{ value }}', '"' . $input . '"')
+            ->setParameter('{{ pattern }}', '/^-?[0-9]{1,}$|^-?[0-9]{1,}[,.]{1}[0-9]{1,}$|^-?[0-9]{1,}:[0-9]{1,}:[0-9]{1,}$|^-?[0-9]{1,}:[0-9]{1,}$|^[0-9]{1,}[hHmMsS]{1}$|^[0-9]{1,}[hH]{1}[0-9]{1,}[mM]{1}$|^[0-9]{1,}[hHmM]{1}[0-9]{1,}[sS]{1}$|^[0-9]{1,}[mM]{1}[0-9]{1,}[sS]{1}$|^[0-9]{1,}[hH]{1}[0-9]{1,}[mM]{1}[0-9]{1,}[sS]{1}$/')
             ->setCode(Regex::REGEX_FAILED_ERROR)
             ->assertRaised();
     }
 
     /**
      * @dataProvider getInvalidData
-     * @param mixed $input
      */
-    public function testValidationErrorUpperCase($input)
+    public function testValidationErrorUpperCase(string $input): void
     {
         $input = strtoupper($input);
         $constraint = new Duration([
@@ -123,6 +131,7 @@ class DurationValidatorTest extends ConstraintValidatorTestCase
 
         $this->buildViolation('myMessage')
             ->setParameter('{{ value }}', '"' . $input . '"')
+            ->setParameter('{{ pattern }}', '/^-?[0-9]{1,}$|^-?[0-9]{1,}[,.]{1}[0-9]{1,}$|^-?[0-9]{1,}:[0-9]{1,}:[0-9]{1,}$|^-?[0-9]{1,}:[0-9]{1,}$|^[0-9]{1,}[hHmMsS]{1}$|^[0-9]{1,}[hH]{1}[0-9]{1,}[mM]{1}$|^[0-9]{1,}[hHmM]{1}[0-9]{1,}[sS]{1}$|^[0-9]{1,}[mM]{1}[0-9]{1,}[sS]{1}$|^[0-9]{1,}[hH]{1}[0-9]{1,}[mM]{1}[0-9]{1,}[sS]{1}$/')
             ->setCode(Regex::REGEX_FAILED_ERROR)
             ->assertRaised();
     }

@@ -12,20 +12,19 @@
  * redirecting to the URL given in the elements 'data-href' or 'href' attribute
  */
 
-import jQuery from 'jquery';
 import KimaiReducedClickHandler from "./KimaiReducedClickHandler";
 
 export default class KimaiAlternativeLinks extends KimaiReducedClickHandler {
 
     constructor(selector) {
         super();
-        this.selector = selector;
+        this._selector = selector;
     }
 
     init() {
-        this._addClickHandler(this.selector, function(href) {
+        this.addClickHandler(this._selector, function(href) {
             window.location = href;
-        });
+        }, []);
     }
 
 }

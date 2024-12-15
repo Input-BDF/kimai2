@@ -10,6 +10,7 @@
 namespace App\Form;
 
 use App\Entity\Tag;
+use App\Form\Type\YesNoType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -19,14 +20,11 @@ class TagEditForm extends AbstractType
 {
     use ColorTrait;
 
-    /**
-     * {@inheritdoc}
-     */
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
             ->add('name', TextType::class, [
-                'label' => 'label.name',
+                'label' => 'name',
                 'attr' => [
                     'autofocus' => 'autofocus'
                 ],
@@ -35,14 +33,15 @@ class TagEditForm extends AbstractType
                     'description' => 'The tag name (forbidden character: comma)',
                 ],
             ])
+            ->add('visible', YesNoType::class, [
+                'label' => 'visible',
+                'help' => 'help.visible',
+            ])
         ;
         $this->addColor($builder);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'data_class' => Tag::class,

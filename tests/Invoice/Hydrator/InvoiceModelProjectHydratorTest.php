@@ -10,6 +10,7 @@
 namespace App\Tests\Invoice\Hydrator;
 
 use App\Invoice\Hydrator\InvoiceModelProjectHydrator;
+use App\Project\ProjectStatisticService;
 use App\Tests\Invoice\Renderer\RendererTestTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -20,26 +21,24 @@ class InvoiceModelProjectHydratorTest extends TestCase
 {
     use RendererTestTrait;
 
-    public function testHydrate()
+    public function testHydrate(): void
     {
         $model = $this->getInvoiceModel();
 
-        $sut = new InvoiceModelProjectHydrator();
+        $sut = new InvoiceModelProjectHydrator($this->createMock(ProjectStatisticService::class));
 
         $result = $sut->hydrate($model);
         $this->assertModelStructure($result);
-
-        $model->getQuery()->setProjects([]);
-        $result = $sut->hydrate($model);
-        self::assertEmpty($result);
     }
 
-    protected function assertModelStructure(array $model)
+    public function assertModelStructure(array $model): void
     {
         $keys = [
             'project.id',
             'project.name',
             'project.comment',
+            'project.number',
+            'project.invoice_text',
             'project.order_date',
             'project.order_number',
             'project.meta.foo-project',
@@ -51,9 +50,15 @@ class InvoiceModelProjectHydratorTest extends TestCase
             'project.budget_time',
             'project.budget_time_decimal',
             'project.budget_time_minutes',
+            'project.budget_open',
+            'project.budget_open_plain',
+            'project.time_budget_open',
+            'project.time_budget_open_plain',
             'project.1.id',
             'project.1.name',
             'project.1.comment',
+            'project.1.number',
+            'project.1.invoice_text',
             'project.1.order_date',
             'project.1.order_number',
             'project.1.meta.foo-project',
@@ -65,6 +70,10 @@ class InvoiceModelProjectHydratorTest extends TestCase
             'project.1.budget_time',
             'project.1.budget_time_decimal',
             'project.1.budget_time_minutes',
+            'project.1.budget_open',
+            'project.1.budget_open_plain',
+            'project.1.time_budget_open',
+            'project.1.time_budget_open_plain',
         ];
 
         $givenKeys = array_keys($model);

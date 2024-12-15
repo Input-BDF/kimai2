@@ -18,15 +18,14 @@ use PHPUnit\Framework\TestCase;
  */
 class UserPreferenceDisplayEventTest extends TestCase
 {
-    public function testGetterAndSetter()
+    public function testGetterAndSetter(): void
     {
         $sut = new UserPreferenceDisplayEvent('blub');
         self::assertEquals('blub', $sut->getLocation());
         self::assertIsArray($sut->getPreferences());
         self::assertEmpty($sut->getPreferences());
 
-        $preference = new UserPreference();
-        $preference->setName('foo')->setValue('bar');
+        $preference = new UserPreference('foo', 'bar');
         $sut->addPreference($preference);
 
         self::assertEquals([$preference], $sut->getPreferences());

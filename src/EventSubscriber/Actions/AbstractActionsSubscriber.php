@@ -9,7 +9,6 @@
 
 namespace App\EventSubscriber\Actions;
 
-use App\Constants;
 use App\Event\PageActionsEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -20,13 +19,10 @@ use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
  */
 abstract class AbstractActionsSubscriber implements EventSubscriberInterface
 {
-    private $auth;
-    private $urlGenerator;
+    private ?string $locale = null;
 
-    public function __construct(AuthorizationCheckerInterface $security, UrlGeneratorInterface $urlGenerator)
+    public function __construct(private readonly AuthorizationCheckerInterface $auth, private readonly UrlGeneratorInterface $urlGenerator)
     {
-        $this->auth = $security;
-        $this->urlGenerator = $urlGenerator;
     }
 
     protected function isGranted($attributes, $subject = null): bool
@@ -36,19 +32,25 @@ abstract class AbstractActionsSubscriber implements EventSubscriberInterface
 
     protected function path(string $route, array $parameters = []): string
     {
-        return $this->urlGenerator->generate($route, $parameters);
-    }
+        if ($this->locale !== null) {
+            $parameters['_locale'] = $this->locale;
+        }
 
-    protected function documentationLink(string $url): string
-    {
-        return Constants::HOMEPAGE . '/documentation/' . $url;
+        return $this->urlGenerator->generate($route, $parameters);
     }
 
     public static function getSubscribedEvents(): array
     {
         return [
-            'actions.' . static::getActionName() => ['onActions', 1000],
+            'actions.' . static::getActionName() => ['handleEvent', 1000],
         ];
+    }
+
+    final public function handleEvent(PageActionsEvent $event): void
+    {
+        $this->locale = $event->getLocale();
+
+        $this->onActions($event);
     }
 
     public static function getActionName(): string

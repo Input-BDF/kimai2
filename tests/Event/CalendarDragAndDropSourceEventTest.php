@@ -19,7 +19,7 @@ use PHPUnit\Framework\TestCase;
  */
 class CalendarDragAndDropSourceEventTest extends TestCase
 {
-    public function testGetterAndSetter()
+    public function testGetterAndSetter(): void
     {
         $user = new User();
         $user->setAlias('foo');
@@ -62,6 +62,11 @@ class TestDragAndDropSource implements DragAndDropSource
     public function getTitle(): string
     {
         return $this->title;
+    }
+
+    public function getTranslationDomain(): string
+    {
+        return 'messages';
     }
 
     public function getRoute(): string

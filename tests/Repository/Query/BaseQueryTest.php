@@ -17,7 +17,7 @@ use App\Entity\Team;
 use App\Form\Model\DateRange;
 use App\Repository\Query\ActivityQuery;
 use App\Repository\Query\BaseQuery;
-use App\Repository\Query\ProjectQuery;
+use App\Repository\Query\DateRangeInterface;
 use App\Repository\Query\TimesheetQuery;
 use App\Utils\SearchTerm;
 use PHPUnit\Framework\TestCase;
@@ -32,24 +32,14 @@ use Symfony\Component\Form\FormFactoryInterface;
  */
 class BaseQueryTest extends TestCase
 {
-    public function testQuery()
+    public function testQuery(): void
     {
         $this->assertBaseQuery(new BaseQuery());
         $this->assertResetByFormError(new BaseQuery());
         $this->assertFilter(new BaseQuery());
     }
 
-    /**
-     * @expectedDeprecation BaseQuery::getResultType() is deprecated and will be removed with 2.0
-     * @group legacy
-     */
-    public function testDeprecations()
-    {
-        $sut = new BaseQuery();
-        $sut->getResultType();
-    }
-
-    protected function assertResetByFormError(BaseQuery $sut, $orderBy = 'id', $order = 'ASC')
+    protected function assertResetByFormError(BaseQuery $sut, $orderBy = 'id', $order = 'ASC'): void
     {
         $sut->setOrder('ASK');
         $sut->setOrderBy('foo');
@@ -57,7 +47,7 @@ class BaseQueryTest extends TestCase
         $sut->setPageSize(99);
         $sut->setSearchTerm(new SearchTerm('sdf'));
 
-        $this->resetByFormError($sut, ['order', 'orderBy', 'page', 'pageSize', 'searchTerm']);
+        $this->resetByFormError($sut, ['order', 'orderBy', 'page', 'size', 'searchTerm']);
 
         self::assertEquals(1, $sut->getPage());
         self::assertEquals(50, $sut->getPageSize());
@@ -66,7 +56,7 @@ class BaseQueryTest extends TestCase
         self::assertNull($sut->getSearchTerm());
     }
 
-    protected function assertBaseQuery(BaseQuery $sut, $orderBy = 'id', $order = BaseQuery::ORDER_ASC)
+    protected function assertBaseQuery(BaseQuery $sut, $orderBy = 'id', $order = BaseQuery::ORDER_ASC): void
     {
         $this->assertPage($sut);
         $this->assertPageSize($sut);
@@ -76,12 +66,12 @@ class BaseQueryTest extends TestCase
         $this->assertBookmark($sut);
     }
 
-    private function getFormBuilder(string $name)
+    private function getFormBuilder(string $name): FormBuilder
     {
         return new FormBuilder($name, null, new EventDispatcher(), $this->createMock(FormFactoryInterface::class), []);
     }
 
-    protected function resetByFormError(BaseQuery $sut, array $invalidFields)
+    protected function resetByFormError(BaseQuery $sut, array $invalidFields): void
     {
         $formBuilder = $this->getFormBuilder('form');
         $formBuilder->setCompound(true);
@@ -104,11 +94,11 @@ class BaseQueryTest extends TestCase
         $sut->resetByFormError($formErrors);
     }
 
-    protected function assertTeams(BaseQuery $sut)
+    protected function assertTeams(BaseQuery $sut): void
     {
         self::assertEmpty($sut->getTeams());
 
-        self::assertInstanceOf(BaseQuery::class, $sut->addTeam(new Team()));
+        self::assertInstanceOf(BaseQuery::class, $sut->addTeam(new Team('foo')));
         self::assertEquals(1, \count($sut->getTeams()));
 
         $sut->setTeams(null);
@@ -116,13 +106,13 @@ class BaseQueryTest extends TestCase
         $sut->setTeams([]);
         self::assertEmpty($sut->getTeams());
 
-        $team = new Team();
+        $team = new Team('foo');
         self::assertInstanceOf(BaseQuery::class, $sut->setTeams([$team]));
-        self::assertEquals(1, \count($sut->getTeams()));
+        self::assertCount(1, $sut->getTeams());
         self::assertSame($team, $sut->getTeams()[0]);
     }
 
-    protected function assertFilter(BaseQuery $sut)
+    protected function assertFilter(BaseQuery $sut): void
     {
         self::assertEquals(0, $sut->countFilter());
         $sut->setSearchTerm(new SearchTerm('sdfsdf'));
@@ -152,7 +142,7 @@ class BaseQueryTest extends TestCase
         self::assertFalse($sut->isDefaultFilter('foo'));
     }
 
-    protected function assertBookmark(BaseQuery $sut)
+    protected function assertBookmark(BaseQuery $sut): void
     {
         $bookmark = new Bookmark();
         self::assertNull($sut->getBookmark());
@@ -165,7 +155,7 @@ class BaseQueryTest extends TestCase
         self::assertTrue($sut->isBookmarkSearch());
     }
 
-    protected function assertPage(BaseQuery $sut)
+    protected function assertPage(BaseQuery $sut): void
     {
         self::assertEquals(1, $sut->getPage());
 
@@ -173,7 +163,7 @@ class BaseQueryTest extends TestCase
         self::assertEquals(42, $sut->getPage());
     }
 
-    protected function assertPageSize(BaseQuery $sut)
+    protected function assertPageSize(BaseQuery $sut): void
     {
         self::assertEquals(BaseQuery::DEFAULT_PAGESIZE, $sut->getPageSize());
 
@@ -181,7 +171,7 @@ class BaseQueryTest extends TestCase
         self::assertEquals(100, $sut->getPageSize());
     }
 
-    protected function assertOrderBy(BaseQuery $sut, $column = 'id')
+    protected function assertOrderBy(BaseQuery $sut, $column = 'id'): void
     {
         self::assertEquals($column, $sut->getOrderBy());
 
@@ -189,7 +179,7 @@ class BaseQueryTest extends TestCase
         self::assertEquals('foo', $sut->getOrderBy());
     }
 
-    protected function assertOrder(BaseQuery $sut, $order = BaseQuery::ORDER_ASC)
+    protected function assertOrder(BaseQuery $sut, $order = BaseQuery::ORDER_ASC): void
     {
         self::assertEquals($order, $sut->getOrder());
 
@@ -203,7 +193,7 @@ class BaseQueryTest extends TestCase
         self::assertEquals(BaseQuery::ORDER_DESC, $sut->getOrder());
     }
 
-    protected function assertSearchTerm(BaseQuery $sut)
+    protected function assertSearchTerm(BaseQuery $sut): void
     {
         self::assertNull($sut->getSearchTerm());
 
@@ -218,20 +208,13 @@ class BaseQueryTest extends TestCase
         self::assertSame($term, $sut->getSearchTerm());
     }
 
-    protected function assertActivity(TimesheetQuery $sut)
+    protected function assertActivity(TimesheetQuery $sut): void
     {
-        $this->assertNull($sut->getActivity());
         $this->assertEquals([], $sut->getActivities());
         $this->assertFalse($sut->hasActivities());
 
         $expected = new Activity();
         $expected->setName('foo-bar');
-
-        $sut->setActivity($expected);
-        $this->assertEquals($expected, $sut->getActivity());
-
-        $sut->setActivities([]);
-        $this->assertEquals([], $sut->getActivities());
 
         $sut->addActivity($expected);
         $this->assertEquals([$expected], $sut->getActivities());
@@ -243,62 +226,86 @@ class BaseQueryTest extends TestCase
         $sut->addActivity($expected2);
         $this->assertEquals([$expected, $expected2], $sut->getActivities());
 
-        $sut->setActivity(null);
-        $this->assertNull($sut->getActivity());
+        $sut->setActivities([]);
+        $this->assertEquals([], $sut->getActivities());
         $this->assertFalse($sut->hasActivities());
 
-        // make sure int is allowed as well
-        $sut->setActivities([99]);
-        $this->assertEquals(99, $sut->getActivity());
-        $this->assertEquals([99], $sut->getActivities());
+        $activity = $this->createMock(Activity::class);
+        $activity->method('getId')->willReturn(13);
+        $sut->addActivity($activity);
+
+        $activity = $this->createMock(Activity::class);
+        $activity->method('getId')->willReturn(27);
+        $sut->addActivity($activity);
+
+        $activity = $this->createMock(Activity::class);
+        $activity->method('getId')->willReturn(null);
+        $sut->addActivity($activity);
+
+        $activity = $this->createMock(Activity::class);
+        $activity->method('getId')->willReturn(27);
+        $sut->addActivity($activity);
+
+        $ids = [];
+        foreach ($sut->getActivities() as $activity) {
+            $ids[] = $activity->getId();
+        }
+        $this->assertEquals([13, 27, null, 27], $ids);
     }
 
-    protected function assertCustomer(ProjectQuery $sut)
+    protected function assertCustomer(BaseQuery $sut): void
     {
-        $this->assertNull($sut->getCustomer());
+        $this->assertTrue(method_exists($sut, 'getCustomers'));
+        $this->assertTrue(method_exists($sut, 'setCustomers'));
+        $this->assertTrue(method_exists($sut, 'hasCustomers'));
+        $this->assertTrue(method_exists($sut, 'addCustomer'));
+        $this->assertTrue(method_exists($sut, 'getCustomerIds'));
+
         $this->assertEquals([], $sut->getCustomers());
         $this->assertFalse($sut->hasCustomers());
 
-        $expected = new Customer();
-        $expected->setName('foo-bar');
-
-        $sut->setCustomer($expected);
-        $this->assertEquals($expected, $sut->getCustomer());
-
-        $sut->setCustomers([]);
-        $this->assertEquals([], $sut->getCustomers());
+        $expected = new Customer('foo-bar');
 
         $sut->addCustomer($expected);
         $this->assertEquals([$expected], $sut->getCustomers());
         $this->assertTrue($sut->hasCustomers());
 
-        $expected2 = new Customer();
-        $expected2->setName('foo-bar2');
+        $expected2 = new Customer('foo-bar2');
 
         $sut->addCustomer($expected2);
         $this->assertEquals([$expected, $expected2], $sut->getCustomers());
+        $this->assertEquals([], $sut->getCustomerIds());
 
-        $sut->setCustomer(null);
-        $this->assertNull($sut->getCustomer());
+        $sut->setCustomers([]);
+        $this->assertEquals([], $sut->getCustomers());
         $this->assertFalse($sut->hasCustomers());
 
-        // make sure int is allowed as well
-        $sut->setCustomers([99]);
-        $this->assertEquals(99, $sut->getCustomer());
-        $this->assertEquals([99], $sut->getCustomers());
+        $customer = $this->createMock(Customer::class);
+        $customer->method('getId')->willReturn(13);
+        $sut->addCustomer($customer);
+
+        $customer = $this->createMock(Customer::class);
+        $customer->method('getId')->willReturn(27);
+        $sut->addCustomer($customer);
+
+        $customer = $this->createMock(Customer::class);
+        $customer->method('getId')->willReturn(null);
+        $sut->addCustomer($customer);
+
+        $customer = $this->createMock(Customer::class);
+        $customer->method('getId')->willReturn(27);
+        $sut->addCustomer($customer);
+
+        $this->assertEquals([13, 27], $sut->getCustomerIds());
     }
 
-    protected function assertProject(ActivityQuery $sut)
+    protected function assertProject(ActivityQuery $sut): void
     {
-        $this->assertNull($sut->getProject());
         $this->assertEquals([], $sut->getProjects());
         $this->assertFalse($sut->hasProjects());
 
         $expected = new Project();
         $expected->setName('foo-bar');
-
-        $sut->setProject($expected);
-        $this->assertEquals($expected, $sut->getProject());
 
         $sut->setProjects([]);
         $this->assertEquals([], $sut->getProjects());
@@ -312,18 +319,31 @@ class BaseQueryTest extends TestCase
 
         $sut->addProject($expected2);
         $this->assertEquals([$expected, $expected2], $sut->getProjects());
+        $this->assertEquals([], $sut->getProjectIds());
 
-        $sut->setProject(null);
-        $this->assertNull($sut->getProject());
+        $sut->setProjects([]);
         $this->assertFalse($sut->hasProjects());
 
-        // make sure int is allowed as well
-        $sut->setProjects([99]);
-        $this->assertEquals(99, $sut->getProject());
-        $this->assertEquals([99], $sut->getProjects());
+        $project = $this->createMock(Project::class);
+        $project->method('getId')->willReturn(13);
+        $sut->addProject($project);
+
+        $project = $this->createMock(Project::class);
+        $project->method('getId')->willReturn(27);
+        $sut->addProject($project);
+
+        $project = $this->createMock(Project::class);
+        $project->method('getId')->willReturn(null);
+        $sut->addProject($project);
+
+        $project = $this->createMock(Project::class);
+        $project->method('getId')->willReturn(27);
+        $sut->addProject($project);
+
+        $this->assertEquals([13, 27], $sut->getProjectIds());
     }
 
-    protected function assertDateRangeTrait($sut)
+    protected function assertDateRangeTrait(DateRangeInterface $sut): void
     {
         self::assertNull($sut->getBegin());
         self::assertNull($sut->getEnd());
@@ -335,16 +355,15 @@ class BaseQueryTest extends TestCase
         self::assertNull($sut->getBegin());
         self::assertNull($sut->getEnd());
 
-        $begin = new \DateTime('2013-11-23 13:45:07');
-        $end = new \DateTime('2014-01-01 23:45:11');
-        $dateRange->setBegin($begin);
-        $dateRange->setEnd($end);
+        $dateRange->setBegin(new \DateTimeImmutable('2013-11-23 13:45:07'));
+        $dateRange->setEnd(new \DateTimeImmutable('2014-01-01 23:45:11'));
 
-        self::assertSame($begin, $sut->getDateRange()->getBegin());
-        /* @phpstan-ignore-next-line */
-        self::assertSame($begin, $sut->getBegin());
-        self::assertSame($end, $sut->getDateRange()->getEnd());
-        /* @phpstan-ignore-next-line */
-        self::assertSame($end, $sut->getEnd());
+        $begin1 = new \DateTimeImmutable('2013-11-23 00:00:00');
+        $end1 = new \DateTimeImmutable('2014-01-01 23:59:59');
+
+        self::assertEquals($begin1, $sut->getDateRange()->getBegin());
+        self::assertEquals($begin1, $sut->getBegin());
+        self::assertEquals($end1, $sut->getDateRange()->getEnd());
+        self::assertEquals($end1, $sut->getEnd());
     }
 }

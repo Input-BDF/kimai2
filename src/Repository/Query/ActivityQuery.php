@@ -14,105 +14,106 @@ use App\Entity\Project;
 /**
  * Can be used for advanced queries with the: ActivityRepository
  */
-class ActivityQuery extends ProjectQuery
+class ActivityQuery extends BaseQuery implements VisibilityInterface
 {
-    public const ACTIVITY_ORDER_ALLOWED = ['id', 'name', 'comment', 'customer', 'project', 'budget', 'timeBudget', 'visible'];
+    use VisibilityTrait;
+    use CustomerTrait;
+
+    public const ACTIVITY_ORDER_ALLOWED = [
+        'name',
+        'description' => 'comment',
+        'activity_number' => 'number',
+        'customer',
+        'project',
+        'budget',
+        'timeBudget',
+        'visible'
+    ];
 
     /**
-     * @var array<Project|int>
+     * @var array<Project>
      */
-    private $projects = [];
+    private array $projects = [];
+    private bool $globalsOnly = false;
+    private bool $excludeGlobals = false;
     /**
-     * @var bool
+     * @var array<int>
      */
-    private $globalsOnly = false;
+    private array $activityIds = [];
     /**
-     * @var bool
+     * @var array<ActivityQueryHydrate>
      */
-    private $excludeGlobals = false;
+    private array $hydrate = [];
 
     public function __construct()
     {
-        parent::__construct();
         $this->setDefaults([
             'orderBy' => 'name',
+            'customers' => [],
             'projects' => [],
             'globalsOnly' => false,
             'excludeGlobals' => false,
+            'activityIds' => [],
         ]);
     }
 
-    /**
-     * @return bool
-     */
+    protected function copyFrom(BaseQuery $query): void
+    {
+        parent::copyFrom($query);
+
+        if (method_exists($query, 'getCustomers')) {
+            $this->setCustomers($query->getCustomers());
+        }
+
+        if ($query instanceof ActivityQuery) {
+            $this->setActivityIds($query->getActivityIds());
+            $this->setGlobalsOnly($query->isGlobalsOnly());
+            $this->setExcludeGlobals($query->isExcludeGlobals());
+            foreach ($query->getHydrate() as $hydrate) {
+                $this->addHydrate($hydrate);
+            }
+        }
+    }
+
     public function isGlobalsOnly(): bool
     {
-        return (bool) $this->globalsOnly;
+        return $this->globalsOnly;
     }
 
     /**
      * @param bool $globalsOnly
      * @return self
      */
-    public function setGlobalsOnly($globalsOnly): self
+    public function setGlobalsOnly(bool $globalsOnly): self
     {
-        $this->globalsOnly = (bool) $globalsOnly;
+        $this->globalsOnly = $globalsOnly;
 
         return $this;
     }
 
     public function isExcludeGlobals(): bool
     {
-        return (bool) $this->excludeGlobals;
+        return $this->excludeGlobals;
     }
 
     public function setExcludeGlobals(bool $excludeGlobals): self
     {
-        $this->excludeGlobals = (bool) $excludeGlobals;
+        $this->excludeGlobals = $excludeGlobals;
 
         return $this;
     }
 
-    /**
-     * @return Project|int|null
-     * @deprecated since 1.9 - use getProjects() instead - will be removed with 2.0
-     */
-    public function getProject()
-    {
-        if (\count($this->projects) > 0) {
-            return $this->projects[0];
-        }
-
-        return null;
-    }
-
-    /**
-     * @param Project|int|null $project
-     * @return self
-     * @deprecated since 1.9 - use setProjects() or addProject() instead - will be removed with 2.0
-     */
-    public function setProject($project = null): self
-    {
-        if (null === $project) {
-            $this->projects = [];
-        } else {
-            $this->projects = [$project];
-        }
-
-        return $this;
-    }
-
-    /**
-     * @param Project|int $project
-     * @return self
-     */
-    public function addProject($project): self
+    public function addProject(Project $project): self
     {
         $this->projects[] = $project;
 
         return $this;
     }
 
+    /**
+     * @param array<Project> $projects
+     * @return $this
+     */
     public function setProjects(array $projects): self
     {
         $this->projects = $projects;
@@ -120,13 +121,64 @@ class ActivityQuery extends ProjectQuery
         return $this;
     }
 
+    /**
+     * @return array<Project>
+     */
     public function getProjects(): array
     {
         return $this->projects;
     }
 
+    /**
+     * @return array<int>
+     */
+    public function getProjectIds(): array
+    {
+        return array_values(array_filter(array_unique(array_map(function (Project $project) {
+            return $project->getId();
+        }, $this->projects)), function ($id) {
+            return $id !== null;
+        }));
+    }
+
     public function hasProjects(): bool
     {
         return !empty($this->projects);
+    }
+
+    /**
+     * @param array<int> $ids
+     */
+    public function setActivityIds(array $ids): void
+    {
+        $this->activityIds = $ids;
+    }
+
+    /**
+     * @return int[]
+     */
+    public function getActivityIds(): array
+    {
+        return $this->activityIds;
+    }
+
+    private function addHydrate(ActivityQueryHydrate $hydrate): void
+    {
+        if (!\in_array($hydrate, $this->hydrate, true)) {
+            $this->hydrate[] = $hydrate;
+        }
+    }
+
+    /**
+     * @return ActivityQueryHydrate[]
+     */
+    public function getHydrate(): array
+    {
+        return $this->hydrate;
+    }
+
+    public function loadTeams(): void
+    {
+        $this->addHydrate(ActivityQueryHydrate::TEAMS);
     }
 }

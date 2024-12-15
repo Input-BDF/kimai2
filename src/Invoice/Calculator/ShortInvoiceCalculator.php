@@ -16,12 +16,12 @@ use App\Invoice\InvoiceItem;
  * A calculator that sums up all invoice item records from the model and returns only one
  * entry for a compact invoice version.
  */
-class ShortInvoiceCalculator extends AbstractMergedCalculator implements CalculatorInterface
+final class ShortInvoiceCalculator extends AbstractMergedCalculator implements CalculatorInterface
 {
     /**
      * @return InvoiceItem[]
      */
-    public function getEntries()
+    public function getEntries(): array
     {
         $entries = $this->model->getEntries();
         if (empty($entries)) {
@@ -32,9 +32,9 @@ class ShortInvoiceCalculator extends AbstractMergedCalculator implements Calcula
         $keys = [];
 
         foreach ($entries as $entry) {
-            $key = 'hourly_' . (string) $entry->getHourlyRate();
+            $key = 'hourly_' . $entry->getHourlyRate();
             if (null !== $entry->getFixedRate()) {
-                $key = 'fixed_' . (string) $entry->getFixedRate();
+                $key = 'fixed_' . $entry->getFixedRate();
             }
             if (!\in_array($key, $keys)) {
                 $keys[] = $key;
@@ -51,9 +51,6 @@ class ShortInvoiceCalculator extends AbstractMergedCalculator implements Calcula
         return [$invoiceItem];
     }
 
-    /**
-     * @return string
-     */
     public function getId(): string
     {
         return 'short';

@@ -13,14 +13,13 @@ use App\Invoice\InvoiceItem;
 use App\Invoice\InvoiceItemHydrator;
 use App\Invoice\InvoiceModel;
 
-class InvoiceItemDefaultHydrator implements InvoiceItemHydrator
+final class InvoiceItemDefaultHydrator implements InvoiceItemHydrator
 {
-    /**
-     * @var InvoiceModel
-     */
-    private $model;
+    private const DATE_PROCESS_FORMAT = 'Y-m-d h:i:s';
 
-    public function setInvoiceModel(InvoiceModel $model)
+    private InvoiceModel $model;
+
+    public function setInvoiceModel(InvoiceModel $model): void
     {
         $this->model = $model;
     }
@@ -32,12 +31,12 @@ class InvoiceItemDefaultHydrator implements InvoiceItemHydrator
         $rate = $item->getRate();
         $internalRate = $item->getInternalRate();
         $appliedRate = $item->getHourlyRate();
-        $amount = $formatter->getFormattedDuration($item->getDuration());
+        $amount = $formatter->getFormattedDecimalDuration($item->getDuration());
         $description = $item->getDescription();
 
         if ($item->isFixedRate()) {
             $appliedRate = $item->getFixedRate();
-            $amount = $item->getAmount();
+            $amount = $formatter->getFormattedAmount($item->getAmount());
         }
 
         $activity = $item->getActivity();
@@ -48,10 +47,6 @@ class InvoiceItemDefaultHydrator implements InvoiceItemHydrator
         $begin = $item->getBegin();
         $end = $item->getEnd();
 
-        if (empty($description) && null !== $activity) {
-            $description = $activity->getName();
-        }
-
         // this should never happen!
         if (empty($appliedRate)) {
             $appliedRate = 0;
@@ -59,11 +54,12 @@ class InvoiceItemDefaultHydrator implements InvoiceItemHydrator
 
         $values = [
             'entry.row' => '',
-            'entry.description' => $description,
+            'entry.description' => $description ?? '',
+            'entry.description_safe' => ($description === null || $description === '' ? ($activity?->getName() ?? $project?->getName() ?? '') : $description),
             'entry.amount' => $amount,
             'entry.type' => $item->getType(),
             'entry.tags' => implode(', ', $item->getTags()),
-            'entry.category' => $item->getCategory(),
+            'entry.category' => $item->getCategory() ?? '',
             'entry.rate' => $formatter->getFormattedMoney($appliedRate, $currency),
             'entry.rate_nc' => $formatter->getFormattedMoney($appliedRate, $currency, false),
             'entry.rate_plain' => $appliedRate,
@@ -75,22 +71,40 @@ class InvoiceItemDefaultHydrator implements InvoiceItemHydrator
             'entry.total_plain' => $rate,
             'entry.currency' => $currency,
             'entry.duration' => $item->getDuration(),
+            'entry.duration_format' => $formatter->getFormattedDuration($item->getDuration()),
             'entry.duration_decimal' => $formatter->getFormattedDecimalDuration($item->getDuration()),
             'entry.duration_minutes' => (int) ($item->getDuration() / 60),
-            'entry.begin' => $formatter->getFormattedDateTime($begin),
-            'entry.begin_time' => $formatter->getFormattedTime($begin),
-            'entry.begin_timestamp' => $begin->getTimestamp(),
-            'entry.end' => $formatter->getFormattedDateTime($end),
-            'entry.end_time' => $formatter->getFormattedTime($end),
-            'entry.end_timestamp' => $end->getTimestamp(),
-            'entry.date' => $formatter->getFormattedDateTime($begin),
-            'entry.week' => \intval($begin->format('W')),
-            'entry.weekyear' => $begin->format('o'),
-            'entry.user_id' => $user->getId(),
-            'entry.user_name' => $user->getUsername(),
-            'entry.user_title' => $user->getTitle(),
-            'entry.user_alias' => $user->getAlias(),
         ];
+
+        if ($begin !== null) {
+            $values['entry.begin'] = $formatter->getFormattedDateTime($begin);
+            $values['entry.begin_time'] = $formatter->getFormattedTime($begin);
+            $values['entry.begin_timestamp'] = $begin->getTimestamp();
+            $values['entry.date'] = $formatter->getFormattedDateTime($begin);
+            $values['entry.date_process'] = $begin->format(self::DATE_PROCESS_FORMAT); // since 2.14
+            $values['entry.week'] = \intval($begin->format('W'));
+            $values['entry.weekyear'] = $begin->format('o');
+        }
+
+        if ($end !== null) {
+            $values['entry.end'] = $formatter->getFormattedDateTime($end);
+            $values['entry.end_time'] = $formatter->getFormattedTime($end);
+            $values['entry.end_timestamp'] = $end->getTimestamp();
+        }
+
+        if (null !== $user) {
+            $values = array_merge($values, [
+                'entry.user_id' => $user->getId(),
+                'entry.user_name' => $user->getUserIdentifier(),
+                'entry.user_title' => $user->getTitle() ?? '',
+                'entry.user_alias' => $user->getAlias() ?? '',
+                'entry.user_display' => $user->getDisplayName(),
+            ]);
+
+            foreach ($user->getVisiblePreferences() as $pref) {
+                $values['entry.user_preference.' . $pref->getName()] = $pref->getValue();
+            }
+        }
 
         if (null !== $activity) {
             $values = array_merge($values, [

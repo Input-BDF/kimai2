@@ -20,7 +20,7 @@ class InvoiceModelDefaultHydratorTest extends TestCase
 {
     use RendererTestTrait;
 
-    public function testHydrate()
+    public function testHydrate(): void
     {
         $model = $this->getInvoiceModel();
 
@@ -30,21 +30,28 @@ class InvoiceModelDefaultHydratorTest extends TestCase
         $this->assertModelStructure($result);
     }
 
-    protected function assertModelStructure(array $model, $hasProject = true)
+    protected function assertModelStructure(array $model, bool $hasProject = true): void
     {
         $keys = [
             'invoice.due_date',
+            'invoice.due_date_process',
             'invoice.date',
+            'invoice.date_process',
             'invoice.number',
             'invoice.currency',
             'invoice.currency_symbol',
             'invoice.vat',
             'invoice.language',
             'invoice.tax',
+            'invoice.tax_hide',
             'invoice.tax_nc',
             'invoice.tax_plain',
             'invoice.total_time',
             'invoice.duration_decimal',
+            'invoice.first',
+            'invoice.first_process',
+            'invoice.last',
+            'invoice.last_process',
             'invoice.total',
             'invoice.total_nc',
             'invoice.total_plain',
@@ -60,20 +67,23 @@ class InvoiceModelDefaultHydratorTest extends TestCase
             'template.vat_id',
             'template.contact',
             'template.payment_details',
-            'query.begin',
-            'query.end',
             'query.day',
             'query.month',
             'query.month_number',
             'query.year',
+            'query.begin',
+            'query.begin_process',
             'query.begin_day',
             'query.begin_month',
             'query.begin_month_number',
             'query.begin_year',
+            'query.end',
+            'query.end_process',
             'query.end_day',
             'query.end_month',
             'query.end_month_number',
             'query.end_year',
+            'user.see_others',
         ];
 
         $givenKeys = array_keys($model);

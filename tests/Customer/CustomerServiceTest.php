@@ -19,6 +19,7 @@ use App\Event\CustomerMetaDefinitionEvent;
 use App\Event\CustomerUpdatePostEvent;
 use App\Event\CustomerUpdatePreEvent;
 use App\Repository\CustomerRepository;
+use App\Tests\Mocks\SystemConfigurationFactory;
 use App\Validator\ValidationFailedException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -43,6 +44,9 @@ class CustomerServiceTest extends TestCase
 
         if ($dispatcher === null) {
             $dispatcher = $this->createMock(EventDispatcherInterface::class);
+            $dispatcher->method('dispatch')->willReturnCallback(function ($event) {
+                return $event;
+            });
         }
 
         if ($validator === null) {
@@ -51,18 +55,21 @@ class CustomerServiceTest extends TestCase
         }
 
         if ($configuration === null) {
-            $configuration = $this->createMock(SystemConfiguration::class);
-            $configuration->method('getCustomerDefaultTimezone')->willReturn('Europe/Vienna');
-            $configuration->method('getCustomerDefaultCountry')->willReturn('IN');
-            $configuration->method('getCustomerDefaultCurrency')->willReturn('RUB');
+            $configuration = SystemConfigurationFactory::createStub([
+                'defaults' => [
+                    'customer' => [
+                        'timezone' => 'Europe/Vienna',
+                        'country' => 'IN',
+                        'currency' => 'RUB',
+                    ]
+                ]
+            ]);
         }
 
-        $service = new CustomerService($repository, $configuration, $validator, $dispatcher);
-
-        return $service;
+        return new CustomerService($repository, $configuration, $validator, $dispatcher);
     }
 
-    public function testCannotSavePersistedCustomerAsNew()
+    public function testCannotSavePersistedCustomerAsNew(): void
     {
         $Customer = $this->createMock(Customer::class);
         $Customer->expects($this->once())->method('getId')->willReturn(1);
@@ -75,7 +82,7 @@ class CustomerServiceTest extends TestCase
         $sut->saveNewCustomer($Customer);
     }
 
-    public function testSaveNewCustomerHasValidationError()
+    public function testSaveNewCustomerHasValidationError(): void
     {
         $constraints = new ConstraintViolationList();
         $constraints->add(new ConstraintViolation('toooo many tests', 'abc.def', [], '$root', 'begin', 4, null, null, null, '$cause'));
@@ -88,10 +95,10 @@ class CustomerServiceTest extends TestCase
         $this->expectException(ValidationFailedException::class);
         $this->expectExceptionMessage('Validation Failed');
 
-        $sut->saveNewCustomer(new Customer());
+        $sut->saveNewCustomer(new Customer('foo'));
     }
 
-    public function testUpdateDispatchesEvents()
+    public function testUpdateDispatchesEvents(): void
     {
         $Customer = $this->createMock(Customer::class);
         $Customer->method('getId')->willReturn(1);
@@ -105,6 +112,8 @@ class CustomerServiceTest extends TestCase
             } else {
                 $this->fail('Invalid event received');
             }
+
+            return $event;
         });
 
         $sut = $this->getSut($dispatcher);
@@ -112,45 +121,40 @@ class CustomerServiceTest extends TestCase
         $sut->updateCustomer($Customer);
     }
 
-    public function testCreateNewCustomerDispatchesEvents()
+    public function testCreateNewCustomerDispatchesEvents(): void
     {
         $dispatcher = $this->createMock(EventDispatcherInterface::class);
         $dispatcher->expects($this->exactly(2))->method('dispatch')->willReturnCallback(function ($event) {
-            if ($event instanceof CustomerMetaDefinitionEvent) {
-                self::assertInstanceOf(Customer::class, $event->getEntity());
-            } elseif ($event instanceof CustomerCreateEvent) {
-                self::assertInstanceOf(Customer::class, $event->getCustomer());
-            } else {
+            if (!$event instanceof CustomerMetaDefinitionEvent && !$event instanceof CustomerCreateEvent) {
                 $this->fail('Invalid event received');
             }
+
+            return $event;
         });
 
         $sut = $this->getSut($dispatcher);
 
-        $customer = $sut->createNewCustomer();
+        $customer = $sut->createNewCustomer('');
 
-        self::assertInstanceOf(Customer::class, $customer);
         self::assertEquals('Europe/Vienna', $customer->getTimezone());
         self::assertEquals('IN', $customer->getCountry());
         self::assertEquals('RUB', $customer->getCurrency());
     }
 
-    public function testSaveNewCustomerDispatchesEvents()
+    public function testSaveNewCustomerDispatchesEvents(): void
     {
         $dispatcher = $this->createMock(EventDispatcherInterface::class);
         $dispatcher->expects($this->exactly(2))->method('dispatch')->willReturnCallback(function ($event) {
-            if ($event instanceof CustomerCreatePreEvent) {
-                self::assertInstanceOf(Customer::class, $event->getCustomer());
-            } elseif ($event instanceof CustomerCreatePostEvent) {
-                self::assertInstanceOf(Customer::class, $event->getCustomer());
-            } else {
+            if (!$event instanceof CustomerCreatePreEvent && !$event instanceof CustomerCreatePostEvent) {
                 $this->fail('Invalid event received');
             }
+
+            return $event;
         });
 
         $sut = $this->getSut($dispatcher);
 
-        $Customer = new Customer();
+        $Customer = new Customer('foo');
         $sut->saveNewCustomer($Customer);
     }
 }

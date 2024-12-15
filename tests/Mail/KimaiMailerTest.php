@@ -31,10 +31,10 @@ class KimaiMailerTest extends TestCase
         return new KimaiMailer($config, $mailer);
     }
 
-    public function testSendSetsFrom()
+    public function testSendSetsFrom(): void
     {
         $user = new User();
-        $user->setUsername('Testing');
+        $user->setUserIdentifier('Testing');
         $user->setEmail('foo@example.com');
         $user->setAlias('Super User');
 
@@ -45,6 +45,6 @@ class KimaiMailerTest extends TestCase
 
         $mailer->send($message);
 
-        self::assertEquals([new Address('zippel@example.com')], $message->getFrom());
+        self::assertEquals([new Address('zippel@example.com', 'Kimai')], $message->getFrom());
     }
 }

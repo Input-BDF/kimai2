@@ -12,10 +12,17 @@ namespace App\Timesheet\TrackingMode;
 use App\Entity\Timesheet;
 use DateTime;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 final class PunchInOutMode implements TrackingModeInterface
 {
     use TrackingModeTrait;
+
+    public function __construct(
+        private readonly AuthorizationCheckerInterface $authorizationChecker
+    )
+    {
+    }
 
     public function canEditBegin(): bool
     {
@@ -34,7 +41,7 @@ final class PunchInOutMode implements TrackingModeInterface
 
     public function canUpdateTimesWithAPI(): bool
     {
-        return false;
+        return $this->authorizationChecker->isGranted('view_other_timesheet');
     }
 
     public function create(Timesheet $timesheet, ?Request $request = null): void
@@ -52,5 +59,10 @@ final class PunchInOutMode implements TrackingModeInterface
     public function canSeeBeginAndEndTimes(): bool
     {
         return true;
+    }
+
+    public function getEditTemplate(): string
+    {
+        return 'timesheet/edit-default.html.twig';
     }
 }

@@ -16,22 +16,31 @@ use App\Entity\User;
  */
 class DoctorControllerTest extends ControllerBaseTest
 {
-    public function testDoctorIsSecure()
+    public function testDoctorIsSecure(): void
     {
         $this->assertUrlIsSecured('/doctor');
     }
 
-    public function testDoctorIsSecureForRole()
+    public function testDoctorIsSecureForRole(): void
     {
         $this->assertUrlIsSecuredForRole(User::ROLE_ADMIN, '/doctor');
     }
 
-    public function testIndexAction()
+    public function testIndexAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_SUPER_ADMIN);
         $this->assertAccessIsGranted($client, '/doctor');
 
-        $result = $client->getCrawler()->filter('.content .box-header');
-        self::assertCount(6, $result);
+        $result = $client->getCrawler()->filter('.content .accordion-header');
+        $counter = \count($result);
+        // this can contain a warning box, that a new release is available
+        self::assertTrue($counter === 6 || $counter === 5);
+    }
+
+    public function testFlushLogWithInvalidCsrf(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_SUPER_ADMIN);
+
+        $this->assertInvalidCsrfToken($client, '/doctor/flush-log/rsetdzfukgli78t6r5uedtjfzkugl', $this->createUrl('/doctor'));
     }
 }

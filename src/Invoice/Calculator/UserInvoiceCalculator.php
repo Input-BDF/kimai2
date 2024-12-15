@@ -9,26 +9,25 @@
 
 namespace App\Invoice\Calculator;
 
+use App\Entity\ExportableItem;
 use App\Invoice\CalculatorInterface;
-use App\Invoice\InvoiceItemInterface;
 
 /**
  * A calculator that sums up the invoice item records by user.
  */
-class UserInvoiceCalculator extends AbstractSumInvoiceCalculator implements CalculatorInterface
+final class UserInvoiceCalculator extends AbstractSumInvoiceCalculator implements CalculatorInterface
 {
-    protected function calculateSumIdentifier(InvoiceItemInterface $invoiceItem): string
+    public function getIdentifiers(ExportableItem $invoiceItem): array
     {
-        if (null === $invoiceItem->getUser()->getId()) {
+        if (null === $invoiceItem->getUser()?->getId()) {
             throw new \Exception('Cannot handle un-persisted user');
         }
 
-        return (string) $invoiceItem->getUser()->getId();
+        return [
+            $invoiceItem->getUser()->getId()
+        ];
     }
 
-    /**
-     * @return string
-     */
     public function getId(): string
     {
         return 'user';

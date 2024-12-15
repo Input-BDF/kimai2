@@ -9,33 +9,43 @@
 
 namespace App\Invoice\Calculator;
 
+use App\Entity\ExportableItem;
 use App\Invoice\CalculatorInterface;
 use App\Invoice\InvoiceItem;
-use App\Invoice\InvoiceItemInterface;
 
 /**
  * A calculator that sums up the invoice item records by project.
  */
-class ProjectInvoiceCalculator extends AbstractSumInvoiceCalculator implements CalculatorInterface
+final class ProjectInvoiceCalculator extends AbstractSumInvoiceCalculator implements CalculatorInterface
 {
-    protected function calculateSumIdentifier(InvoiceItemInterface $invoiceItem): string
+    public function getIdentifiers(ExportableItem $invoiceItem): array
     {
-        if (null === $invoiceItem->getProject()->getId()) {
+        if ($invoiceItem->getProject() === null) {
+            throw new \Exception('Cannot handle invoice items without project');
+        }
+
+        if ($invoiceItem->getProject()->getId() === null) {
             throw new \Exception('Cannot handle un-persisted projects');
         }
 
-        return (string) $invoiceItem->getProject()->getId();
+        return [
+            $invoiceItem->getProject()->getId()
+        ];
     }
 
-    protected function mergeSumInvoiceItem(InvoiceItem $invoiceItem, InvoiceItemInterface $entry)
+    protected function mergeSumInvoiceItem(InvoiceItem $invoiceItem, ExportableItem $entry): void
     {
-        $invoiceItem->setProject($entry->getProject());
-        $invoiceItem->setDescription($entry->getProject()->getName());
+        if ($entry->getProject() === null) {
+            return;
+        }
+
+        if ($entry->getProject()->getInvoiceText() !== null) {
+            $invoiceItem->setDescription($entry->getProject()->getInvoiceText());
+        } else {
+            $invoiceItem->setDescription($entry->getProject()->getName());
+        }
     }
 
-    /**
-     * @return string
-     */
     public function getId(): string
     {
         return 'project';

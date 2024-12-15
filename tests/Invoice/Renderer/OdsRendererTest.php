@@ -24,17 +24,15 @@ class OdsRendererTest extends TestCase
 {
     use RendererTestTrait;
 
-    public function testSupports()
+    public function testSupports(): void
     {
         $sut = $this->getAbstractRenderer(OdsRenderer::class);
 
-        $this->assertFalse($sut->supports($this->getInvoiceDocument('default.html.twig')));
-        $this->assertFalse($sut->supports($this->getInvoiceDocument('freelancer.html.twig')));
+        $this->assertFalse($sut->supports($this->getInvoiceDocument('invoice.html.twig')));
+        $this->assertFalse($sut->supports($this->getInvoiceDocument('service-date.pdf.twig')));
         $this->assertFalse($sut->supports($this->getInvoiceDocument('timesheet.html.twig')));
-        $this->assertFalse($sut->supports($this->getInvoiceDocument('foo.html.twig')));
-        $this->assertFalse($sut->supports($this->getInvoiceDocument('company.docx')));
-        $this->assertFalse($sut->supports($this->getInvoiceDocument('export.csv')));
-        $this->assertFalse($sut->supports($this->getInvoiceDocument('spreadsheet.xlsx')));
+        $this->assertFalse($sut->supports($this->getInvoiceDocument('company.docx', true)));
+        $this->assertFalse($sut->supports($this->getInvoiceDocument('spreadsheet.xlsx', true)));
         $this->assertTrue($sut->supports($this->getInvoiceDocument('open-spreadsheet.ods', true)));
     }
 
@@ -47,7 +45,7 @@ class OdsRendererTest extends TestCase
     /**
      * @dataProvider getTestModel
      */
-    public function testRender(InvoiceModel $model, $expectedRate, $expectedRows, $expectedDescriptions, $expectedUser1, $expectedUser2, $expectedUser3)
+    public function testRender(InvoiceModel $model, $expectedRate, $expectedRows, $expectedDescriptions, $expectedUser1, $expectedUser2, $expectedUser3): void
     {
         /** @var OdsRenderer $sut */
         $sut = $this->getAbstractRenderer(OdsRenderer::class);

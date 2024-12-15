@@ -24,13 +24,15 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
  */
 class UserPreferenceExtractorTest extends TestCase
 {
-    public function testExtract()
+    public function testExtract(): void
     {
         $dispatcher = $this->createMock(EventDispatcherInterface::class);
         $dispatcher->expects(self::once())->method('dispatch')->willReturnCallback(function (UserPreferenceDisplayEvent $event) {
-            $event->addPreference((new UserPreference())->setName('foo')->setEnabled(true));
-            $event->addPreference((new UserPreference())->setName('no')->setEnabled(false));
-            $event->addPreference((new UserPreference())->setName('bar')->setEnabled(true));
+            $event->addPreference(new UserPreference('foo'));
+            $event->addPreference((new UserPreference('no'))->setEnabled(false));
+            $event->addPreference(new UserPreference('bar'));
+
+            return $event;
         });
 
         $sut = new UserPreferenceExtractor($dispatcher);
@@ -49,10 +51,10 @@ class UserPreferenceExtractorTest extends TestCase
         $definition = $columns[1];
         self::assertEquals('bar', $definition->getLabel());
         self::assertEquals('string', $definition->getType());
-        self::assertEquals('tralalalala', \call_user_func($definition->getAccessor(), (new User())->addPreference((new UserPreference())->setName('bar')->setValue('tralalalala'))));
+        self::assertEquals('tralalalala', \call_user_func($definition->getAccessor(), (new User())->addPreference((new UserPreference('bar', 'tralalalala')))));
     }
 
-    public function testCheckType()
+    public function testCheckType(): void
     {
         $dispatcher = $this->createMock(EventDispatcherInterface::class);
         $sut = new UserPreferenceExtractor($dispatcher);
@@ -60,7 +62,7 @@ class UserPreferenceExtractorTest extends TestCase
         $this->expectException(ExtractorException::class);
         $this->expectExceptionMessage('UserPreferenceExtractor needs a UserPreferenceDisplayEvent instance for work');
 
-        /* @phpstan-ignore-next-line */
+        /* @phpstan-ignore argument.type */
         $sut->extract(new \stdClass());
     }
 }

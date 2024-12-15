@@ -20,23 +20,15 @@ final class TagFixtures implements TestFixture
     /**
      * @var string[]
      */
-    private $tagArray = [];
-    /**
-     * @var callable
-     */
-    private $callback;
+    private array $tagArray = [];
+    private ?\Closure $callback = null;
 
     /**
      * Will be called prior to persisting the object.
-     *
-     * @param callable $callback
-     * @return TagFixtures
      */
-    public function setCallback(callable $callback): TagFixtures
+    public function setCallback(\Closure $callback): void
     {
         $this->callback = $callback;
-
-        return $this;
     }
 
     /**
@@ -47,19 +39,29 @@ final class TagFixtures implements TestFixture
         return $this->tagArray;
     }
 
-    /**
-     * @param string[] $tagArray
-     * @return TagFixtures
-     */
-    public function setTagArray(array $tagArray): TagFixtures
+    public function addTagNameToCreate(string $name): void
     {
-        $this->tagArray = $tagArray;
-
-        return $this;
+        $this->tagArray[] = $name;
     }
 
     /**
-     * @param ObjectManager $manager
+     * @param string[] $tagArray
+     */
+    public function setTagArray(array $tagArray): void
+    {
+        $this->tagArray = $tagArray;
+    }
+
+    public function importAmount(int $amount): void
+    {
+        $tags = [];
+        for ($i = 0; $i <= $amount; $i++) {
+            $tags[] = (string) $i;
+        }
+        $this->setTagArray($tags);
+    }
+
+    /**
      * @return Tag[]
      */
     public function load(ObjectManager $manager): array

@@ -9,36 +9,35 @@
 
 namespace App\Invoice\Calculator;
 
+use App\Entity\ExportableItem;
 use App\Invoice\CalculatorInterface;
 use App\Invoice\InvoiceItem;
-use App\Invoice\InvoiceItemInterface;
 
 /**
  * A calculator that sums up the invoice item records by activity.
  */
-class ActivityInvoiceCalculator extends AbstractSumInvoiceCalculator implements CalculatorInterface
+final class ActivityInvoiceCalculator extends AbstractSumInvoiceCalculator implements CalculatorInterface
 {
-    protected function calculateSumIdentifier(InvoiceItemInterface $invoiceItem): string
+    public function getIdentifiers(ExportableItem $invoiceItem): array
     {
-        if (null === $invoiceItem->getActivity()) {
-            return '__NULL__';
-        }
-
-        return (string) $invoiceItem->getActivity()->getId();
+        return [
+            $invoiceItem->getActivity()?->getId()
+        ];
     }
 
-    protected function mergeSumInvoiceItem(InvoiceItem $invoiceItem, InvoiceItemInterface $entry)
+    protected function mergeSumInvoiceItem(InvoiceItem $invoiceItem, ExportableItem $entry): void
     {
         if (null === $entry->getActivity()) {
             return;
         }
 
-        $invoiceItem->setDescription($entry->getActivity()->getName());
+        if ($entry->getActivity()->getInvoiceText() !== null) {
+            $invoiceItem->setDescription($entry->getActivity()->getInvoiceText());
+        } else {
+            $invoiceItem->setDescription($entry->getActivity()->getName());
+        }
     }
 
-    /**
-     * @return string
-     */
     public function getId(): string
     {
         return 'activity';

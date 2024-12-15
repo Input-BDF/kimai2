@@ -11,52 +11,46 @@ namespace App\Command;
 
 use App\Entity\User;
 use App\User\UserService;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-class DemoteUserCommand extends AbstractRoleCommand
+#[AsCommand(name: 'kimai:user:demote')]
+final class DemoteUserCommand extends AbstractRoleCommand
 {
-    /**
-     * {@inheritdoc}
-     */
-    protected function configure()
+    protected function configure(): void
     {
         parent::configure();
 
         $this
-            ->setName('kimai:user:demote')
-            ->setAliases(['fos:user:demote'])
             ->setDescription('Demote a user by removing a role')
             ->setHelp(
                 <<<'EOT'
-The <info>kimai:user:demote</info> command demotes a user by removing a role
+                    The <info>kimai:user:demote</info> command demotes a user by removing a role
 
-  <info>php %command.full_name% susan_super ROLE_TEAMLEAD</info>
-  <info>php %command.full_name% --super susan_super</info>
-EOT
+                      <info>php %command.full_name% susan_super ROLE_TEAMLEAD</info>
+                      <info>php %command.full_name% --super susan_super</info>
+                    EOT
             );
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function executeRoleCommand(UserService $manipulator, SymfonyStyle $output, User $user, bool $super, $role)
+    protected function executeRoleCommand(UserService $userService, SymfonyStyle $output, User $user, bool $super, $role): void
     {
-        $username = $user->getUsername();
+        $username = $user->getUserIdentifier();
         if ($super) {
             if ($user->isSuperAdmin()) {
                 $user->setSuperAdmin(false);
-                $manipulator->updateUser($user);
-                $output->success(sprintf('Super administrator role has been removed from the user "%s".', $username));
+                $userService->saveUser($user);
+                $output->success(\sprintf('Super administrator role has been removed from the user "%s".', $username));
             } else {
-                $output->warning(sprintf('User "%s" doesn\'t have the super administrator role.', $username));
+                $output->warning(\sprintf('User "%s" doesn\'t have the super administrator role.', $username));
             }
         } else {
             if ($user->hasRole($role)) {
                 $user->removeRole($role);
-                $manipulator->updateUser($user);
-                $output->success(sprintf('Role "%s" has been removed from user "%s".', $role, $username));
+                $userService->saveUser($user);
+                $output->success(\sprintf('Role "%s" has been removed from user "%s".', $role, $username));
             } else {
-                $output->warning(sprintf('User "%s" didn\'t have "%s" role.', $username, $role));
+                $output->warning(\sprintf('User "%s" didn\'t have "%s" role.', $username, $role));
             }
         }
     }

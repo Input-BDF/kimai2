@@ -11,11 +11,12 @@ namespace App\Repository;
 
 use App\Entity\InvoiceTemplate;
 use App\Repository\Paginator\PaginatorInterface;
-use App\Repository\Paginator\QueryBuilderPaginator;
+use App\Repository\Paginator\QueryPaginator;
 use App\Repository\Query\BaseQuery;
+use App\Utils\Pagination;
 use Doctrine\ORM\EntityRepository;
+use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
-use Pagerfanta\Pagerfanta;
 
 /**
  * @extends \Doctrine\ORM\EntityRepository<InvoiceTemplate>
@@ -49,23 +50,26 @@ class InvoiceTemplateRepository extends EntityRepository
         return $qb;
     }
 
-    protected function getPaginatorForQuery(BaseQuery $query): PaginatorInterface
+    /**
+     * @return PaginatorInterface<InvoiceTemplate>
+     */
+    private function getPaginatorForQuery(BaseQuery $baseQuery): PaginatorInterface
     {
-        $counter = $this->countTemplatesForQuery($query);
-        $qb = $this->getQueryBuilderForQuery($query);
+        $counter = $this->countTemplatesForQuery($baseQuery);
+        /** @var Query<InvoiceTemplate> $query */
+        $query = $this->getQueryBuilderForQuery($baseQuery)->getQuery();
 
-        return new QueryBuilderPaginator($qb, $counter);
+        return new QueryPaginator($query, $counter);
     }
 
-    public function getPagerfantaForQuery(BaseQuery $query): Pagerfanta
+    public function getPagerfantaForQuery(BaseQuery $query): Pagination
     {
-        $paginator = new Pagerfanta($this->getPaginatorForQuery($query));
-        $paginator->setMaxPerPage($query->getPageSize());
-        $paginator->setCurrentPage($query->getPage());
-
-        return $paginator;
+        return new Pagination($this->getPaginatorForQuery($query), $query);
     }
 
+    /**
+     * @return int<0, max>
+     */
     public function countTemplatesForQuery(BaseQuery $query): int
     {
         $qb = $this->getQueryBuilderForQuery($query);
@@ -75,37 +79,18 @@ class InvoiceTemplateRepository extends EntityRepository
             ->select($qb->expr()->countDistinct('t.id'))
         ;
 
-        return (int) $qb->getQuery()->getSingleScalarResult();
+        return (int) $qb->getQuery()->getSingleScalarResult(); // @phpstan-ignore-line
     }
 
-    /**
-     * @param InvoiceTemplate $template
-     * @return InvoiceTemplate
-     * @throws RepositoryException
-     */
-    public function saveTemplate(InvoiceTemplate $template)
+    public function saveTemplate(InvoiceTemplate $template): void
     {
-        try {
-            $this->getEntityManager()->persist($template);
-            $this->getEntityManager()->flush();
-        } catch (\Exception $ex) {
-            throw new RepositoryException('Could not save InvoiceTemplate');
-        }
-
-        return $template;
+        $this->getEntityManager()->persist($template);
+        $this->getEntityManager()->flush();
     }
 
-    /**
-     * @param InvoiceTemplate $template
-     * @throws RepositoryException
-     */
-    public function removeTemplate(InvoiceTemplate $template)
+    public function removeTemplate(InvoiceTemplate $template): void
     {
-        try {
-            $this->getEntityManager()->remove($template);
-            $this->getEntityManager()->flush();
-        } catch (\Exception $ex) {
-            throw new RepositoryException('Could not remove InvoiceTemplate');
-        }
+        $this->getEntityManager()->remove($template);
+        $this->getEntityManager()->flush();
     }
 }

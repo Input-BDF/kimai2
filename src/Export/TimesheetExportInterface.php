@@ -11,19 +11,18 @@ namespace App\Export;
 
 use App\Entity\Timesheet;
 use App\Repository\Query\TimesheetQuery;
+use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Component\HttpFoundation\Response;
 
+#[AutoconfigureTag]
 interface TimesheetExportInterface
 {
     /**
      * @param Timesheet[] $timesheets
-     * @param TimesheetQuery $query
-     * @return Response
      */
     public function render(array $timesheets, TimesheetQuery $query): Response;
 
-    /**
-     * @return string
-     */
     public function getId(): string;
+
+    public function getTitle(): string;
 }

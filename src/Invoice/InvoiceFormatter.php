@@ -9,56 +9,30 @@
 
 namespace App\Invoice;
 
-use DateTime;
+use DateTimeInterface;
 
 /**
  * @internal this is subject to change
  */
 interface InvoiceFormatter
 {
-    /**
-     * @param DateTime $date
-     * @return mixed
-     */
-    public function getFormattedDateTime(DateTime $date);
+    public function getLocale(): string;
 
-    /**
-     * @param DateTime $date
-     * @return mixed
-     */
-    public function getFormattedTime(DateTime $date);
+    public function setLocale(string $locale): void;
 
-    /**
-     * @param int|float $amount
-     * @param string|null $currency
-     * @param bool $withCurrency
-     * @return string
-     */
-    public function getFormattedMoney($amount, ?string $currency, bool $withCurrency = true);
+    public function getFormattedDateTime(DateTimeInterface $date): string;
 
-    /**
-     * @param DateTime $date
-     * @return mixed
-     */
-    public function getFormattedMonthName(DateTime $date);
+    public function getFormattedTime(DateTimeInterface $date): string;
 
-    /**
-     * @param int $seconds
-     * @return mixed
-     */
-    public function getFormattedDuration($seconds);
+    public function getFormattedAmount(float $amount): string;
 
-    /**
-     * @param int $seconds
-     * @return mixed
-     */
-    public function getFormattedDecimalDuration($seconds);
+    public function getFormattedMoney(float $amount, ?string $currency, bool $withCurrency = true): string;
 
-    /**
-     * Returns the currency symbol for the given currency by name.
-     *
-     * @param string $currency
-     * @return string
-     */
+    public function getFormattedMonthName(DateTimeInterface $date): string;
+
+    public function getFormattedDuration(int $seconds): string;
+
+    public function getFormattedDecimalDuration(int $seconds): string;
+
     public function getCurrencySymbol(string $currency): string;
 }

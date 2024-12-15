@@ -17,23 +17,25 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\TimesheetMultiUser
  * @covers \App\Validator\Constraints\TimesheetMultiUserValidator
+ * @extends ConstraintValidatorTestCase<TimesheetMultiUserValidator>
  */
 class TimesheetMultiUserValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator($isGranted = true)
+    protected function createValidator(): TimesheetMultiUserValidator
     {
         return new TimesheetMultiUserValidator();
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
         $this->validator->validate('foo', new NotBlank());
     }
 
-    public function testEmptyTimesheet()
+    public function testEmptyTimesheet(): void
     {
         $timesheet = new MultiUserTimesheet();
 

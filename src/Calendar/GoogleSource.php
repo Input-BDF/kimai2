@@ -9,40 +9,10 @@
 
 namespace App\Calendar;
 
-final class GoogleSource
+final class GoogleSource extends CalendarSource
 {
-    /**
-     * @var string
-     */
-    private $id;
-    /**
-     * @var string
-     */
-    private $uri;
-    /**
-     * @var string|null
-     */
-    private $color;
-
     public function __construct(string $id, string $uri, ?string $color = null)
     {
-        $this->id = $id;
-        $this->uri = $uri;
-        $this->color = $color;
-    }
-
-    public function getId(): string
-    {
-        return $this->id;
-    }
-
-    public function getUri(): string
-    {
-        return $this->uri;
-    }
-
-    public function getColor(): ?string
-    {
-        return $this->color;
+        parent::__construct(CalendarSourceType::GOOGLE, $id, $uri, $color);
     }
 }

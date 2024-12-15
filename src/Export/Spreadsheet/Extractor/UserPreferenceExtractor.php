@@ -12,21 +12,15 @@ namespace App\Export\Spreadsheet\Extractor;
 use App\Entity\User;
 use App\Event\UserPreferenceDisplayEvent;
 use App\Export\Spreadsheet\ColumnDefinition;
-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 
 /**
  * @internal
  */
 final class UserPreferenceExtractor implements ExtractorInterface
 {
-    /**
-     * @var EventDispatcherInterface
-     */
-    private $eventDispatcher;
-
-    public function __construct(EventDispatcherInterface $eventDispatcher)
+    public function __construct(private EventDispatcherInterface $eventDispatcher)
     {
-        $this->eventDispatcher = $eventDispatcher;
     }
 
     /**

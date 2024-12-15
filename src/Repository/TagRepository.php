@@ -10,91 +10,91 @@
 namespace App\Repository;
 
 use App\Entity\Tag;
-use App\Repository\Paginator\QueryBuilderPaginator;
+use App\Entity\Timesheet;
+use App\Repository\Paginator\QueryPaginator;
 use App\Repository\Query\TagFormTypeQuery;
 use App\Repository\Query\TagQuery;
+use App\Utils\Pagination;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityRepository;
-use Doctrine\ORM\ORMException;
 use Doctrine\ORM\QueryBuilder;
-use Pagerfanta\Pagerfanta;
 
 /**
- * @extends \Doctrine\ORM\EntityRepository<Tag>
+ * @extends EntityRepository<Tag>
  */
 class TagRepository extends EntityRepository
 {
-    /**
-     * @param Tag $tag
-     * @throws ORMException
-     * @throws \Doctrine\ORM\OptimisticLockException
-     */
-    public function saveTag(Tag $tag)
+    public function saveTag(Tag $tag): void
     {
         $entityManager = $this->getEntityManager();
         $entityManager->persist($tag);
         $entityManager->flush();
     }
 
-    /**
-     * @param Tag $tag
-     * @throws ORMException
-     * @throws \Doctrine\ORM\OptimisticLockException
-     */
-    public function deleteTag(Tag $tag)
+    public function deleteTag(Tag $tag): void
     {
         $entityManager = $this->getEntityManager();
         $entityManager->remove($tag);
         $entityManager->flush();
     }
 
-    public function findTagByName(string $tagName): ?Tag
-    {
-        return $this->findOneBy(['name' => $tagName]);
-    }
-
     /**
-     * Find ids of the given tagNames separated by comma
-     * @param string $tagNames
-     * @return array
+     * @param array<string> $tagNames
+     * @return array<Tag>
      */
-    public function findIdsByTagNameList(string $tagNames)
+    public function findTagsByName(array $tagNames, ?bool $visible = null): array
     {
-        $qb = $this
-            ->createQueryBuilder('t')
-            ->select('t.id');
-        $list = array_filter(array_unique(array_map('trim', explode(',', $tagNames))));
-        $cnt = 0;
-        foreach ($list as $listElem) {
-            $qb
-                ->orWhere('t.name like :elem' . $cnt)
-                ->setParameter('elem' . $cnt, '%' . $listElem . '%');
-            $cnt++;
+        if ($visible === null) {
+            return $this->findBy(['name' => $tagNames]);
         }
 
-        return array_column($qb->getQuery()->getScalarResult(), 'id');
+        return $this->findBy(['name' => $tagNames, 'visible' => $visible]);
     }
 
-    /**
-     * Find all tag names in an alphabetical order
-     *
-     * @param string $filter
-     * @return array
-     */
-    public function findAllTagNames($filter = null)
+    public function findTagByName(string $tagName, ?bool $visible = null): ?Tag
+    {
+        if ($visible === null) {
+            return $this->findOneBy(['name' => $tagName]);
+        }
+
+        return $this->findOneBy(['name' => $tagName, 'visible' => $visible]);
+    }
+
+    private function findAllTagsQuery(?string $filter = null): QueryBuilder
     {
         $qb = $this->createQueryBuilder('t');
 
-        $qb
-            ->select('t.name')
-            ->addOrderBy('t.name', 'ASC');
+        $qb->addOrderBy('t.name', 'ASC');
+
+        $qb->andWhere($qb->expr()->eq('t.visible', ':visible'));
+        $qb->setParameter('visible', true, ParameterType::BOOLEAN);
 
         if (null !== $filter) {
-            $qb
-                ->andWhere('t.name LIKE :filter')
-                ->setParameter('filter', '%' . $filter . '%');
+            $qb->andWhere('t.name LIKE :filter');
+            $qb->setParameter('filter', '%' . $filter . '%');
         }
 
-        return array_column($qb->getQuery()->getScalarResult(), 'name');
+        return $qb;
+    }
+
+    /**
+     * Find all visible tag names in alphabetical order.
+     *
+     * @return array<Tag>
+     */
+    public function findAllTags(?string $filter = null): array
+    {
+        return $this->findAllTagsQuery($filter)->getQuery()->getResult();
+    }
+
+    /**
+     * Find all visible tag names in alphabetical order.
+     *
+     * @return array<string>
+     */
+    public function findAllTagNames(?string $filter = null): array
+    {
+        return array_column($this->findAllTagsQuery($filter)->select('t.name')->getQuery()->getScalarResult(), 'name');
     }
 
     /**
@@ -104,51 +104,59 @@ class TagRepository extends EntityRepository
      * - amount
      *
      * @param TagQuery $query
-     * @return Pagerfanta
+     * @return Pagination
      */
-    public function getTagCount(TagQuery $query)
+    public function getTagCount(TagQuery $query): Pagination
     {
         $qb = $this->getQueryBuilderForQuery($query);
+        $qb1 = clone $qb;
+
         $qb
             ->resetDQLPart('select')
             ->resetDQLPart('orderBy')
-            ->select($qb->expr()->count('tag.name'))
+            ->select($qb->expr()->count('tag.id'))
         ;
+        /** @var int<0, max> $counter */
         $counter = (int) $qb->getQuery()->getSingleScalarResult();
 
-        $qb = $this->getQueryBuilderForQuery($query);
+        $paginator = new QueryPaginator($qb1->getQuery(), $counter);
 
-        $paginator = new QueryBuilderPaginator($qb, $counter);
+        $pager = new Pagination($paginator);
+        $pager->setMaxPerPage($query->getPageSize());
+        $pager->setCurrentPage($query->getPage());
 
-        $pagerfanta = new Pagerfanta($paginator);
-        $pagerfanta->setMaxPerPage($query->getPageSize());
-        $pagerfanta->setCurrentPage($query->getPage());
-
-        return $pagerfanta;
+        return $pager;
     }
 
     private function getQueryBuilderForQuery(TagQuery $query): QueryBuilder
     {
         $qb = $this->createQueryBuilder('tag');
 
-        $qb
-            ->select('tag.id, tag.name, tag.color, SIZE(tag.timesheets) as amount')
-        ;
+        $qb1 = $this->getEntityManager()->createQueryBuilder();
+        $qb1->from(Timesheet::class, 't')->select('COUNT(tags)')->innerJoin('t.tags', 'tags')->where('tags.id = tag.id');
+
+        $dql = $qb1->getDQL(); // see https://github.com/phpstan/phpstan-doctrine/issues/606
+        $qb->select('tag.id, tag.name, tag.color, tag.visible');
+        $qb->addSelect('(' . $dql . ') as amount');
 
         $orderBy = $query->getOrderBy();
-        switch ($orderBy) {
-            case 'amount':
-                $orderBy = 'amount';
-                break;
-            default:
-                $orderBy = 'tag.' . $orderBy;
-                break;
+        $orderBy = match ($orderBy) {
+            'amount' => 'amount',
+            default => 'tag.' . $orderBy,
+        };
+
+        if ($query->isShowVisible()) {
+            $qb->andWhere($qb->expr()->eq('tag.visible', ':visible'));
+            $qb->setParameter('visible', true, ParameterType::BOOLEAN);
+        } elseif ($query->isShowHidden()) {
+            $qb->andWhere($qb->expr()->eq('tag.visible', ':visible'));
+            $qb->setParameter('visible', false, ParameterType::BOOLEAN);
         }
 
         $qb->addOrderBy($orderBy, $query->getOrder());
 
-        if ($query->hasSearchTerm()) {
-            $searchTerm = $query->getSearchTerm();
+        $searchTerm = $query->getSearchTerm();
+        if ($searchTerm !== null) {
             $searchAnd = $qb->expr()->andX();
 
             if ($searchTerm->hasSearchTerm()) {
@@ -173,6 +181,8 @@ class TagRepository extends EntityRepository
         $qb = $this->createQueryBuilder('tag');
 
         $qb->orderBy('tag.name', 'ASC');
+        $qb->andWhere($qb->expr()->eq('tag.visible', ':visible'));
+        $qb->setParameter('visible', true, ParameterType::BOOLEAN);
 
         return $qb;
     }
@@ -189,6 +199,27 @@ class TagRepository extends EntityRepository
         try {
             foreach ($tags as $tag) {
                 $em->remove($tag);
+            }
+            $em->flush();
+            $em->commit();
+        } catch (\Exception $ex) {
+            $em->rollback();
+            throw $ex;
+        }
+    }
+
+    /**
+     * @param Tag[] $tags
+     * @throws \Exception
+     */
+    public function multiUpdate(iterable $tags): void
+    {
+        $em = $this->getEntityManager();
+        $em->beginTransaction();
+
+        try {
+            foreach ($tags as $tag) {
+                $em->persist($tag);
             }
             $em->flush();
             $em->commit();

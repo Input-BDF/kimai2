@@ -25,22 +25,22 @@ class UserStatisticTest extends AbstractTimesheetCountedStatisticTest
         return new UserStatistic($user);
     }
 
-    public function testDefaultValues()
+    public function testDefaultValues(): void
     {
         $this->assertDefaultValues($this->getSut());
     }
 
-    public function testSetter()
+    public function testSetter(): void
     {
         $this->assertSetter($this->getSut());
     }
 
-    public function testJsonSerialize()
+    public function testJsonSerialize(): void
     {
         $this->assertJsonSerialize($this->getSut());
     }
 
-    public function testAdditionalValues()
+    public function testAdditionalValues(): void
     {
         $user = new User();
         $sut = new UserStatistic($user);
@@ -74,7 +74,7 @@ class UserStatisticTest extends AbstractTimesheetCountedStatisticTest
 
         self::assertSame(145, $sut->getDuration());
         self::assertSame(1468, $sut->getDurationBillable());
-        self::assertSame(669.64, $sut->getRate());
+        self::assertSame('669.64', number_format($sut->getRate(), 2));
         self::assertSame(580.236, $sut->getRateBillable());
         self::assertSame(1134.98, $sut->getInternalRate());
     }

@@ -9,38 +9,46 @@
 
 namespace App\Form\Model;
 
-class SystemConfiguration
+final class SystemConfiguration
 {
-    public const SECTION_ROUNDING = 'rounding';
-    public const SECTION_LOCKDOWN = 'lockdown_period';
-    public const SECTION_TIMESHEET = 'timesheet';
-    public const SECTION_FORM_INVOICE = 'invoice';
-    public const SECTION_FORM_CUSTOMER = 'form_customer';
-    public const SECTION_FORM_USER = 'form_user';
-    public const SECTION_THEME = 'theme';
-    public const SECTION_AUTHENTICATION = 'authentication';
-    public const SECTION_CALENDAR = 'calendar';
-    public const SECTION_BRANDING = 'branding';
-
-    /**
-     * @var string|null
-     */
-    private $section;
+    private ?string $translation = null;
+    private string $translationDomain = 'system-configuration';
     /**
      * @var Configuration[]
      */
-    private $configuration = [];
+    private array $configuration = [];
+
+    public function __construct(private ?string $section = null)
+    {
+    }
 
     public function getSection(): ?string
     {
         return $this->section;
     }
 
-    public function setSection(?string $section): SystemConfiguration
+    public function setTranslation(string $translation): SystemConfiguration
     {
-        $this->section = $section;
+        $this->translation = $translation;
 
         return $this;
+    }
+
+    public function getTranslation(): string
+    {
+        return $this->translation ?? $this->section;
+    }
+
+    public function setTranslationDomain(string $domain): SystemConfiguration
+    {
+        $this->translationDomain = $domain;
+
+        return $this;
+    }
+
+    public function getTranslationDomain(): string
+    {
+        return $this->translationDomain;
     }
 
     /**

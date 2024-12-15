@@ -14,10 +14,10 @@ use App\Event\ActivityBudgetStatisticEvent;
 use App\Event\ActivityStatisticEvent;
 use App\Model\ActivityBudgetStatisticModel;
 use App\Model\ActivityStatistic;
-use App\Repository\ActivityRepository;
 use App\Repository\TimesheetRepository;
 use App\Timesheet\DateTimeFactory;
-use DateTime;
+use DateTimeImmutable;
+use DateTimeInterface;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -27,26 +27,15 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  */
 class ActivityStatisticService
 {
-    private $activityRepository;
-    private $timesheetRepository;
-    private $dispatcher;
-
-    public function __construct(ActivityRepository $activityRepository, TimesheetRepository $timesheetRepository, EventDispatcherInterface $dispatcher)
+    public function __construct(private readonly TimesheetRepository $timesheetRepository, private readonly EventDispatcherInterface $dispatcher)
     {
-        $this->activityRepository = $activityRepository;
-        $this->timesheetRepository = $timesheetRepository;
-        $this->dispatcher = $dispatcher;
     }
 
     /**
-     * WARNING: this method does not respect the budget type. Your results will always be wither the "full lifetime data" or the "selected date-range".
-     *
-     * @param Activity $activity
-     * @param DateTime|null $begin
-     * @param DateTime|null $end
-     * @return ActivityStatistic
+     * WARNING: this method does not respect the budget type.
+     * Your results will always be with the "full lifetime data" or the "selected date-range".
      */
-    public function getActivityStatistics(Activity $activity, ?DateTime $begin = null, ?DateTime $end = null): ActivityStatistic
+    public function getActivityStatistics(Activity $activity, ?DateTimeInterface $begin = null, ?DateTimeInterface $end = null): ActivityStatistic
     {
         $statistics = $this->getBudgetStatistic([$activity], $begin, $end);
         $event = new ActivityStatisticEvent($activity, array_pop($statistics), $begin, $end);
@@ -55,7 +44,7 @@ class ActivityStatisticService
         return $event->getStatistic();
     }
 
-    public function getBudgetStatisticModel(Activity $activity, DateTime $today): ActivityBudgetStatisticModel
+    public function getBudgetStatisticModel(Activity $activity, DateTimeInterface $today): ActivityBudgetStatisticModel
     {
         $stats = new ActivityBudgetStatisticModel($activity);
         $stats->setStatisticTotal($this->getActivityStatistics($activity));
@@ -71,18 +60,14 @@ class ActivityStatisticService
 
         $stats->setStatistic($this->getActivityStatistics($activity, $begin, $end));
 
-        $event = new ActivityBudgetStatisticEvent([$stats], $begin, $end);
-        $this->dispatcher->dispatch($event);
-
         return $stats;
     }
 
     /**
      * @param Activity[] $activities
-     * @param DateTime $today
      * @return ActivityBudgetStatisticModel[]
      */
-    public function getBudgetStatisticModelForActivities(array $activities, DateTime $today): array
+    public function getBudgetStatisticModelForActivities(array $activities, DateTimeInterface $today): array
     {
         $models = [];
         $monthly = [];
@@ -132,11 +117,9 @@ class ActivityStatisticService
 
     /**
      * @param Activity[] $activities
-     * @param DateTime|null $begin
-     * @param DateTime|null $end
-     * @return array<int, ActivityStatistic>
+     * @return array<int|string, ActivityStatistic>
      */
-    private function getBudgetStatistic(array $activities, ?DateTime $begin = null, ?DateTime $end = null): array
+    private function getBudgetStatistic(array $activities, ?DateTimeInterface $begin = null, ?DateTimeInterface $end = null): array
     {
         $statistics = [];
         foreach ($activities as $activity) {
@@ -150,15 +133,25 @@ class ActivityStatisticService
         if (null !== $result) {
             foreach ($result as $resultRow) {
                 $statistic = $statistics[$resultRow['id']];
-                $statistic->setDuration($statistic->getDuration() + $resultRow['duration']);
-                $statistic->setRate($statistic->getRate() + $resultRow['rate']);
-                $statistic->setInternalRate($statistic->getInternalRate() + $resultRow['internalRate']);
-                $statistic->setCounter($statistic->getCounter() + $resultRow['counter']);
+                $statistic->addDuration((int) $resultRow['duration']);
+                $statistic->addRate((float) $resultRow['rate']);
+                $statistic->addInternalRate((float) $resultRow['internalRate']);
+                $statistic->addCounter((int) $resultRow['counter']);
                 if ($resultRow['billable']) {
-                    $statistic->setDurationBillable($resultRow['duration']);
-                    $statistic->setRateBillable($resultRow['rate']);
-                    $statistic->setInternalRateBillable($resultRow['internalRate']);
-                    $statistic->setCounterBillable($resultRow['counter']);
+                    $statistic->addDurationBillable((int) $resultRow['duration']);
+                    $statistic->addRateBillable((float) $resultRow['rate']);
+                    $statistic->addInternalRateBillable((float) $resultRow['internalRate']);
+                    $statistic->addCounterBillable((int) $resultRow['counter']);
+                    if ($resultRow['exported']) {
+                        $statistic->addDurationBillableExported((int) $resultRow['duration']);
+                        $statistic->addRateBillableExported((float) $resultRow['rate']);
+                    }
+                }
+                if ($resultRow['exported']) {
+                    $statistic->addDurationExported((int) $resultRow['duration']);
+                    $statistic->addRateExported((float) $resultRow['rate']);
+                    $statistic->addInternalRateExported((float) $resultRow['internalRate']);
+                    $statistic->addCounterExported((int) $resultRow['counter']);
                 }
             }
         }
@@ -166,7 +159,10 @@ class ActivityStatisticService
         return $statistics;
     }
 
-    private function createStatisticQueryBuilder(array $activities, DateTime $begin = null, ?DateTime $end = null): QueryBuilder
+    /**
+     * @param Activity[] $activities
+     */
+    private function createStatisticQueryBuilder(array $activities, \DateTimeInterface $begin = null, ?\DateTimeInterface $end = null): QueryBuilder
     {
         $qb = $this->timesheetRepository->createQueryBuilder('t');
         $qb
@@ -176,9 +172,11 @@ class ActivityStatisticService
             ->addSelect('COALESCE(SUM(t.internalRate), 0) as internalRate')
             ->addSelect('COUNT(t.id) as counter')
             ->addSelect('t.billable as billable')
+            ->addSelect('t.exported as exported')
             ->andWhere($qb->expr()->isNotNull('t.end'))
             ->groupBy('id')
             ->addGroupBy('billable')
+            ->addGroupBy('exported')
             ->andWhere($qb->expr()->in('t.activity', ':activity'))
             ->setParameter('activity', $activities)
         ;
@@ -186,14 +184,14 @@ class ActivityStatisticService
         if ($begin !== null) {
             $qb
                 ->andWhere($qb->expr()->gte('t.begin', ':begin'))
-                ->setParameter('begin', $begin, Types::DATETIME_MUTABLE)
+                ->setParameter('begin', DateTimeImmutable::createFromInterface($begin), Types::DATETIME_IMMUTABLE)
             ;
         }
 
         if ($end !== null) {
             $qb
                 ->andWhere($qb->expr()->lte('t.begin', ':end'))
-                ->setParameter('end', $end, Types::DATETIME_MUTABLE)
+                ->setParameter('end', DateTimeImmutable::createFromInterface($end), Types::DATETIME_IMMUTABLE)
             ;
         }
 

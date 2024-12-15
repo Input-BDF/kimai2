@@ -10,6 +10,7 @@
 namespace App\Doctrine;
 
 use Doctrine\DBAL\Exception;
+use Doctrine\DBAL\Platforms\MySQLPlatform;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration as BaseAbstractMigration;
 
@@ -21,17 +22,6 @@ use Doctrine\Migrations\AbstractMigration as BaseAbstractMigration;
 abstract class AbstractMigration extends BaseAbstractMigration
 {
     /**
-     * @param string $name
-     * @return string
-     */
-    protected function getTableName($name)
-    {
-        @trigger_error('AbstractMigration::getTableName() is deprecated and will be removed with 2.0', E_USER_DEPRECATED);
-
-        return 'kimai2_' . $name;
-    }
-
-    /**
      * @see https://github.com/doctrine/migrations/issues/1104
      */
     public function isTransactional(): bool
@@ -40,33 +30,6 @@ abstract class AbstractMigration extends BaseAbstractMigration
     }
 
     /**
-     * @deprecated since 1.14 - will be removed with 2.0
-     */
-    protected function isSupportingForeignKeys(): bool
-    {
-        @trigger_error('isSupportingForeignKeys() is deprecated and will be removed with 2.0', E_USER_DEPRECATED);
-
-        return true;
-    }
-
-    /**
-     * @deprecated since 1.14 - will be removed with 2.0
-     */
-    protected function deactivateForeignKeysOnSqlite()
-    {
-        @trigger_error('deactivateForeignKeysOnSqlite() is deprecated and will be removed with 2.0', E_USER_DEPRECATED);
-    }
-
-    /**
-     * @deprecated since 1.14 - will be removed with 2.0
-     */
-    private function activateForeignKeysOnSqlite()
-    {
-        @trigger_error('activateForeignKeysOnSqlite() is deprecated and will be removed with 2.0', E_USER_DEPRECATED);
-    }
-
-    /**
-     * @param Schema $schema
      * @throws Exception
      */
     public function preUp(Schema $schema): void
@@ -75,7 +38,6 @@ abstract class AbstractMigration extends BaseAbstractMigration
     }
 
     /**
-     * @param Schema $schema
      * @throws Exception
      */
     public function preDown(Schema $schema): void
@@ -88,45 +50,32 @@ abstract class AbstractMigration extends BaseAbstractMigration
      *
      * @throws Exception
      */
-    protected function abortIfPlatformNotSupported()
+    private function abortIfPlatformNotSupported(): void
     {
-        $platform = $this->getPlatform();
-        if (!$this->isPlatformMysql()) {
-            $this->abortIf(true, 'Unsupported database platform: ' . $platform);
+        $platform = $this->connection->getDatabasePlatform();
+        if (!($platform instanceof MySQLPlatform)) {
+            $this->abortIf(true, 'Unsupported database platform: ' . \get_class($platform));
         }
     }
 
-    /**
-     * @deprecated since 1.14 - will be removed with 2.0
-     */
-    protected function isPlatformSqlite(): bool
+    protected function preventEmptyMigrationWarning(): void
     {
-        @trigger_error('isPlatformSqlite() is deprecated and will be removed with 2.0', E_USER_DEPRECATED);
-
-        return ($this->getPlatform() === 'sqlite');
-    }
-
-    protected function isPlatformMysql(): bool
-    {
-        return ($this->getPlatform() === 'mysql');
+        $this->addSql('#prevent empty warning - no SQL to execute');
     }
 
     /**
-     * @return string
-     * @throws Exception
+     * I don't know how often I accidentally dropped database tables,
+     * because a generated "left-over" migration was executed.
+     *
+     * @param mixed[] $params
+     * @param mixed[] $types
      */
-    protected function getPlatform()
+    protected function addSql(string $sql, array $params = [], array $types = []): void
     {
-        return $this->connection->getDatabasePlatform()->getName();
-    }
+        if (str_starts_with($sql, 'DROP TABLE ')) {
+            throw new \InvalidArgumentException('Cannot use addSql() with DROP TABLE');
+        }
 
-    /**
-     * @deprecated since 1.14 - will be removed with 2.0
-     */
-    protected function addSqlDropIndex($indexName, $tableName)
-    {
-        @trigger_error('addSqlDropIndex() is deprecated and will be removed with 2.0', E_USER_DEPRECATED);
-
-        $this->addSql('DROP INDEX ' . $indexName . ' ON ' . $tableName);
+        parent::addSql($sql, $params, $types);
     }
 }

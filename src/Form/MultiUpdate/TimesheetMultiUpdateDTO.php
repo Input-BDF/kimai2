@@ -17,62 +17,40 @@ use App\Entity\Project;
 use App\Entity\Tag;
 use App\Entity\TimesheetMeta;
 use App\Entity\User;
+use App\Validator\Constraints as Constraints;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 
 /**
- * @App\Validator\Constraints\TimesheetMultiUpdate
+ * @internal
  */
-class TimesheetMultiUpdateDTO extends MultiUpdateTableDTO implements EntityWithMetaFields
+#[Constraints\TimesheetMultiUpdate]
+final class TimesheetMultiUpdateDTO extends MultiUpdateTableDTO implements EntityWithMetaFields
 {
     /**
-     * @var Tag[]|ArrayCollection|iterable
+     * @var iterable<Tag>
      */
-    private $tags = [];
+    private iterable $tags = [];
+    private bool $replaceTags = false;
+    private bool $recalculateRates = false;
+    private ?Customer $customer = null;
+    private ?Project $project = null;
+    private ?Activity $activity = null;
+    private ?User $user = null;
+    private ?bool $exported = null;
+    private ?bool $billable = null;
+    private ?float $fixedRate = null;
+    private ?float $hourlyRate = null;
     /**
-     * @var bool
+     * @var Collection<TimesheetMeta>
      */
-    private $replaceTags = false;
+    private Collection $meta;
     /**
-     * @var bool
+     * @var array<string>
      */
-    private $recalculateRates = false;
-    /**
-     * @var Customer|null
-     */
-    private $customer;
-    /**
-     * @var Project|null
-     */
-    private $project;
-    /**
-     * @var Activity|null
-     */
-    private $activity;
-    /**
-     * @var User|null
-     */
-    private $user;
-    /**
-     * @var bool|null
-     */
-    private $exported = null;
-    /**
-     * @var float|null
-     */
-    private $fixedRate = null;
-    /**
-     * @var float|null
-     */
-    private $hourlyRate = null;
-    /**
-     * @var TimesheetMeta[]|Collection
-     */
-    private $meta;
-    /**
-     * @var string[]
-     */
-    private $updateMeta = [];
+    private array $updateMeta = [];
+    private bool $replaceDescription = false;
+    private ?string $description = null;
 
     public function __construct()
     {
@@ -84,11 +62,9 @@ class TimesheetMultiUpdateDTO extends MultiUpdateTableDTO implements EntityWithM
         return $this->customer;
     }
 
-    public function setCustomer(Customer $customer): TimesheetMultiUpdateDTO
+    public function setCustomer(Customer $customer): void
     {
         $this->customer = $customer;
-
-        return $this;
     }
 
     public function getProject(): ?Project
@@ -96,11 +72,9 @@ class TimesheetMultiUpdateDTO extends MultiUpdateTableDTO implements EntityWithM
         return $this->project;
     }
 
-    public function setProject(Project $project): TimesheetMultiUpdateDTO
+    public function setProject(Project $project): void
     {
         $this->project = $project;
-
-        return $this;
     }
 
     public function getActivity(): ?Activity
@@ -108,26 +82,32 @@ class TimesheetMultiUpdateDTO extends MultiUpdateTableDTO implements EntityWithM
         return $this->activity;
     }
 
-    public function setActivity(Activity $activity): TimesheetMultiUpdateDTO
+    public function setActivity(Activity $activity): void
     {
         $this->activity = $activity;
-
-        return $this;
     }
 
     /**
-     * @return Tag[]|ArrayCollection|iterable
+     * @return iterable<Tag>
      */
     public function getTags(): iterable
     {
         return $this->tags;
     }
 
-    public function setTags(iterable $tags): TimesheetMultiUpdateDTO
+    public function setTags(iterable $tags): void
     {
         $this->tags = $tags;
+    }
 
-        return $this;
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function setDescription(?string $description): void
+    {
+        $this->description = $description;
     }
 
     public function getUser(): ?User
@@ -135,11 +115,9 @@ class TimesheetMultiUpdateDTO extends MultiUpdateTableDTO implements EntityWithM
         return $this->user;
     }
 
-    public function setUser(User $user): TimesheetMultiUpdateDTO
+    public function setUser(User $user): void
     {
         $this->user = $user;
-
-        return $this;
     }
 
     public function isExported(): ?bool
@@ -147,11 +125,19 @@ class TimesheetMultiUpdateDTO extends MultiUpdateTableDTO implements EntityWithM
         return $this->exported;
     }
 
-    public function setExported(bool $exported): TimesheetMultiUpdateDTO
+    public function setExported(?bool $exported): void
     {
         $this->exported = $exported;
+    }
 
-        return $this;
+    public function isBillable(): ?bool
+    {
+        return $this->billable;
+    }
+
+    public function setBillable(?bool $billable): void
+    {
+        $this->billable = $billable;
     }
 
     public function isRecalculateRates(): bool
@@ -159,11 +145,9 @@ class TimesheetMultiUpdateDTO extends MultiUpdateTableDTO implements EntityWithM
         return $this->recalculateRates;
     }
 
-    public function setRecalculateRates(bool $recalculateRates): TimesheetMultiUpdateDTO
+    public function setRecalculateRates(bool $recalculateRates): void
     {
         $this->recalculateRates = $recalculateRates;
-
-        return $this;
     }
 
     public function isReplaceTags(): bool
@@ -171,11 +155,19 @@ class TimesheetMultiUpdateDTO extends MultiUpdateTableDTO implements EntityWithM
         return $this->replaceTags;
     }
 
-    public function setReplaceTags(bool $replaceTags): TimesheetMultiUpdateDTO
+    public function setReplaceTags(bool $replaceTags): void
     {
         $this->replaceTags = $replaceTags;
+    }
 
-        return $this;
+    public function isReplaceDescription(): bool
+    {
+        return $this->replaceDescription;
+    }
+
+    public function setReplaceDescription(bool $replaceDescription): void
+    {
+        $this->replaceDescription = $replaceDescription;
     }
 
     public function getFixedRate(): ?float
@@ -183,11 +175,9 @@ class TimesheetMultiUpdateDTO extends MultiUpdateTableDTO implements EntityWithM
         return $this->fixedRate;
     }
 
-    public function setFixedRate(?float $fixedRate): TimesheetMultiUpdateDTO
+    public function setFixedRate(?float $fixedRate): void
     {
         $this->fixedRate = $fixedRate;
-
-        return $this;
     }
 
     public function getHourlyRate(): ?float
@@ -195,11 +185,9 @@ class TimesheetMultiUpdateDTO extends MultiUpdateTableDTO implements EntityWithM
         return $this->hourlyRate;
     }
 
-    public function setHourlyRate(?float $hourlyRate): TimesheetMultiUpdateDTO
+    public function setHourlyRate(?float $hourlyRate): void
     {
         $this->hourlyRate = $hourlyRate;
-
-        return $this;
     }
 
     /**

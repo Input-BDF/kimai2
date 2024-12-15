@@ -9,30 +9,35 @@
 
 namespace App\Tests\Invoice\NumberGenerator;
 
-use App\Configuration\SystemConfiguration;
 use App\Entity\Customer;
-use App\Invoice\InvoiceModel;
+use App\Entity\InvoiceTemplate;
+use App\Entity\User;
 use App\Invoice\NumberGenerator\ConfigurableNumberGenerator;
 use App\Repository\InvoiceRepository;
+use App\Repository\Query\InvoiceQuery;
 use App\Tests\Invoice\DebugFormatter;
+use App\Tests\Mocks\InvoiceModelFactoryFactory;
+use App\Tests\Mocks\SystemConfigurationFactory;
 use PHPUnit\Framework\TestCase;
 
 /**
  * @covers \App\Invoice\NumberGenerator\ConfigurableNumberGenerator
+ * @covers \App\Utils\NumberGenerator
  */
 class ConfigurableNumberGeneratorTest extends TestCase
 {
-    private function getSut(string $format, int $counter = 1)
+    private function getSut(string $format, int $counter = 1): ConfigurableNumberGenerator
     {
-        $config = $this->createMock(SystemConfiguration::class);
-        $config->expects($this->any())
-            ->method('find')
-            ->willReturn($format);
+        $config = SystemConfigurationFactory::createStub(['invoice' => ['number_format' => $format]]);
 
         $repository = $this->createMock(InvoiceRepository::class);
         $repository
             ->expects($this->any())
-            ->method('getCounterForAllTime')
+            ->method('getCounterForCustomerAllTime')
+            ->willReturn($counter);
+        $repository
+            ->expects($this->any())
+            ->method('getCounterForUserAllTime')
             ->willReturn($counter);
         $repository
             ->expects($this->any())
@@ -50,9 +55,14 @@ class ConfigurableNumberGeneratorTest extends TestCase
         return new ConfigurableNumberGenerator($repository, $config);
     }
 
-    public function getTestData()
+    /**
+     * @return array<int, array<int, string|\DateTime|int>>
+     */
+    public function getTestData(): array
     {
         $invoiceDate = new \DateTime();
+        $invoiceDateFixed = new \DateTime('2021-03-07');
+        $invoiceDateFixed1 = new \DateTime('2021-03-27');
 
         return [
             // simple tests for single calls
@@ -68,12 +78,20 @@ class ConfigurableNumberGeneratorTest extends TestCase
             ['{cy}', '2', $invoiceDate],
             ['{cm}', '2', $invoiceDate],
             ['{cd}', '2', $invoiceDate],
+            // customer
             ['{cc}', '2', $invoiceDate],
             ['{ccy}', '2', $invoiceDate],
             ['{ccm}', '2', $invoiceDate],
             ['{ccd}', '2', $invoiceDate],
             ['{cname}', 'Acme company', $invoiceDate],
             ['{cnumber}', '0815', $invoiceDate],
+            // user
+            ['{cu}', '2', $invoiceDate],
+            ['{cuy}', '2', $invoiceDate],
+            ['{cum}', '2', $invoiceDate],
+            ['{cud}', '2', $invoiceDate],
+            ['{ustaff}', '0815', $invoiceDate],
+            ['{uid}', '13', $invoiceDate],
             // number formatting (not testing the lower case versions, as the tests might break depending on the date)
             ['{date,10}', '0000' . $invoiceDate->format('ymd'), $invoiceDate],
             ['{Y,6}', '00' . $invoiceDate->format('Y'), $invoiceDate],
@@ -93,6 +111,7 @@ class ConfigurableNumberGeneratorTest extends TestCase
             ['{c+13,3}', '014', $invoiceDate],
             ['{c+13,2}', '14', $invoiceDate],
             ['{c+13}', '14', $invoiceDate],
+            ['{c-20}', '0', $invoiceDate],
             ['{cd+111}', '112', $invoiceDate],
             ['{cd+111,5}', '00112', $invoiceDate],
             ['{cd+111,2}', '113', $invoiceDate, 2],
@@ -108,10 +127,11 @@ class ConfigurableNumberGeneratorTest extends TestCase
             ['{Y}{cy}{m}', $invoiceDate->format('Y') . '2' . $invoiceDate->format('n'), $invoiceDate],
             ['{Y}-{cy}/{m}', $invoiceDate->format('Y') . '-2/' . $invoiceDate->format('n'), $invoiceDate],
             ['{Y}-{cy}/{m}', $invoiceDate->format('Y') . '-2/' . $invoiceDate->format('n'), $invoiceDate],
+            ['{ustaff}|{cuy}_{Y}-{cy}/{m}', '0815|2_' . $invoiceDate->format('Y') . '-2/' . $invoiceDate->format('n'), $invoiceDate],
             ['{Y,5}/{cy,5}', '0' . $invoiceDate->format('Y') . '/00002', $invoiceDate],
             // with decrementing counter
             ['{c-1,2}', '00', $invoiceDate],
-            ['{c-2,2}', '-1', $invoiceDate],
+            ['{c-2,2}', '00', $invoiceDate],
             // with incrementing and decrementing counter
             ['{c-5+13,1}', '9', $invoiceDate],
             ['{c+13-5,2}', '09', $invoiceDate],
@@ -125,29 +145,72 @@ class ConfigurableNumberGeneratorTest extends TestCase
             ['{cm+22+2+2-1-13-4}', '9', $invoiceDate],
             ['{cm+22+2-2-22}', '6', $invoiceDate, 5],
             ['{cm-21+22+2-2}', '6', $invoiceDate, 5],
+            // increment dates
+            ['{YY}', '2022', $invoiceDateFixed],
+            ['{YY+1}', '2022', $invoiceDateFixed],
+            ['{YY+2}', '2023', $invoiceDateFixed],
+            ['{YY+3}', '2024', $invoiceDateFixed],
+            ['{YY-1}', '2020', $invoiceDateFixed],
+            ['{YY-2}', '2019', $invoiceDateFixed],
+            ['{YY-3}', '2018', $invoiceDateFixed],
+            ['{yy}', '22', $invoiceDateFixed],
+            ['{yy+1}', '22', $invoiceDateFixed],
+            ['{yy+2}', '23', $invoiceDateFixed],
+            ['{yy+3}', '24', $invoiceDateFixed],
+            ['{yy-1}', '20', $invoiceDateFixed],
+            ['{yy-2}', '19', $invoiceDateFixed],
+            ['{yy-3}', '18', $invoiceDateFixed],
+            ['{MM}', '4', $invoiceDateFixed], // cast to int removes leading zero
+            ['{MM+1}', '4', $invoiceDateFixed], // cast to int removes leading zero
+            ['{MM+2}', '5', $invoiceDateFixed], // cast to int removes leading zero
+            ['{MM+3}', '6', $invoiceDateFixed], // cast to int removes leading zero
+            ['{MM-1}', '2', $invoiceDateFixed], // cast to int removes leading zero
+            ['{MM-2}', '1', $invoiceDateFixed], // cast to int removes leading zero
+            ['{MM-3}', '0', $invoiceDateFixed], // cast to int removes leading zero
+            ['{MM-4}', '0', $invoiceDateFixed], // cast to int removes leading zero
+            ['{DD}', '8', $invoiceDateFixed], // cast to int removes leading zero
+            ['{DD+1}', '8', $invoiceDateFixed], // cast to int removes leading zero
+            ['{DD+2}', '9', $invoiceDateFixed], // cast to int removes leading zero
+            ['{DD+3}', '10', $invoiceDateFixed], // cast to int removes leading zero
+            ['{DD-1}', '6', $invoiceDateFixed], // cast to int removes leading zero
+            ['{DD-2}', '5', $invoiceDateFixed], // cast to int removes leading zero
+            ['{DD-3}', '4', $invoiceDateFixed], // cast to int removes leading zero
+            ['{DD}', '28', $invoiceDateFixed1], // cast to int removes leading zero
+            ['{DD+1}', '28', $invoiceDateFixed1], // cast to int removes leading zero
+            ['{DD+2}', '29', $invoiceDateFixed1], // cast to int removes leading zero
+            ['{DD+3}', '30', $invoiceDateFixed1], // cast to int removes leading zero
+            ['{DD-1}', '26', $invoiceDateFixed1], // cast to int removes leading zero
+            ['{DD-2}', '25', $invoiceDateFixed1], // cast to int removes leading zero
+            ['{DD-3}', '24', $invoiceDateFixed1], // cast to int removes leading zero
         ];
     }
 
     /**
      * @dataProvider getTestData
      */
-    public function testGetInvoiceNumber(string $format, string $expectedInvoiceNumber, \DateTime $invoiceDate, int $counter = 1)
+    public function testGetInvoiceNumber(string $format, string $expectedInvoiceNumber, \DateTime $invoiceDate, int $counter = 1): void
     {
-        $customer = new Customer();
-        $customer->setName('Acme company');
+        $customer = new Customer('Acme company');
         $customer->setNumber('0815');
 
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(13);
+        $user->method('getAccountNumber')->willReturn('0815');
+
         $sut = $this->getSut($format, $counter);
-        $model = new InvoiceModel(new DebugFormatter());
+        $model = (new InvoiceModelFactoryFactory($this))->create()->createModel(new DebugFormatter(), $customer, new InvoiceTemplate(), new InvoiceQuery());
         $model->setInvoiceDate($invoiceDate);
-        $model->setCustomer($customer);
+        $model->setUser($user);
         $sut->setModel($model);
 
         $this->assertEquals($expectedInvoiceNumber, $sut->getInvoiceNumber());
         $this->assertEquals('default', $sut->getId());
     }
 
-    public function getInvalidTestData()
+    /**
+     * @return array<int, array<int, string|\DateTime>>
+     */
+    public function getInvalidTestData(): array
     {
         $invoiceDate = new \DateTime();
 
@@ -172,15 +235,49 @@ class ConfigurableNumberGeneratorTest extends TestCase
     /**
      * @dataProvider getInvalidTestData
      */
-    public function testInvalidGetInvoiceNumber(string $format, \DateTime $invoiceDate, string $brokenPart)
+    public function testInvalidGetInvoiceNumber(string $format, \DateTime $invoiceDate, string $brokenPart): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage(sprintf('Unknown %s found', $brokenPart));
+        $this->expectExceptionMessage(\sprintf('Unknown %s found', $brokenPart));
 
         $sut = $this->getSut($format);
-        $model = new InvoiceModel(new DebugFormatter());
+        $model = (new InvoiceModelFactoryFactory($this))->create()->createModel(new DebugFormatter(), new Customer('foo'), new InvoiceTemplate(), new InvoiceQuery());
         $model->setInvoiceDate($invoiceDate);
-        $model->setCustomer(new Customer());
+        $sut->setModel($model);
+
+        $sut->getInvoiceNumber();
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
+    public function getMissingFieldTestData(): array
+    {
+        return [
+            ['{Y}/{cnumber}_{ccy,3}', 'Customer has no number, replacer {cnumber} failed evaluation'],
+            ['{Y}/{cname}_{ccy,3}', 'Customer has no name, replacer {cname} failed evaluation'],
+        ];
+    }
+
+    /**
+     * @dataProvider getMissingFieldTestData
+     */
+    public function testCustomerHasMissingField(string $format, string $message): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(13);
+        $user->method('getAccountNumber')->willReturn('0815');
+
+        $customer = new Customer('');
+        $customer->setName(null);
+
+        $sut = $this->getSut($format);
+        $model = (new InvoiceModelFactoryFactory($this))->create()->createModel(new DebugFormatter(), $customer, new InvoiceTemplate(), new InvoiceQuery());
+        $model->setInvoiceDate(new \DateTime());
+        $model->setUser($user);
         $sut->setModel($model);
 
         $sut->getInvoiceNumber();

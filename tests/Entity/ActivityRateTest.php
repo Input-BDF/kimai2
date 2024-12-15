@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
  */
 class ActivityRateTest extends TestCase
 {
-    public function testDefaultValues()
+    public function testDefaultValues(): void
     {
         $sut = new ActivityRate();
         self::assertNull($sut->getId());
@@ -32,7 +32,7 @@ class ActivityRateTest extends TestCase
         self::assertFalse($sut->isFixed());
     }
 
-    public function testSetterAndGetter()
+    public function testSetterAndGetter(): void
     {
         $sut = new ActivityRate();
 
@@ -49,7 +49,7 @@ class ActivityRateTest extends TestCase
 
         $user = new User();
         $user->setAlias('foo');
-        $user->setUsername('bar');
+        $user->setUserIdentifier('bar');
         self::assertInstanceOf(ActivityRate::class, $sut->setUser($user));
         self::assertSame($user, $sut->getUser());
         $sut->setUser(null);

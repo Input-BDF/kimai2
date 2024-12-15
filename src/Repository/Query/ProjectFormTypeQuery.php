@@ -14,18 +14,17 @@ use App\Entity\Project;
 
 final class ProjectFormTypeQuery extends BaseFormTypeQuery
 {
-    /**
-     * @var Project|null
-     */
-    private $projectToIgnore;
-    private $ignoreDate = false;
-    private $withCustomer = false;
+    private ?\DateTime $projectStart = null;
+    private ?\DateTime $projectEnd = null;
+    private ?Project $projectToIgnore = null;
+    private bool $ignoreDate = false;
+    private bool $withCustomer = false;
 
     /**
-     * @param Project|int|null $project
-     * @param Customer|int|null $customer
+     * @param Project|array<Project>|int|null $project
+     * @param Customer|array<Customer>|int|null $customer
      */
-    public function __construct($project = null, $customer = null)
+    public function __construct(Project|array|int|null $project = null, Customer|array|int|null $customer = null)
     {
         if (null !== $project) {
             if (!\is_array($project)) {
@@ -40,31 +39,35 @@ final class ProjectFormTypeQuery extends BaseFormTypeQuery
             }
             $this->setCustomers($customer);
         }
+
+        $this->projectStart = new \DateTime();
+        $this->projectEnd = clone $this->projectStart;
     }
 
+    /**
+     * Whether customers should be joined
+     */
     public function withCustomer(): bool
     {
         return $this->withCustomer;
     }
 
+    /**
+     * Directly join the customer
+     */
     public function setWithCustomer(bool $withCustomer): void
     {
         $this->withCustomer = $withCustomer;
     }
 
-    /**
-     * @return Project|null
-     */
     public function getProjectToIgnore(): ?Project
     {
         return $this->projectToIgnore;
     }
 
-    public function setProjectToIgnore(Project $projectToIgnore): ProjectFormTypeQuery
+    public function setProjectToIgnore(Project $projectToIgnore): void
     {
         $this->projectToIgnore = $projectToIgnore;
-
-        return $this;
     }
 
     public function isIgnoreDate(): bool
@@ -72,10 +75,28 @@ final class ProjectFormTypeQuery extends BaseFormTypeQuery
         return $this->ignoreDate;
     }
 
-    public function setIgnoreDate(bool $ignoreDate): ProjectFormTypeQuery
+    public function setIgnoreDate(bool $ignoreDate): void
     {
         $this->ignoreDate = $ignoreDate;
+    }
 
-        return $this;
+    public function getProjectStart(): ?\DateTime
+    {
+        return $this->projectStart;
+    }
+
+    public function setProjectStart(?\DateTime $projectStart): void
+    {
+        $this->projectStart = $projectStart;
+    }
+
+    public function getProjectEnd(): ?\DateTime
+    {
+        return $this->projectEnd;
+    }
+
+    public function setProjectEnd(?\DateTime $projectEnd): void
+    {
+        $this->projectEnd = $projectEnd;
     }
 }

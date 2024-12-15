@@ -13,51 +13,57 @@ use App\Repository\Loader\LoaderInterface;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 
+/**
+ * @template T
+ * @implements PaginatorInterface<T>
+ */
 final class LoaderPaginator implements PaginatorInterface
 {
     /**
-     * @var QueryBuilder
+     * @param LoaderInterface<T> $loader
+     * @param int<0, max> $results
      */
-    private $query;
-    /**
-     * @var int
-     */
-    private $results = 0;
-    /**
-     * @var LoaderInterface
-     */
-    private $loader;
-
-    public function __construct(LoaderInterface $loader, QueryBuilder $query, int $results)
+    public function __construct(
+        private readonly LoaderInterface $loader,
+        private readonly QueryBuilder $queryBuilder,
+        private readonly int $results
+    )
     {
-        $this->loader = $loader;
-        $this->query = $query;
-        $this->results = $results;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getNbResults()
+    public function getNbResults(): int
     {
         return $this->results;
     }
 
     /**
-     * {@inheritdoc}
+     * @return Query<null, T>
      */
-    public function getSlice($offset, $length)
+    private function getQuery(): Query
     {
-        $query = $this->query
-            ->getQuery()
+        return $this->queryBuilder->getQuery(); // @phpstan-ignore-line
+    }
+
+    /**
+     * @return iterable<array-key, T>
+     */
+    public function getSlice(int $offset, int $length): iterable
+    {
+        /** @var Query<null, T> $query */
+        $query = $this->getQuery()
             ->setFirstResult($offset)
             ->setMaxResults($length);
 
         return $this->getResults($query);
     }
 
-    private function getResults(Query $query)
+    /**
+     * @param Query<null, T> $query
+     * @return array<array-key, T>
+     */
+    private function getResults(Query $query): array
     {
+        /** @var array<array-key, T> $results */
         $results = $query->execute();
 
         $this->loader->loadResults($results);
@@ -65,8 +71,11 @@ final class LoaderPaginator implements PaginatorInterface
         return $results;
     }
 
+    /**
+     * @return iterable<array-key, T>
+     */
     public function getAll(): iterable
     {
-        return $this->getResults($this->query->getQuery());
+        return $this->getResults($this->getQuery());
     }
 }

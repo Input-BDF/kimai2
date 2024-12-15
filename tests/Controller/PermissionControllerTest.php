@@ -13,54 +13,56 @@ use App\DataFixtures\UserFixtures;
 use App\Entity\Role;
 use App\Entity\RolePermission;
 use App\Entity\User;
-use Symfony\Component\Security\Csrf\CsrfToken;
 
 /**
  * @group integration
  */
 class PermissionControllerTest extends ControllerBaseTest
 {
-    public function testIsSecure()
+    public function testIsSecure(): void
     {
         $this->assertUrlIsSecured('/admin/permissions');
     }
 
-    public function testIsSecureForRole()
+    public function testIsSecureForRole(): void
     {
         $this->assertUrlIsSecuredForRole(User::ROLE_ADMIN, '/admin/permissions');
     }
 
-    public function testPermissions()
+    public function testPermissions(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_SUPER_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/permissions');
         $this->assertHasDataTable($client);
-        $this->assertDataTableRowCount($client, 'datatable_user_admin_permissions', 119);
+        $this->assertDataTableRowCount($client, 'datatable_user_admin_permissions', 135);
         $this->assertPageActions($client, [
-            //'back' => $this->createUrl('/admin/user/'),
             'create modal-ajax-form' => $this->createUrl('/admin/permissions/roles/create'),
-            'help' => 'https://www.kimai.org/documentation/permissions.html'
         ]);
 
         $content = $client->getResponse()->getContent();
-        // the english translation instead of the real system user role names
-        self::assertStringContainsString('<th data-field="User" class="alwaysVisible text-center">', $content);
-        self::assertStringContainsString('<th data-field="Teamlead" class="alwaysVisible text-center">', $content);
-        self::assertStringContainsString('<th data-field="Administrator" class="alwaysVisible text-center">', $content);
-        self::assertStringContainsString('<th data-field="System-Admin" class="alwaysVisible text-center">', $content);
+        $this->assertTableHeader($content);
     }
 
-    public function testCreateRoleIsSecured()
+    private function assertTableHeader(string $content): void
+    {
+        // the english translation instead of the real system user role names
+        self::assertStringContainsString('<th data-field="ROLE_USER" class="alwaysVisible text-center bg-green-lt col_ROLE_USER">', $content);
+        self::assertStringContainsString('<th data-field="ROLE_TEAMLEAD" class="alwaysVisible text-center col_ROLE_TEAMLEAD">', $content);
+        self::assertStringContainsString('<th data-field="ROLE_ADMIN" class="alwaysVisible text-center col_ROLE_ADMIN">', $content);
+        self::assertStringContainsString('<th data-field="ROLE_SUPER_ADMIN" class="alwaysVisible text-center bg-orange-lt col_ROLE_SUPER_ADMIN">', $content);
+    }
+
+    public function testCreateRoleIsSecured(): void
     {
         $this->assertUrlIsSecured('/admin/permissions/roles/create');
     }
 
-    public function testCreateRoleIsSecuredForRole()
+    public function testCreateRoleIsSecuredForRole(): void
     {
         $this->assertUrlIsSecuredForRole(User::ROLE_ADMIN, '/admin/permissions');
     }
 
-    public function testCreateRole()
+    public function testCreateRole(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_SUPER_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/permissions/roles/create');
@@ -74,25 +76,29 @@ class PermissionControllerTest extends ControllerBaseTest
         $client->followRedirect();
 
         $content = $client->getResponse()->getContent();
-        // the english translation instead of the real system user role names
-        self::assertStringContainsString('<th data-field="User" class="alwaysVisible text-center">', $content);
-        self::assertStringContainsString('<th data-field="Teamlead" class="alwaysVisible text-center">', $content);
-        self::assertStringContainsString('<th data-field="Administrator" class="alwaysVisible text-center">', $content);
-        self::assertStringContainsString('<th data-field="System-Admin" class="alwaysVisible text-center">', $content);
-        self::assertStringContainsString('<th data-field="TEST_ROLE" class="alwaysVisible text-center">', $content);
+        $this->assertTableHeader($content);
     }
 
-    public function testDeleteRoleIsSecured()
+    public function testDeleteRoleIsSecured(): void
     {
-        $this->assertUrlIsSecured('/admin/permissions/roles/1/delete/sdfsdfsdfsd');
+        $client = self::createClient();
+
+        $role = new Role();
+        $role->setName('TEST_ROLE');
+
+        $em = $this->getEntityManager();
+        $em->persist($role);
+        $em->flush();
+
+        $this->assertRequestIsSecured($client, '/admin/permissions/roles/' . $role->getId() . '/delete/sdfsdfsdfsd');
     }
 
-    public function testDeleteRoleIsSecuredForRole()
+    public function testDeleteRoleIsSecuredForRole(): void
     {
         $this->assertUrlIsSecuredForRole(User::ROLE_ADMIN, '/admin/permissions');
     }
 
-    public function testDeleteRole()
+    public function testDeleteRole(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_SUPER_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/permissions/roles/create');
@@ -115,7 +121,7 @@ class PermissionControllerTest extends ControllerBaseTest
         }
 
         $content = $client->getResponse()->getContent();
-        self::assertStringContainsString('<th data-field="TEST_ROLE" class="alwaysVisible text-center">', $content);
+        self::assertStringContainsString('<th data-field="TEST_ROLE" class="alwaysVisible text-center col_TEST_ROLE">', $content);
 
         // add user to role
         $this->request($client, '/profile/' . UserFixtures::USERNAME_USER . '/roles');
@@ -134,9 +140,11 @@ class PermissionControllerTest extends ControllerBaseTest
         $user = $this->getUserByName(UserFixtures::USERNAME_USER);
         $this->assertEquals(['ROLE_TEAMLEAD', 'ROLE_SUPER_ADMIN', 'TEST_ROLE', 'ROLE_USER'], $user->getRoles());
 
-        /** @var CsrfToken $token */
-        $token = static::$kernel->getContainer()->get('security.csrf.token_manager')->getToken('user_role_permissions');
-        $this->request($client, '/admin/permissions/roles/' . $id . '/delete/' . $token->getValue());
+        $this->request($client, '/admin/permissions');
+        $node = $client->getCrawler()->filter('div.card .card-title a.confirmation-link');
+        self::assertEquals(1, $node->count());
+
+        $this->request($client, $node->attr('href'));
         $this->assertIsRedirect($client, $this->createUrl('/admin/permissions'));
         $client->followRedirect();
 
@@ -149,17 +157,26 @@ class PermissionControllerTest extends ControllerBaseTest
         $this->assertEquals(['ROLE_TEAMLEAD', 'ROLE_SUPER_ADMIN', 'ROLE_USER'], $user->getRoles());
     }
 
-    public function testSavePermissionIsSecured()
+    public function testSavePermissionIsSecured(): void
     {
-        $this->assertUrlIsSecured('/admin/permissions/roles/1/view_user/1/asdfasdf', 'POST');
+        $client = self::createClient();
+
+        $role = new Role();
+        $role->setName('TEST_ROLE');
+
+        $em = $this->getEntityManager();
+        $em->persist($role);
+        $em->flush();
+
+        $this->assertRequestIsSecured($client, '/admin/permissions/roles/' . $role->getId() . '/view_user/1/asdfasdf', 'POST');
     }
 
-    public function testSavePermissionIsSecuredForRole()
+    public function testSavePermissionIsSecuredForRole(): void
     {
         $this->assertUrlIsSecuredForRole(User::ROLE_ADMIN, '/admin/permissions');
     }
 
-    public function testSavePermission()
+    public function testSavePermission(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_SUPER_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/permissions/roles/create');
@@ -185,17 +202,17 @@ class PermissionControllerTest extends ControllerBaseTest
             }
         }
 
-        // create the permission
-        $token = static::$kernel->getContainer()->get('security.csrf.token_manager')->getToken('user_role_permissions');
-        $this->request($client, '/admin/permissions/roles/' . $id . '/view_user/1/' . $token->getValue(), 'POST');
+        $token = $client->getCrawler()->filter('div#permission-token')->attr('data-value');
 
+        // create the permission
+        $this->request($client, '/admin/permissions/roles/' . $id . '/view_user/1/' . $token, 'POST');
         self::assertTrue($client->getResponse()->isSuccessful());
         $result = json_decode($client->getResponse()->getContent(), true);
         self::assertIsArray($result);
         self::assertArrayHasKey('token', $result);
 
         $rolePermissions = $em->getRepository(RolePermission::class)->findAll();
-        $this->assertEquals(1, \count($rolePermissions));
+        $this->assertCount(1, $rolePermissions);
         $permission = $rolePermissions[0];
         self::assertInstanceOf(RolePermission::class, $permission);
         self::assertEquals('view_user', $permission->getPermission());
@@ -207,8 +224,7 @@ class PermissionControllerTest extends ControllerBaseTest
         $em->clear();
 
         // update the permission
-        $token = static::$kernel->getContainer()->get('security.csrf.token_manager')->getToken('user_role_permissions');
-        $this->request($client, '/admin/permissions/roles/' . $id . '/view_user/0/' . $token->getValue(), 'POST');
+        $this->request($client, '/admin/permissions/roles/' . $id . '/view_user/0/' . $result['token'], 'POST');
 
         self::assertTrue($client->getResponse()->isSuccessful());
         $result = json_decode($client->getResponse()->getContent(), true);

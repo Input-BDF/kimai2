@@ -27,25 +27,25 @@ class BudgetStatisticModelTest extends TestCase
 
     protected function getEntity(): EntityWithBudget
     {
-        return new Customer();
+        return new Customer('foo');
     }
 
-    public function testDefaults()
+    public function testDefaults(): void
     {
         $this->assertDefaults();
     }
 
-    public function testSetter()
+    public function testSetter(): void
     {
         $this->assertSetter();
     }
 
-    public function testCalculation()
+    public function testCalculation(): void
     {
         $this->assertCalculation();
     }
 
-    protected function assertCalculation()
+    protected function assertCalculation(): void
     {
         $entity = $this->getEntity();
         $entity->setBudget(100.0);
@@ -71,8 +71,12 @@ class BudgetStatisticModelTest extends TestCase
 
         self::assertSame($entity, $sut->getEntity());
         self::assertSame(23, $sut->getDurationBillable());
+        self::assertSame(23, $sut->getDurationBillableRelative());
+        self::assertSame(223, $sut->getDurationBillableTotal());
         self::assertSame(53, $sut->getDuration());
         self::assertSame(13.00, $sut->getRateBillable());
+        self::assertSame(13.00, $sut->getRateBillableRelative());
+        self::assertSame(213.00, $sut->getRateBillableTotal());
         self::assertSame(47.00, $sut->getRate());
         self::assertSame(147.95, $sut->getInternalRate());
 
@@ -108,7 +112,7 @@ class BudgetStatisticModelTest extends TestCase
         self::assertSame(213.00, $sut->getBudgetSpent());
     }
 
-    protected function assertSetter()
+    protected function assertSetter(): void
     {
         $entity = $this->getEntity();
         $entity->setBudget(10.0);
@@ -139,7 +143,7 @@ class BudgetStatisticModelTest extends TestCase
         self::assertNull($sut->getStatistic());
     }
 
-    protected function assertDefaults()
+    protected function assertDefaults(): void
     {
         $entity = $this->getEntity();
         $sut = $this->getSut($entity);

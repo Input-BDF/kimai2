@@ -14,17 +14,17 @@ use App\Model\Statistic\StatisticDate;
 use DateTime;
 use DateTimeInterface;
 
-final class MonthlyStatistic
+final class MonthlyStatistic implements DateStatisticInterface
 {
     /**
-     * @var array<string, array<int, StatisticDate>>
+     * @var array<string, array<int<1, 12>, StatisticDate>>
      */
-    private $years = [];
-    private $begin;
-    private $end;
-    private $user;
+    private array $years = [];
+    private DateTimeInterface $begin;
+    private DateTimeInterface $end;
+    private User $user;
 
-    public function __construct(DateTime $begin, DateTime $end, User $user)
+    public function __construct(DateTimeInterface $begin, DateTimeInterface $end, User $user)
     {
         $this->begin = clone $begin;
         $this->end = clone $end;
@@ -43,14 +43,14 @@ final class MonthlyStatistic
         }
 
         $years = [];
-        $begin = clone $this->begin;
+        $begin = DateTime::createFromInterface($this->begin);
         $begin->setTime(0, 0, 0);
 
         $tmp = clone $begin;
         $day = (int) $begin->format('d');
 
         while ($tmp < $this->end) {
-            $curYear = $tmp->format('Y');
+            $curYear = (string) $tmp->format('Y');
             if (!isset($years[$curYear])) {
                 $year = [];
                 for ($i = 1; $i < 13; $i++) {
@@ -67,7 +67,7 @@ final class MonthlyStatistic
             }
             $tmp->modify('+1 month');
         }
-        $this->years = $years;
+        $this->years = $years; // @phpstan-ignore assign.propertyType
     }
 
     /**
@@ -105,6 +105,26 @@ final class MonthlyStatistic
         }
 
         return $all;
+    }
+
+    /**
+     * For unified frontend access
+     *
+     * @return StatisticDate[]
+     */
+    public function getData(): array
+    {
+        return $this->getMonths();
+    }
+
+    public function getMonthByDateTime(DateTimeInterface $date): ?StatisticDate
+    {
+        return $this->getMonth($date->format('Y'), $date->format('m'));
+    }
+
+    public function getByDateTime(DateTimeInterface $date): ?StatisticDate
+    {
+        return $this->getMonthByDateTime($date);
     }
 
     public function getMonth(string $year, string $month): ?StatisticDate

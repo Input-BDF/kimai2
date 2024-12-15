@@ -19,22 +19,11 @@ use App\Model\Statistic\BudgetStatistic;
  */
 class BudgetStatisticModel implements BudgetStatisticModelInterface
 {
-    /**
-     * @var EntityWithBudget
-     */
-    private $entity;
-    /**
-     * @var BudgetStatistic
-     */
-    private $statistic;
-    /**
-     * @var BudgetStatistic
-     */
-    private $statisticTotal;
+    private ?BudgetStatistic $statistic = null;
+    private ?BudgetStatistic $statisticTotal = null;
 
-    public function __construct(EntityWithBudget $entity)
+    public function __construct(private readonly EntityWithBudget $entity)
     {
-        $this->entity = $entity;
     }
 
     public function getEntity(): EntityWithBudget
@@ -47,7 +36,7 @@ class BudgetStatisticModel implements BudgetStatisticModelInterface
         return $this->statistic;
     }
 
-    public function setStatistic(BudgetStatistic $statistic)
+    public function setStatistic(BudgetStatistic $statistic): void
     {
         $this->statistic = $statistic;
     }
@@ -57,7 +46,7 @@ class BudgetStatisticModel implements BudgetStatisticModelInterface
         return $this->statisticTotal;
     }
 
-    public function setStatisticTotal(BudgetStatistic $statistic)
+    public function setStatisticTotal(BudgetStatistic $statistic): void
     {
         $this->statisticTotal = $statistic;
     }
@@ -80,13 +69,23 @@ class BudgetStatisticModel implements BudgetStatisticModelInterface
     public function getDurationBillable(): int
     {
         if ($this->isMonthlyBudget()) {
-            if ($this->statistic === null) {
-                return 0;
-            }
-
-            return $this->statistic->getDurationBillable();
+            return $this->getDurationBillableRelative();
         }
 
+        return $this->getDurationBillableTotal();
+    }
+
+    public function getDurationBillableRelative(): int
+    {
+        if ($this->statistic === null) {
+            return 0;
+        }
+
+        return $this->statistic->getDurationBillable();
+    }
+
+    public function getDurationBillableTotal(): int
+    {
         if ($this->statisticTotal === null) {
             return 0;
         }
@@ -96,9 +95,16 @@ class BudgetStatisticModel implements BudgetStatisticModelInterface
 
     public function getTimeBudgetOpen(): int
     {
-        $value = $this->getTimeBudget() - $this->getTimeBudgetSpent();
+        $value = $this->getTimeBudget() - $this->getDurationBillable();
 
-        return $value > 0 ? $value : 0;
+        return max($value, 0);
+    }
+
+    public function getTimeBudgetOpenRelative(): int
+    {
+        $value = $this->getTimeBudget() - $this->getDurationBillableRelative();
+
+        return max($value, 0);
     }
 
     public function getTimeBudgetSpent(): int
@@ -118,9 +124,16 @@ class BudgetStatisticModel implements BudgetStatisticModelInterface
 
     public function getBudgetOpen(): float
     {
-        $value = $this->getBudget() - $this->getBudgetSpent();
+        $value = $this->getBudget() - $this->getRateBillable();
 
-        return $value > 0 ? $value : 0;
+        return max($value, 0);
+    }
+
+    public function getBudgetOpenRelative(): float
+    {
+        $value = $this->getBudget() - $this->getRateBillableRelative();
+
+        return max($value, 0);
     }
 
     public function getBudgetSpent(): float
@@ -131,13 +144,23 @@ class BudgetStatisticModel implements BudgetStatisticModelInterface
     public function getRateBillable(): float
     {
         if ($this->isMonthlyBudget()) {
-            if ($this->statistic === null) {
-                return 0.00;
-            }
-
-            return $this->statistic->getRateBillable();
+            return $this->getRateBillableRelative();
         }
 
+        return $this->getRateBillableTotal();
+    }
+
+    public function getRateBillableRelative(): float
+    {
+        if ($this->statistic === null) {
+            return 0.00;
+        }
+
+        return $this->statistic->getRateBillable();
+    }
+
+    public function getRateBillableTotal(): float
+    {
         if ($this->statisticTotal === null) {
             return 0.00;
         }

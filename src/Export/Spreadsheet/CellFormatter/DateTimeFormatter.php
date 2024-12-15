@@ -9,26 +9,27 @@
 
 namespace App\Export\Spreadsheet\CellFormatter;
 
+use PhpOffice\PhpSpreadsheet\Cell\CellAddress;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class DateTimeFormatter implements CellFormatterInterface
+final class DateTimeFormatter implements CellFormatterInterface
 {
     public const DATETIME_FORMAT = 'yyyy-mm-dd hh:mm';
 
     public function setFormattedValue(Worksheet $sheet, int $column, int $row, $value): void
     {
         if (null === $value) {
-            $sheet->setCellValueByColumnAndRow($column, $row, '');
+            $sheet->setCellValue(CellAddress::fromColumnAndRow($column, $row), '');
 
             return;
         }
 
-        if (!$value instanceof \DateTime) {
-            throw new \InvalidArgumentException('Unsupported value given, only DateTime is supported');
+        if (!$value instanceof \DateTimeInterface) {
+            throw new \InvalidArgumentException('Unsupported value given, only DateTimeInterface is supported');
         }
 
-        $sheet->setCellValueByColumnAndRow($column, $row, Date::PHPToExcel($value));
-        $sheet->getStyleByColumnAndRow($column, $row)->getNumberFormat()->setFormatCode(self::DATETIME_FORMAT);
+        $sheet->setCellValue(CellAddress::fromColumnAndRow($column, $row), Date::PHPToExcel($value));
+        $sheet->getStyle(CellAddress::fromColumnAndRow($column, $row))->getNumberFormat()->setFormatCode(self::DATETIME_FORMAT);
     }
 }

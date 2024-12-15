@@ -17,7 +17,7 @@ use PHPUnit\Framework\TestCase;
  */
 class StringHelperTest extends TestCase
 {
-    public function testEnsureMaxLength()
+    public function testEnsureMaxLength(): void
     {
         self::assertNull(StringHelper::ensureMaxLength(null, 10));
         self::assertEquals('', StringHelper::ensureMaxLength('', 10));
@@ -32,6 +32,7 @@ class StringHelperTest extends TestCase
     public function getDdeAttackStrings()
     {
         yield ['DDE ("cmd";"/C calc";"!A0")A0'];
+        yield [' DDE ("cmd";"/C calc";"!A0")A0'];
         yield ["@SUM(1+9)*cmd|' /C calc'!A0"];
         yield ["-10+20+cmd|' /C calc'!A0"];
         yield ["+10+20+cmd|' /C calc'!A0"];
@@ -50,8 +51,22 @@ class StringHelperTest extends TestCase
     /**
      * @dataProvider getDdeAttackStrings
      */
-    public function testSanitizeDde(string $input)
+    public function testSanitizeDde(string $input): void
     {
         self::assertEquals("' " . $input, StringHelper::sanitizeDDE($input));
+    }
+
+    public function getNonDdeAttackStrings()
+    {
+        yield [''];
+        yield [' '];
+    }
+
+    /**
+     * @dataProvider getNonDdeAttackStrings
+     */
+    public function testSanitizeDdeWithCorrectStrings(string $input): void
+    {
+        self::assertEquals($input, StringHelper::sanitizeDDE($input));
     }
 }

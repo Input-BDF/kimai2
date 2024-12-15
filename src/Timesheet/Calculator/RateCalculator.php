@@ -9,27 +9,20 @@
 
 namespace App\Timesheet\Calculator;
 
-use App\Entity\Rate;
 use App\Entity\Timesheet;
 use App\Timesheet\CalculatorInterface;
-use App\Timesheet\RateService;
+use App\Timesheet\RateServiceInterface;
 
 /**
  * Implementation to calculate the rate for a timesheet record.
  */
-class RateCalculator implements CalculatorInterface
+final class RateCalculator implements CalculatorInterface
 {
-    /**
-     * @var RateService
-     */
-    private $service;
-
-    public function __construct(RateService $service)
+    public function __construct(private RateServiceInterface $service)
     {
-        $this->service = $service;
     }
 
-    public function calculate(Timesheet $record)
+    public function calculate(Timesheet $record, array $changeset): void
     {
         $rate = $this->service->calculate($record);
 
@@ -43,5 +36,10 @@ class RateCalculator implements CalculatorInterface
         if ($rate->getFixedRate() !== null) {
             $record->setFixedRate($rate->getFixedRate());
         }
+    }
+
+    public function getPriority(): int
+    {
+        return 300;
     }
 }

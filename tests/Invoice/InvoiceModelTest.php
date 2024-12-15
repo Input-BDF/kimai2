@@ -11,11 +11,11 @@ namespace App\Tests\Invoice;
 
 use App\Entity\Customer;
 use App\Entity\InvoiceTemplate;
-use App\Entity\Timesheet;
 use App\Invoice\Calculator\DefaultCalculator;
 use App\Invoice\InvoiceModel;
 use App\Repository\Query\InvoiceQuery;
 use App\Tests\Invoice\NumberGenerator\IncrementingNumberGenerator;
+use App\Tests\Mocks\InvoiceModelFactoryFactory;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -23,22 +23,19 @@ use PHPUnit\Framework\TestCase;
  */
 class InvoiceModelTest extends TestCase
 {
-    public function testEmptyObject()
+    public function testEmptyObject(): void
     {
         $formatter = new DebugFormatter();
-        $sut = new InvoiceModel($formatter);
+        $sut = (new InvoiceModelFactoryFactory($this))->create()->createModel($formatter, new Customer('foo'), new InvoiceTemplate(), new InvoiceQuery());
 
-        self::assertNull($sut->getQuery());
-        self::assertNull($sut->getCustomer());
-        self::assertNull($sut->getDueDate());
+        self::assertNotNull($sut->getQuery());
+        self::assertNotNull($sut->getCustomer());
+        self::assertNotNull($sut->getTemplate());
+
         self::assertNull($sut->getCalculator());
-        self::assertNull($sut->getNumberGenerator());
-
         self::assertEmpty($sut->getEntries());
         self::assertIsArray($sut->getEntries());
-
-        self::assertNull($sut->getTemplate());
-        self::assertInstanceOf(\DateTime::class, $sut->getInvoiceDate());
+        self::assertInstanceOf(\DateTimeInterface::class, $sut->getInvoiceDate());
 
         self::assertSame($formatter, $sut->getFormatter());
 
@@ -48,27 +45,24 @@ class InvoiceModelTest extends TestCase
         self::assertSame($newFormatter, $sut->getFormatter());
     }
 
-    public function testEmptyObjectThrowsExceptionOnNumberGenerator()
+    public function testEmptyObjectThrowsExceptionOnNumberGenerator(): void
     {
         $formatter = new DebugFormatter();
-        $sut = new InvoiceModel($formatter);
+        $sut = (new InvoiceModelFactoryFactory($this))->create()->createModel($formatter, new Customer('foo'), new InvoiceTemplate(), new InvoiceQuery());
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('InvoiceModel::getInvoiceNumber() cannot be called before calling setNumberGenerator()');
         $sut->getInvoiceNumber();
     }
 
-    public function testSetter()
+    public function testSetter(): void
     {
-        $sut = new InvoiceModel(new DebugFormatter());
-
+        $customer = new Customer('foo');
         $query = new InvoiceQuery();
-        self::assertInstanceOf(InvoiceModel::class, $sut->setQuery($query));
-        self::assertSame($query, $sut->getQuery());
+        $template = new InvoiceTemplate();
+        $sut = (new InvoiceModelFactoryFactory($this))->create()->createModel(new DebugFormatter(), $customer, $template, $query);
 
-        $customer = new Customer();
-        self::assertInstanceOf(InvoiceModel::class, $sut->setCustomer($customer));
-        self::assertSame($customer, $sut->getCustomer());
+        self::assertSame($query, $sut->getQuery());
 
         $calculator = new DefaultCalculator();
         self::assertInstanceOf(InvoiceModel::class, $sut->setCalculator($calculator));
@@ -76,29 +70,31 @@ class InvoiceModelTest extends TestCase
 
         $generator = new IncrementingNumberGenerator();
         self::assertInstanceOf(InvoiceModel::class, $sut->setNumberGenerator($generator));
-        self::assertSame($generator, $sut->getNumberGenerator());
         $number = $sut->getInvoiceNumber();
-        $first = $sut->getNumberGenerator()->getInvoiceNumber();
-        $second = $sut->getNumberGenerator()->getInvoiceNumber();
-        self::assertEquals(((int) $first + 1), $second);
         self::assertEquals($number, $sut->getInvoiceNumber());
 
-        $template = new InvoiceTemplate();
-        self::assertNull($sut->getDueDate());
-        self::assertInstanceOf(InvoiceModel::class, $sut->setTemplate($template));
         self::assertSame($template, $sut->getTemplate());
-        self::assertInstanceOf(\DateTime::class, $sut->getDueDate());
+        self::assertInstanceOf(\DateTimeInterface::class, $sut->getDueDate());
     }
 
-    /**
-     * @group legacy
-     */
-    public function testDeprecations()
+    public function testDueDate(): void
     {
-        $sut = new InvoiceModel(new DebugFormatter());
+        $customer = new Customer('foo');
+        $query = new InvoiceQuery();
+        $template = new InvoiceTemplate();
+        $sut = (new InvoiceModelFactoryFactory($this))->create()->createModel(new DebugFormatter(), $customer, $template, $query);
 
-        $entries = [new Timesheet()];
-        self::assertInstanceOf(InvoiceModel::class, $sut->setEntries($entries));
-        self::assertSame($entries, $sut->getEntries());
+        $dueDate = $sut->getDueDate();
+        $dueDays = $template->getDueDays();
+        self::assertNotNull($dueDays);
+        $expected = new \DateTimeImmutable('+' . $dueDays . ' days');
+
+        self::assertEquals($expected->format('Y-m-d'), $dueDate->format('Y-m-d'));
+
+        $sut->setInvoiceDate(new \DateTimeImmutable('2022-05-23'));
+        $template->setDueDays(14);
+        $dueDate = $sut->getDueDate();
+        $expected = new \DateTimeImmutable('2022-06-06');
+        self::assertEquals($expected->format('Y-m-d'), $dueDate->format('Y-m-d'));
     }
 }

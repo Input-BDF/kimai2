@@ -9,38 +9,44 @@
 
 namespace App\Controller;
 
+use App\Configuration\ConfigurationService;
 use App\Configuration\SystemConfiguration;
 use App\Event\SystemConfigurationEvent;
 use App\Form\Model\Configuration;
 use App\Form\Model\SystemConfiguration as SystemConfigurationModel;
 use App\Form\SystemConfigurationForm;
+use App\Form\Type\ActivityTypePatternType;
 use App\Form\Type\ArrayToCommaStringType;
+use App\Form\Type\CalendarTitlePatternType;
+use App\Form\Type\CustomerTypePatternType;
 use App\Form\Type\DatePickerType;
 use App\Form\Type\DateTimeTextType;
 use App\Form\Type\DayTimeType;
-use App\Form\Type\LanguageType;
 use App\Form\Type\MinuteIncrementType;
+use App\Form\Type\ProjectTypePatternType;
 use App\Form\Type\RoundingModeType;
 use App\Form\Type\SkinType;
 use App\Form\Type\TimezoneType;
 use App\Form\Type\TrackingModeType;
+use App\Form\Type\UserLanguageType;
 use App\Form\Type\WeekDaysType;
 use App\Form\Type\YesNoType;
-use App\Repository\ConfigurationRepository;
-use App\Validator\Constraints\AllowedHtmlTags;
+use App\Timesheet\LockdownService;
+use App\Utils\PageSetup;
 use App\Validator\Constraints\ColorChoices;
 use App\Validator\Constraints\DateTimeFormat;
 use App\Validator\Constraints\TimeFormat;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
-use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Form\Extension\Core\Type\CountryType;
 use Symfony\Component\Form\Extension\Core\Type\CurrencyType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
+use Symfony\Component\Form\FormInterface;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Validator\Constraints\GreaterThanOrEqual;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\NotNull;
@@ -49,35 +55,17 @@ use Symfony\Component\Validator\Constraints\Regex;
 
 /**
  * Controller used for executing system relevant tasks.
- *
- * @Route(path="/admin/system-config")
- * @Security("is_granted('system_configuration')")
  */
+#[Route(path: '/admin/system-config')]
+#[IsGranted('IS_AUTHENTICATED_FULLY')]
+#[IsGranted('system_configuration')]
 final class SystemConfigurationController extends AbstractController
 {
-    /**
-     * @var EventDispatcherInterface
-     */
-    private $eventDispatcher;
-    /**
-     * @var SystemConfiguration
-     */
-    private $configurations;
-    /**
-     * @var ConfigurationRepository
-     */
-    private $repository;
-
-    public function __construct(EventDispatcherInterface $dispatcher, ConfigurationRepository $repository, SystemConfiguration $config)
+    public function __construct(private EventDispatcherInterface $eventDispatcher, private ConfigurationService $repository, private SystemConfiguration $systemConfiguration, private LockdownService $lockdownService)
     {
-        $this->eventDispatcher = $dispatcher;
-        $this->repository = $repository;
-        $this->configurations = $config;
     }
 
-    /**
-     * @Route(path="/", name="system_configuration", methods={"GET"})
-     */
+    #[Route(path: '/', name: 'system_configuration', methods: ['GET'])]
     public function indexAction(): Response
     {
         $configSettings = $this->getInitializedConfigurations();
@@ -90,14 +78,16 @@ final class SystemConfigurationController extends AbstractController
             ];
         }
 
+        $page = new PageSetup('menu.system_configuration');
+        $page->setHelp('configurations.html');
+
         return $this->render('system-configuration/index.html.twig', [
+            'page_setup' => $page,
             'sections' => $configurations,
         ]);
     }
 
-    /**
-     * @Route(path="/edit/{section}", name="system_configuration_section", methods={"GET"})
-     */
+    #[Route(path: '/edit/{section}', name: 'system_configuration_section', methods: ['GET'])]
     public function sectionAction(string $section): Response
     {
         $configSettings = $this->getInitializedConfigurations();
@@ -110,29 +100,35 @@ final class SystemConfigurationController extends AbstractController
 
             $configurations[] = [
                 'model' => $configModel,
-                'form' => $this->createConfigurationsForm($configModel)->createView(),
+                'form' => $this->createConfigurationsForm($configModel, true)->createView(),
             ];
         }
 
-        return $this->render('system-configuration/index.html.twig', [
+        $page = new PageSetup('menu.system_configuration');
+        $page->setHelp('configurations.html');
+
+        return $this->render('system-configuration/section.html.twig', [
+            'page_setup' => $page,
             'sections' => $configurations,
         ]);
     }
 
     /**
-     * @Route(path="/update/{section}", name="system_configuration_update", methods={"POST"})
-     *
+     * @internal do not link directly to this route
      * @param Request $request
      * @param string $section
-     * @return \Symfony\Component\HttpFoundation\RedirectResponse|\Symfony\Component\HttpFoundation\Response
+     * @return RedirectResponse|Response
      */
-    public function configUpdate(Request $request, string $section)
+    #[Route(path: '/update/{section}/{single}', defaults: ['single' => 0], name: 'system_configuration_update', methods: ['POST'])]
+    public function configUpdate(Request $request, string $section, string $single): Response
     {
+        $single = (bool) $single;
         $configModel = null;
         $configSettings = $this->getInitializedConfigurations();
 
-        foreach ($configSettings as $configModel) {
-            if ($configModel->getSection() === $section) {
+        foreach ($configSettings as $model) {
+            if ($model->getSection() === $section) {
+                $configModel = $model;
                 break;
             }
         }
@@ -141,35 +137,41 @@ final class SystemConfigurationController extends AbstractController
             throw $this->createNotFoundException('Could not find config model: ' . $section);
         }
 
-        $form = $this->createConfigurationsForm($configModel);
+        $form = $this->createConfigurationsForm($configModel, $single);
         $form->handleRequest($request);
 
-        if ($form->isSubmitted()) {
-            if ($form->isValid()) {
-                try {
-                    $this->repository->saveSystemConfiguration($form->getData());
-                    $this->flashSuccess('action.update.success');
-                } catch (\Exception $ex) {
-                    $this->flashUpdateException($ex);
-                }
-
-                return $this->redirectToRoute('system_configuration');
-            } else {
-                $this->flashError('action.update.error', ['%reason%' => 'Validation problem']);
+        if ($form->isSubmitted() && $form->isValid()) {
+            try {
+                /** @var SystemConfigurationModel $saveModel */
+                $saveModel = $form->getData();
+                $this->repository->saveSystemConfiguration($saveModel);
+                $this->flashSuccess('action.update.success');
+            } catch (\Exception $ex) {
+                $this->handleFormUpdateException($ex, $form);
             }
+
+            if ($single) {
+                return $this->redirectToRoute('system_configuration_section', ['section' => $section]);
+            }
+
+            return $this->redirectToRoute('system_configuration');
         }
 
         $configSettings = $this->getInitializedConfigurations();
 
         $configurations = [];
-        foreach ($configSettings as $configModel) {
-            if ($section !== $configModel->getSection()) {
-                $form2 = $this->createConfigurationsForm($configModel);
+        foreach ($configSettings as $model) {
+            if ($single && $section !== $model->getSection()) {
+                continue;
+            }
+
+            if ($section !== $model->getSection()) {
+                $form2 = $this->createConfigurationsForm($model, $single);
             } else {
                 $form2 = $form;
             }
             $configurations[] = [
-                'model' => $configModel,
+                'model' => $model,
                 'form' => $form2->createView(),
             ];
         }
@@ -179,14 +181,10 @@ final class SystemConfigurationController extends AbstractController
         ]);
     }
 
-    /**
-     * @param SystemConfigurationModel $configuration
-     * @return \Symfony\Component\Form\FormInterface
-     */
-    private function createConfigurationsForm(SystemConfigurationModel $configuration)
+    private function createConfigurationsForm(SystemConfigurationModel $configuration, bool $isSingleSection = false): FormInterface
     {
         $options = [
-            'action' => $this->generateUrl('system_configuration_update', ['section' => $configuration->getSection()]),
+            'action' => $this->generateUrl('system_configuration_update', ['section' => $configuration->getSection(), 'single' => $isSingleSection ? '1' : '0']),
             'method' => 'POST',
         ];
 
@@ -199,7 +197,7 @@ final class SystemConfigurationController extends AbstractController
     /**
      * @return SystemConfigurationModel[]
      */
-    protected function getInitializedConfigurations()
+    private function getInitializedConfigurations(): array
     {
         $types = $this->getConfigurationTypes();
 
@@ -208,11 +206,11 @@ final class SystemConfigurationController extends AbstractController
 
         foreach ($event->getConfigurations() as $configs) {
             foreach ($configs->getConfiguration() as $config) {
-                if (!$this->configurations->has($config->getName())) {
+                if (!$this->systemConfiguration->has($config->getName())) {
                     continue;
                 }
 
-                $configValue = $this->configurations->find($config->getName());
+                $configValue = $this->systemConfiguration->find($config->getName());
                 if (null !== $configValue) {
                     $config->setValue($configValue);
                 }
@@ -225,404 +223,393 @@ final class SystemConfigurationController extends AbstractController
     /**
      * @return SystemConfigurationModel[]
      */
-    protected function getConfigurationTypes()
+    private function getConfigurationTypes(): array
     {
+        $user = $this->getUser();
         $lockdownStartHelp = null;
         $lockdownEndHelp = null;
         $lockdownGraceHelp = null;
         $dateFormat = 'D, d M Y H:i:s';
 
-        if ($this->configurations->isTimesheetLockdownActive()) {
-            $userTimezone = $this->getDateTimeFactory()->getTimezone();
-            $timezone = $this->configurations->getTimesheetLockdownTimeZone();
-
-            if ($timezone !== null) {
-                $timezone = new \DateTimeZone($timezone);
-            }
-
-            if ($timezone === null) {
-                $timezone = $userTimezone;
-            }
-
+        if ($this->lockdownService->isLockdownActive()) {
             try {
-                if (!empty($this->configurations->getTimesheetLockdownPeriodStart())) {
-                    $lockdownStartHelp = new \DateTime($this->configurations->getTimesheetLockdownPeriodStart(), $timezone);
-                    $lockdownStartHelp->setTimezone($userTimezone);
-                    $lockdownStartHelp = $lockdownStartHelp->format($dateFormat);
+                $start = $this->lockdownService->getLockdownStart($user);
+                if ($start !== null) {
+                    $lockdownStartHelp = $start->format($dateFormat);
                 }
-                if (!empty($this->configurations->getTimesheetLockdownPeriodEnd())) {
-                    $lockdownEndHelp = new \DateTime($this->configurations->getTimesheetLockdownPeriodEnd(), $timezone);
-                    if (!empty($this->configurations->getTimesheetLockdownGracePeriod())) {
-                        $lockdownGraceHelp = clone $lockdownEndHelp;
-                        $lockdownGraceHelp->modify($this->configurations->getTimesheetLockdownGracePeriod());
-                        $lockdownGraceHelp->setTimezone($userTimezone);
-                        $lockdownGraceHelp = $lockdownGraceHelp->format($dateFormat);
-                    }
-                    $lockdownEndHelp->setTimezone($userTimezone);
-                    $lockdownEndHelp = $lockdownEndHelp->format($dateFormat);
+
+                $end = $this->lockdownService->getLockdownEnd($user);
+                if ($end !== null) {
+                    $lockdownEndHelp = $end->format($dateFormat);
+                }
+
+                $grace = $this->lockdownService->getLockdownGrace($user);
+                if ($grace !== null) {
+                    $lockdownGraceHelp = $grace->format($dateFormat);
                 }
             } catch (\Exception $ex) {
                 $lockdownStartHelp = 'invalid';
             }
         }
 
-        $authentication = (new SystemConfigurationModel())
-            ->setSection(SystemConfigurationModel::SECTION_AUTHENTICATION)
+        $authentication = (new SystemConfigurationModel('authentication'))
             ->setConfiguration([
-                (new Configuration())
-                    ->setName('user.login')
+                (new Configuration('user.login'))
                     ->setLabel('user_auth_login')
                     ->setTranslationDomain('system-configuration')
                     ->setType(YesNoType::class),
-                (new Configuration())
-                    ->setName('user.registration')
+                (new Configuration('user.registration'))
                     ->setLabel('user_auth_registration')
                     ->setTranslationDomain('system-configuration')
                     ->setType(YesNoType::class),
-                (new Configuration())
-                    ->setName('user.password_reset')
+                (new Configuration('user.password_reset'))
                     ->setTranslationDomain('system-configuration')
                     ->setLabel('user_auth_password_reset')
                     ->setType(YesNoType::class),
-                (new Configuration())
-                    ->setName('user.password_reset_retry_ttl')
+                (new Configuration('user.password_reset_retry_ttl'))
                     ->setTranslationDomain('system-configuration')
                     ->setLabel('user_auth_password_reset_retry_ttl')
                     ->setConstraints([new NotNull(), new GreaterThanOrEqual(['value' => 60])])
                     ->setType(IntegerType::class),
-                (new Configuration())
-                    ->setName('user.password_reset_token_ttl')
+                (new Configuration('user.password_reset_token_ttl'))
                     ->setTranslationDomain('system-configuration')
                     ->setLabel('user_auth_password_reset_token_ttl')
                     ->setConstraints([new NotNull(), new GreaterThanOrEqual(['value' => 60])])
                     ->setType(IntegerType::class),
-                /*
-                (new Configuration())
-                    ->setName('ldap.activate')
-                    ->setLabel('ldap_activate')
-                    ->setTranslationDomain('system-configuration')
-                    ->setType(YesNoType::class),
-                (new Configuration())
-                    ->setName('saml.activate')
-                    ->setLabel('saml_activate')
-                    ->setTranslationDomain('system-configuration')
-                    ->setType(YesNoType::class),
-                */
             ]);
 
-        if (!$this->configurations->isSamlActive()) {
-            $authentication->getConfigurationByName('user.login')->setEnabled(false);
+        $allowRegistration = $this->systemConfiguration->find('features.user_registration');
+        if ($allowRegistration === false) {
+            $authentication->getConfigurationByName('user.registration')?->setEnabled(false);
         }
 
-        if (!$this->configurations->isPasswordResetActive()) {
-            $authentication->getConfigurationByName('user.password_reset_retry_ttl')->setEnabled(false);
-            $authentication->getConfigurationByName('user.password_reset_token_ttl')->setEnabled(false);
+        if (!$this->systemConfiguration->isSamlActive()) {
+            $authentication->getConfigurationByName('user.login')?->setEnabled(false);
         }
 
-        $configurationModels = [
-            (new SystemConfigurationModel())
-                ->setSection(SystemConfigurationModel::SECTION_TIMESHEET)
+        if (!$this->systemConfiguration->isPasswordResetActive()) {
+            $authentication->getConfigurationByName('user.password_reset_retry_ttl')?->setEnabled(false);
+            $authentication->getConfigurationByName('user.password_reset_token_ttl')?->setEnabled(false);
+        }
+
+        return [
+            (new SystemConfigurationModel('timesheet'))
                 ->setConfiguration([
-                    (new Configuration())
-                        ->setName('timesheet.mode')
+                    (new Configuration('timesheet.mode'))
                         ->setType(TrackingModeType::class)
                         ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('timesheet.default_begin')
+                    (new Configuration('timesheet.default_begin'))
                         ->setType(DateTimeTextType::class)
                         ->setConstraints([new DateTimeFormat(), new NotNull()])
                         ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('timesheet.rules.allow_future_times')
-                        ->setType(CheckboxType::class)
+                    (new Configuration('timesheet.rules.allow_future_times'))
+                        ->setType(YesNoType::class)
                         ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('timesheet.rules.allow_overlapping_records')
-                        ->setType(CheckboxType::class)
+                    (new Configuration('timesheet.rules.allow_zero_duration'))
+                        ->setType(YesNoType::class)
                         ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('timesheet.rules.allow_overbooking_budget')
-                        ->setType(CheckboxType::class)
+                    (new Configuration('timesheet.rules.allow_overlapping_records'))
+                        ->setType(YesNoType::class)
                         ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('timesheet.active_entries.hard_limit')
+                    (new Configuration('timesheet.rules.allow_overbooking_budget'))
+                        ->setType(YesNoType::class)
+                        ->setTranslationDomain('system-configuration'),
+                    (new Configuration('timesheet.active_entries.hard_limit'))
                         ->setType(IntegerType::class)
                         ->setTranslationDomain('system-configuration')
                         ->setConstraints([
                             new GreaterThanOrEqual(['value' => 1])
                         ]),
-                    (new Configuration())
-                        ->setName('timesheet.time_increment')
+                    (new Configuration('timesheet.time_increment'))
                         ->setType(MinuteIncrementType::class)
-                        ->setOptions(['deactivate' => false])
                         ->setTranslationDomain('system-configuration')
                         ->setConstraints([
-                            new GreaterThanOrEqual(['value' => 1])
+                            new Range(['min' => 0, 'max' => 60])
                         ]),
-                    (new Configuration())
-                        ->setName('timesheet.duration_increment')
+                    (new Configuration('timesheet.duration_increment'))
                         ->setType(MinuteIncrementType::class)
                         ->setTranslationDomain('system-configuration')
                         ->setConstraints([
                             new GreaterThanOrEqual(['value' => 0])
                         ]),
                     /*
-                    (new Configuration())
-                        ->setName('timesheet.rules.break_warning_duration')
+                    (new Configuration('timesheet.rules.break_warning_duration'))
                         ->setType(IntegerType::class)
                         ->setTranslationDomain('system-configuration')
                         ->setConstraints([
                             new GreaterThanOrEqual(['value' => 0])
                         ]),
                     */
-                    (new Configuration())
-                        ->setName('timesheet.rules.long_running_duration')
+                    (new Configuration('timesheet.rules.long_running_duration'))
                         ->setType(IntegerType::class)
                         ->setTranslationDomain('system-configuration')
                         ->setConstraints([
                             new GreaterThanOrEqual(['value' => 0])
                         ]),
                 ]),
-            (new SystemConfigurationModel())
-                ->setSection(SystemConfigurationModel::SECTION_LOCKDOWN)
+            (new SystemConfigurationModel('quick_entry'))
+                ->setTranslation('quick_entry.title')
+                ->setTranslationDomain('messages')
                 ->setConfiguration([
-                    (new Configuration())
-                        ->setName('timesheet.rules.lockdown_period_start')
+                    (new Configuration('quick_entry.recent_activities'))
+                        ->setType(IntegerType::class)
+                        ->setTranslationDomain('system-configuration')
+                        ->setRequired(false)
+                        ->setConstraints([
+                            new Range(['min' => 0, 'max' => 20]),
+                        ]),
+                    (new Configuration('quick_entry.recent_activity_weeks'))
+                        ->setType(IntegerType::class)
+                        ->setTranslationDomain('system-configuration')
+                        ->setRequired(false)
+                        ->setConstraints([
+                            new Range(['min' => 0, 'max' => 20]),
+                        ]),
+                    (new Configuration('quick_entry.minimum_rows'))
+                        ->setType(IntegerType::class)
+                        ->setTranslationDomain('system-configuration')
+                        ->setConstraints([
+                            new Range(['min' => 1, 'max' => 5]),
+                        ]),
+                ]),
+            (new SystemConfigurationModel('lockdown_period'))
+                ->setConfiguration([
+                    (new Configuration('timesheet.rules.lockdown_period_start'))
                         ->setOptions(['help' => $lockdownStartHelp])
                         ->setType(TextType::class)
                         ->setRequired(false)
-                        ->setConstraints([new DateTimeFormat()])
+                        ->setConstraints([new DateTimeFormat(['separator' => ','])])
                         ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('timesheet.rules.lockdown_period_end')
+                    (new Configuration('timesheet.rules.lockdown_period_end'))
                         ->setOptions(['help' => $lockdownEndHelp])
                         ->setType(TextType::class)
                         ->setRequired(false)
-                        ->setConstraints([new DateTimeFormat()])
+                        ->setConstraints([new DateTimeFormat(['separator' => ','])])
                         ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('timesheet.rules.lockdown_period_timezone')
+                    (new Configuration('timesheet.rules.lockdown_period_timezone'))
                         ->setType(TimezoneType::class)
                         ->setRequired(false)
                         ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('timesheet.rules.lockdown_grace_period')
+                    (new Configuration('timesheet.rules.lockdown_grace_period'))
                         ->setOptions(['help' => $lockdownGraceHelp])
                         ->setType(TextType::class)
                         ->setRequired(false)
                         ->setConstraints([new DateTimeFormat()])
                         ->setTranslationDomain('system-configuration'),
                 ]),
-            (new SystemConfigurationModel())
-                ->setSection(SystemConfigurationModel::SECTION_ROUNDING)
+            (new SystemConfigurationModel('rounding'))
                 ->setConfiguration([
-                    (new Configuration())
-                        ->setName('timesheet.rounding.default.mode')
+                    (new Configuration('timesheet.rounding.default.mode'))
                         ->setType(RoundingModeType::class)
                         ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('timesheet.rounding.default.begin')
+                    (new Configuration('timesheet.rounding.default.begin'))
                         ->setType(IntegerType::class)
                         ->setTranslationDomain('system-configuration')
                         ->setConstraints([
                             new GreaterThanOrEqual(['value' => 0])
                         ]),
-                    (new Configuration())
-                        ->setName('timesheet.rounding.default.end')
+                    (new Configuration('timesheet.rounding.default.end'))
                         ->setType(IntegerType::class)
                         ->setTranslationDomain('system-configuration')
                         ->setConstraints([
                             new GreaterThanOrEqual(['value' => 0])
                         ]),
-                    (new Configuration())
-                        ->setName('timesheet.rounding.default.duration')
+                    (new Configuration('timesheet.rounding.default.duration'))
                         ->setType(IntegerType::class)
                         ->setTranslationDomain('system-configuration')
                         ->setConstraints([
                             new GreaterThanOrEqual(['value' => 0])
                         ]),
-                    (new Configuration())
-                        ->setName('timesheet.rounding.default.days')
+                    (new Configuration('timesheet.rounding.default.days'))
                         ->setType(WeekDaysType::class)
+                        ->setRequired(false)
                         ->setTranslationDomain('system-configuration'),
                 ]),
-            (new SystemConfigurationModel())
-                ->setSection(SystemConfigurationModel::SECTION_FORM_INVOICE)
+            (new SystemConfigurationModel('invoice'))
+                ->setTranslation('invoices')
+                ->setTranslationDomain('messages')
                 ->setConfiguration([
-                    (new Configuration())
-                        ->setName('invoice.number_format')
+                    // TODO that should be a custom type with validation
+                    (new Configuration('invoice.number_format'))
                         ->setLabel('invoice.number_format')
+                        ->setOptions([
+                            'help' => 'allowed_replacer',
+                            'help_translation_parameters' => [
+                                '%replacer%' => '{Y}, {y}, {M}, {m}, {D}, {d}, {date}, {cc}, {ccy}, {ccm}, {ccd}, {cu}, {cuy}, {cum}, {cud}, {ustaff}, {uid}, {c}, {cy}, {cm}, {cd}, {cname}, {cnumber}'
+                            ]
+                        ])
                         ->setRequired(true)
-                        ->setType(TextType::class) // TODO that should be a custom type with validation
-                        ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('invoice.simple_form')
-                        ->setLabel('simple_form')
-                        ->setRequired(false)
-                        ->setType(YesNoType::class)
+                        ->setType(TextType::class)
+                        ->setConstraints([new NotBlank()])
                         ->setTranslationDomain('system-configuration'),
                 ]),
             $authentication,
-            (new SystemConfigurationModel())
-                ->setSection(SystemConfigurationModel::SECTION_FORM_CUSTOMER)
+            (new SystemConfigurationModel('customer'))
                 ->setConfiguration([
-                    (new Configuration())
-                        ->setName('defaults.customer.timezone')
+                    (new Configuration('defaults.customer.timezone'))
                         ->setLabel('timezone')
                         ->setType(TimezoneType::class)
-                        ->setValue(date_default_timezone_get()),
-                    (new Configuration())
-                        ->setName('defaults.customer.country')
+                        ->setValue(date_default_timezone_get())
+                        ->setOptions(['help' => 'default_value_new']),
+                    (new Configuration('defaults.customer.country'))
                         ->setLabel('country')
-                        ->setType(CountryType::class),
-                    (new Configuration())
-                        ->setName('defaults.customer.currency')
+                        ->setType(CountryType::class)
+                        ->setOptions(['help' => 'default_value_new']),
+                    (new Configuration('defaults.customer.currency'))
                         ->setLabel('currency')
-                        ->setType(CurrencyType::class),
+                        ->setType(CurrencyType::class)
+                        ->setOptions(['help' => 'default_value_new']),
+                    (new Configuration('customer.choice_pattern'))
+                        ->setLabel('choice_pattern')
+                        ->setType(CustomerTypePatternType::class),
+                    (new Configuration('customer.number_format'))
+                        ->setLabel('customer.number_format')
+                        ->setOptions(['help' => 'allowed_replacer', 'help_translation_parameters' => ['%replacer%' => '{cc}']])
+                        ->setRequired(true)
+                        ->setType(TextType::class)
+                        ->setTranslationDomain('system-configuration'),
+                    (new Configuration('customer.rules.allow_duplicate_number'))
+                        ->setLabel('allow_duplicate_number')
+                        ->setType(YesNoType::class)
+                        ->setTranslationDomain('system-configuration'),
                 ]),
-            (new SystemConfigurationModel())
-                ->setSection(SystemConfigurationModel::SECTION_FORM_USER)
+            (new SystemConfigurationModel('project'))
                 ->setConfiguration([
-                    (new Configuration())
-                        ->setName('defaults.user.timezone')
+                    (new Configuration('project.choice_pattern'))
+                        ->setLabel('choice_pattern')
+                        ->setType(ProjectTypePatternType::class),
+                    (new Configuration('project.copy_teams_on_create'))
+                        ->setLabel('copy_teams_on_create')
+                        ->setType(YesNoType::class)
+                        ->setTranslationDomain('system-configuration'),
+                    (new Configuration('project.number_format'))
+                        ->setLabel('project.number_format')
+                        ->setOptions(['help' => 'allowed_replacer', 'help_translation_parameters' => ['%replacer%' => '{pc}']])
+                        ->setRequired(false)
+                        ->setType(TextType::class)
+                        ->setTranslationDomain('system-configuration'),
+                    (new Configuration('project.allow_duplicate_number'))
+                        ->setLabel('allow_duplicate_number')
+                        ->setType(YesNoType::class)
+                        ->setTranslationDomain('system-configuration'),
+                ]),
+            (new SystemConfigurationModel('activity'))
+                ->setConfiguration([
+                    (new Configuration('activity.choice_pattern'))
+                        ->setLabel('choice_pattern')
+                        ->setType(ActivityTypePatternType::class),
+                    (new Configuration('activity.number_format'))
+                        ->setLabel('activity.number_format')
+                        ->setOptions(['help' => 'allowed_replacer', 'help_translation_parameters' => ['%replacer%' => '{ac}']])
+                        ->setRequired(false)
+                        ->setType(TextType::class)
+                        ->setTranslationDomain('system-configuration'),
+                    (new Configuration('activity.allow_duplicate_number'))
+                        ->setLabel('allow_duplicate_number')
+                        ->setType(YesNoType::class)
+                        ->setTranslationDomain('system-configuration'),
+                    // TODO see DependencyInjection/Configuration::getActivityNode()
+                    /*
+                    (new Configuration('activity.allow_inline_create'))
+                        ->setLabel('activity.allow_inline_create')
+                        ->setType(YesNoType::class)
+                        ->setTranslationDomain('system-configuration'), */
+                ]),
+            (new SystemConfigurationModel('user'))
+                ->setConfiguration([
+                    (new Configuration('defaults.user.timezone'))
                         ->setLabel('timezone')
                         ->setType(TimezoneType::class)
-                        ->setValue(date_default_timezone_get()),
-                    (new Configuration())
-                        ->setName('defaults.user.language')
+                        ->setValue(date_default_timezone_get())
+                        ->setOptions(['help' => 'default_value_new']),
+                    (new Configuration('defaults.user.language'))
                         ->setLabel('language')
-                        ->setType(LanguageType::class),
-                    (new Configuration())
-                        ->setName('defaults.user.theme')
+                        ->setType(UserLanguageType::class)
+                        ->setOptions(['help' => 'default_value_new']),
+                    (new Configuration('defaults.user.theme'))
                         ->setLabel('skin')
-                        ->setType(SkinType::class),
-                    (new Configuration())
-                        ->setName('defaults.user.currency')
+                        ->setType(SkinType::class)
+                        ->setOptions(['help' => 'default_value_new']),
+                    (new Configuration('defaults.user.currency'))
                         ->setLabel('currency')
                         ->setType(CurrencyType::class),
+                    (new Configuration('theme.avatar_url'))
+                        ->setRequired(false)
+                        ->setLabel('theme.avatar_url')
+                        ->setType(YesNoType::class)
+                        ->setTranslationDomain('system-configuration'),
                 ]),
-            (new SystemConfigurationModel())
-                ->setSection(SystemConfigurationModel::SECTION_THEME)
+            (new SystemConfigurationModel('theme'))
                 ->setConfiguration([
-                    (new Configuration())
-                        ->setName('theme.autocomplete_chars')
-                        ->setLabel('theme.autocomplete_chars')
-                        ->setType(IntegerType::class)
-                        ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('timesheet.markdown_content')
+                    (new Configuration('timesheet.markdown_content'))
                         ->setLabel('theme.markdown_content')
-                        ->setType(CheckboxType::class)
+                        ->setType(YesNoType::class)
                         ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('theme.tags_create')
-                        ->setLabel('theme.tags_create')
-                        ->setType(CheckboxType::class)
-                        ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('theme.colors_limited')
-                        ->setLabel('theme.colors_limited')
-                        ->setType(CheckboxType::class)
-                        ->setTranslationDomain('system-configuration'),
-                    (new Configuration())
-                        ->setName('theme.color_choices')
+                    (new Configuration('theme.color_choices'))
                         ->setRequired(false)
                         ->setLabel('theme.color_choices')
                         ->setType(ArrayToCommaStringType::class)
                         ->setOptions(['help' => 'help.theme.color_choices'])
                         ->setConstraints([new ColorChoices()])
                         ->setTranslationDomain('system-configuration'),
-                    // allow avatar URLs
-                    (new Configuration())
-                        ->setName('theme.avatar_url')
-                        ->setRequired(false)
-                        ->setLabel('theme.avatar_url')
-                        ->setType(CheckboxType::class)
-                        ->setTranslationDomain('system-configuration'),
-                    // random colors as fallback
-                    (new Configuration())
-                        ->setName('theme.random_colors')
-                        ->setRequired(false)
-                        ->setLabel('theme.random_colors')
-                        ->setType(CheckboxType::class)
-                        ->setTranslationDomain('system-configuration'),
                 ]),
-            (new SystemConfigurationModel())
-                ->setSection(SystemConfigurationModel::SECTION_CALENDAR)
+            (new SystemConfigurationModel('calendar'))
+                ->setTranslation('calendar')
+                ->setTranslationDomain('messages')
                 ->setConfiguration([
-                    (new Configuration())
-                        ->setName('calendar.week_numbers')
+                    (new Configuration('calendar.week_numbers'))
                         ->setTranslationDomain('system-configuration')
-                        ->setType(CheckboxType::class),
-                    (new Configuration())
-                        ->setName('calendar.weekends')
+                        ->setType(YesNoType::class),
+                    (new Configuration('calendar.weekends'))
                         ->setTranslationDomain('system-configuration')
-                        ->setType(CheckboxType::class),
-                    (new Configuration())
-                        ->setName('calendar.businessHours.begin')
+                        ->setType(YesNoType::class),
+                    (new Configuration('calendar.businessHours.begin'))
                         ->setTranslationDomain('system-configuration')
                         ->setType(DayTimeType::class)
                         ->setConstraints([new NotBlank(), new TimeFormat()]),
-                    (new Configuration())
-                        ->setName('calendar.businessHours.end')
+                    (new Configuration('calendar.businessHours.end'))
                         ->setTranslationDomain('system-configuration')
                         ->setType(DayTimeType::class)
                         ->setConstraints([new NotBlank(), new TimeFormat()]),
-                    (new Configuration())
-                        ->setName('calendar.visibleHours.begin')
+                    (new Configuration('calendar.visibleHours.begin'))
                         ->setTranslationDomain('system-configuration')
                         ->setType(DayTimeType::class)
                         ->setConstraints([new NotBlank(), new TimeFormat()]),
-                    (new Configuration())
-                        ->setName('calendar.visibleHours.end')
+                    (new Configuration('calendar.visibleHours.end'))
                         ->setTranslationDomain('system-configuration')
                         ->setType(DayTimeType::class)
                         ->setConstraints([new NotBlank(), new TimeFormat()]),
-                    (new Configuration())
-                        ->setName('calendar.slot_duration')
+                    (new Configuration('calendar.slot_duration'))
                         ->setTranslationDomain('system-configuration')
                         ->setType(TextType::class)
                         ->setConstraints([new Regex(['pattern' => '/[0-2]{1}[0-9]{1}:[0-9]{2}:[0-9]{2}/']), new NotNull()]),
-                    (new Configuration())
-                        ->setName('calendar.dragdrop_amount')
+                    (new Configuration('calendar.dragdrop_amount'))
                         ->setTranslationDomain('system-configuration')
                         ->setType(IntegerType::class)
                         ->setConstraints([new Range(['min' => 0, 'max' => 20]), new NotNull()]),
+                    (new Configuration('calendar.dragdrop_data'))
+                        ->setTranslationDomain('system-configuration')
+                        ->setType(YesNoType::class),
+                    (new Configuration('calendar.title_pattern'))
+                        ->setTranslationDomain('system-configuration')
+                        ->setType(CalendarTitlePatternType::class),
                 ]),
-            (new SystemConfigurationModel())
-                ->setSection(SystemConfigurationModel::SECTION_BRANDING)
+            (new SystemConfigurationModel('branding'))
                 ->setConfiguration([
-                    (new Configuration())
-                        ->setName('theme.branding.logo')
+                    (new Configuration('theme.branding.logo'))
                         ->setTranslationDomain('system-configuration')
                         ->setRequired(false)
                         ->setType(TextType::class),
-                    (new Configuration())
-                        ->setName('theme.branding.company')
-                        ->setTranslationDomain('system-configuration')
-                        ->setRequired(false)
-                        ->setType(TextType::class)
-                        ->setConstraints([new AllowedHtmlTags(['tags' => '<b><i><u><strong><em><img><svg>'])]),
-                    (new Configuration())
-                        ->setName('theme.branding.mini')
-                        ->setTranslationDomain('system-configuration')
-                        ->setRequired(false)
-                        ->setType(TextType::class)
-                        ->setConstraints([new AllowedHtmlTags(['tags' => '<b><i><u><strong><em><img><svg>'])]),
-                    (new Configuration())
-                        ->setName('theme.branding.title')
+                    (new Configuration('theme.branding.company'))
                         ->setTranslationDomain('system-configuration')
                         ->setRequired(false)
                         ->setType(TextType::class),
-                    (new Configuration())
-                        ->setName('company.financial_year')
+                    (new Configuration('company.financial_year'))
                         ->setTranslationDomain('system-configuration')
                         ->setRequired(false)
                         ->setType(DatePickerType::class)
-                    ->setOptions(['input' => 'string']),
+                        ->setOptions(['input' => 'string']),
                 ]),
         ];
-
-        return $configurationModels;
     }
 }

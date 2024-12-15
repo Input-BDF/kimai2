@@ -10,6 +10,7 @@
 namespace App\Form\Type;
 
 use App\Form\DataTransformer\TagArrayToStringTransformer;
+use App\Repository\TagRepository;
 use Symfony\Bridge\Doctrine\Form\DataTransformer\CollectionToArrayTransformer;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -22,61 +23,53 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 /**
  * Custom form field type to enter tags or use one of autocompleted field
  */
-class TagsInputType extends AbstractType
+final class TagsInputType extends AbstractType
 {
-    /**
-     * @var TagArrayToStringTransformer
-     */
-    private $transformer;
-
-    /**
-     * @var UrlGeneratorInterface
-     */
-    private $router;
-
-    public function __construct(TagArrayToStringTransformer $transformer, UrlGeneratorInterface $router)
+    public function __construct(
+        private readonly TagRepository $tagRepository,
+        private readonly UrlGeneratorInterface $router
+    )
     {
-        $this->transformer = $transformer;
-        $this->router = $router;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder
-            ->addModelTransformer(new CollectionToArrayTransformer(), true)
-            ->addModelTransformer($this->transformer, true);
+        $builder->addModelTransformer(new CollectionToArrayTransformer(), true);
+        $builder->addModelTransformer(new TagArrayToStringTransformer($this->tagRepository, (bool) $options['allow_create']), true);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'documentation' => [
                 'type' => 'string',
                 'description' => 'Comma separated list of tags',
             ],
-            'label' => 'label.tag',
+            'allow_create' => false,
+            'label' => 'tag',
         ]);
+        $resolver->setAllowedTypes('allow_create', 'bool');
     }
 
-    public function buildView(FormView $view, FormInterface $form, array $options)
+    public function buildView(FormView $view, FormInterface $form, array $options): void
     {
         $view->vars['attr'] = array_merge($view->vars['attr'], [
-            'data-autocomplete-url' => $this->router->generate('get_tags'),
-            'class' => 'js-autocomplete',
+            'data-autocomplete-url' => $this->router->generate('get_tags_full'),
+            'data-minimum-character' => 3,
+            'class' => 'form-select',
             'autocomplete' => 'off',
+            'data-form-widget' => 'tags',
+            'data-renderer' => 'color',
         ]);
+
+        if ($options['allow_create']) {
+            $view->vars['attr'] = array_merge($view->vars['attr'], [
+                'data-create' => 'post_tag',
+            ]);
+        }
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getParent()
+    public function getParent(): string
     {
         return TextType::class;
     }

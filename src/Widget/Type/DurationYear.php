@@ -11,25 +11,59 @@ namespace App\Widget\Type;
 
 use App\Configuration\SystemConfiguration;
 use App\Repository\TimesheetRepository;
+use App\Widget\WidgetException;
+use App\Widget\WidgetInterface;
 
-final class DurationYear extends CounterYear
+final class DurationYear extends AbstractCounterYear
 {
-    public function __construct(TimesheetRepository $repository, SystemConfiguration $systemConfiguration)
+    public function __construct(private TimesheetRepository $repository, SystemConfiguration $systemConfiguration)
     {
-        parent::__construct($repository, $systemConfiguration);
-        $this->setId('durationYear');
-        $this->setOption('dataType', 'duration');
-        $this->setOption('icon', 'duration');
-        $this->setOption('color', 'yellow');
-        $this->setTitle('stats.durationYear');
+        parent::__construct($systemConfiguration);
     }
 
-    public function getData(array $options = [])
+    /**
+     * @param array<string, string|bool|int|null|array<string, mixed>> $options
+     @return array<string, string|bool|int|null|array<string, mixed>>
+     */
+    public function getOptions(array $options = []): array
     {
-        $this->titleYear = 'stats.durationFinancialYear';
-        $this->setQuery(TimesheetRepository::STATS_QUERY_DURATION);
-        $this->setQueryWithUser(false);
+        return array_merge([
+            'icon' => 'duration',
+            'color' => WidgetInterface::COLOR_YEAR,
+        ], parent::getOptions($options));
+    }
 
-        return parent::getData($options);
+    /**
+     * @param array<string, string|bool|int|null|array<string, mixed>> $options
+     */
+    protected function getYearData(\DateTimeInterface $begin, \DateTimeInterface $end, array $options = []): mixed
+    {
+        try {
+            return $this->repository->getDurationForTimeRange($begin, $end, null);
+        } catch (\Exception $ex) {
+            throw new WidgetException(
+                'Failed loading widget data: ' . $ex->getMessage()
+            );
+        }
+    }
+
+    public function getPermissions(): array
+    {
+        return ['view_other_timesheet'];
+    }
+
+    protected function getFinancialYearTitle(): string
+    {
+        return 'stats.durationFinancialYear';
+    }
+
+    public function getTemplateName(): string
+    {
+        return 'widget/widget-counter-duration.html.twig';
+    }
+
+    public function getId(): string
+    {
+        return 'DurationYear';
     }
 }

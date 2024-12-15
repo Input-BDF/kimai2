@@ -18,31 +18,29 @@ use App\Tests\Plugin\Fixtures\TestPlugin\TestPlugin;
  */
 class PluginControllerTest extends ControllerBaseTest
 {
-    public function testIsSecure()
+    public function testIsSecure(): void
     {
         $this->assertUrlIsSecured('/admin/plugins/');
     }
 
-    public function testIsSecureForRole()
+    public function testIsSecureForRole(): void
     {
         $this->assertUrlIsSecuredForRole(User::ROLE_ADMIN, '/admin/plugins/');
     }
 
-    public function testIndexAction()
+    public function testIndexAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_SUPER_ADMIN);
         $this->assertAccessIsGranted($client, '/admin/plugins/');
         $this->assertCalloutWidgetWithMessage($client, 'You have no plugins installed yet');
-        $this->assertPageActions($client, ['shop' => 'https://www.kimai.org/store/', 'help' => 'https://www.kimai.org/documentation/plugins.html']);
     }
 
-    public function testIndexActionWithInstalledPlugins()
+    public function testIndexActionWithInstalledPlugins(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_SUPER_ADMIN);
 
-        /** @var PluginManager $manager */
-        $manager = self::$container->get(PluginManager::class);
-        $manager->addPlugin(new TestPlugin());
+        $manager = new PluginManager([new TestPlugin()]);
+        self::getContainer()->set(PluginManager::class, $manager);
 
         $this->assertAccessIsGranted($client, '/admin/plugins/');
         $this->assertHasDataTable($client);

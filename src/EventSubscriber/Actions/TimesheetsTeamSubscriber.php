@@ -10,10 +10,17 @@
 namespace App\EventSubscriber\Actions;
 
 use App\Event\PageActionsEvent;
-use App\Repository\Query\TimesheetQuery;
+use App\Export\ServiceExport;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
-class TimesheetsTeamSubscriber extends AbstractActionsSubscriber
+final class TimesheetsTeamSubscriber extends AbstractActionsSubscriber
 {
+    public function __construct(AuthorizationCheckerInterface $auth, UrlGeneratorInterface $urlGenerator, private readonly ServiceExport $serviceExport)
+    {
+        parent::__construct($auth, $urlGenerator);
+    }
+
     public static function getActionName(): string
     {
         return 'timesheets_team';
@@ -21,23 +28,15 @@ class TimesheetsTeamSubscriber extends AbstractActionsSubscriber
 
     public function onActions(PageActionsEvent $event): void
     {
-        $payload = $event->getPayload();
-
-        /** @var TimesheetQuery $query */
-        $query = $payload['query'];
-
-        $event->addSearchToggle($query);
-        $event->addColumnToggle('#modal_timesheet_admin');
+        if ($this->isGranted('create_other_timesheet')) {
+            $event->addAction('create', ['title' => 'create', 'url' => $this->path('admin_timesheet_create'), 'class' => 'create-ts modal-ajax-form']);
+            $event->addAction('multi-user', ['title' => 'create-timesheet-multiuser', 'url' => $this->path('admin_timesheet_create_multiuser'), 'class' => 'create-ts-mu modal-ajax-form', 'icon' => 'fas fa-user-plus']);
+        }
 
         if ($this->isGranted('export_other_timesheet')) {
-            $event->addAction('download', ['url' => $this->path('admin_timesheet_export'), 'class' => 'toolbar-action modal-ajax-form']);
+            foreach ($this->serviceExport->getTimesheetExporter() as $exporter) {
+                $event->addActionToSubmenu('export', $exporter->getId(), ['url' => $this->path('admin_timesheet_export', ['exporter' => $exporter->getId()]), 'class' => 'toolbar-action', 'title' => 'button.' . $exporter->getId(), 'translation_domain' => 'messages']);
+            }
         }
-
-        if ($this->isGranted('create_other_timesheet')) {
-            $event->addActionToSubmenu('create', 'single', ['title' => 'create', 'url' => $this->path('admin_timesheet_create'), 'class' => 'create-ts modal-ajax-form']);
-            $event->addActionToSubmenu('create', 'multi-user', ['title' => 'create-timesheet-multiuser', 'translation_domain' => 'actions', 'url' => $this->path('admin_timesheet_create_multiuser'), 'class' => 'create-ts-mu modal-ajax-form']);
-        }
-
-        $event->addHelp($this->documentationLink('timesheet.html'));
     }
 }

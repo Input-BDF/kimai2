@@ -1,45 +1,42 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
   <file source-language="en" target-language="ro" datatype="plaintext" original="invoice-renderer.en.xlf">
-    <header>
-      <tool tool-id="symfony" tool-name="Symfony"/>
-    </header>
     <body>
-      <trans-unit id="label.invoice_renderer">
-        <source>label.invoice_renderer</source>
+      <trans-unit id="hOcTt2G" resname="invoice_renderer">
+        <source>invoice_renderer</source>
         <target>Document factură</target>
       </trans-unit>
-      <trans-unit id="default">
-        <source>default</source>
-        <target>Factură (implicit)</target>
+      <trans-unit id="Utbj3k_" resname="invoice">
+        <source>invoice</source>
+        <target state="translated">Factură</target>
       </trans-unit>
-      <trans-unit id="timesheet">
+      <trans-unit id="lt2Y2LO" resname="timesheet">
         <source>timesheet</source>
-        <target>Pontaj</target>
+        <target state="translated">Pontaj</target>
       </trans-unit>
-      <trans-unit id="freelancer">
-        <source>freelancer</source>
+      <trans-unit id="m1UyfD9" resname="service-date">
+        <source>service-date</source>
         <target>Freelancer</target>
       </trans-unit>
-      <trans-unit id="open-spreadsheet">
-        <source>open-spreadsheet</source>
-        <target>Calc Spreadsheet</target>
-      </trans-unit>
-      <trans-unit id="spreadsheet">
-        <source>spreadsheet</source>
-        <target>Excel</target>
-      </trans-unit>
-      <trans-unit id="export">
-        <source>export</source>
-        <target>Data exportului</target>
-      </trans-unit>
-      <trans-unit id="company">
-        <source>company</source>
-        <target>Factură firmă</target>
-      </trans-unit>
-      <trans-unit id="help.upload">
+      <trans-unit id="7mEUv6C" resname="help.upload">
         <source>help.upload</source>
-        <target>Atenție: fișierele existente vor fi suprascrise. Tipuri de fișiere permise: DOCX, ODS, XLSX.</target>
+        <target>Atenție: fișierele existente vor fi suprascrise. Tipuri de fișiere permise: %extensions%.</target>
+      </trans-unit>
+      <trans-unit id="E5BwZHT" resname="programmatic">
+        <source>programmatic</source>
+        <target>Pentru prelucrare ulterioară</target>
+      </trans-unit>
+      <trans-unit id="N6juwc4" resname="default">
+        <source>default</source>
+        <target>Factură</target>
+      </trans-unit>
+      <trans-unit id="mC2ePrm" resname="text">
+        <source>text</source>
+        <target>Text</target>
+      </trans-unit>
+      <trans-unit id="22pt8Gs" resname="download_invoice_renderer">
+        <source>download_invoice_renderer</source>
+        <target state="translated">Puteți descărca alte modele aici</target>
       </trans-unit>
     </body>
   </file>

@@ -13,16 +13,19 @@ use InvalidArgumentException;
 
 final class Month extends Timesheet
 {
-    private $month;
-    private $billableDuration = 0;
-    private $billableRate = 0.00;
+    private string $month;
+    private int $billableDuration = 0;
+    private float $billableRate = 0.00;
 
-    public function __construct(string $month)
+    /**
+     * @param string|int $month
+     */
+    public function __construct($month)
     {
         $monthNumber = (int) $month;
         if ($monthNumber < 1 || $monthNumber > 12) {
             throw new InvalidArgumentException(
-                sprintf('Invalid month given. Expected 1-12, received "%s".', $monthNumber)
+                \sprintf('Invalid month given. Expected 1-12, received "%s".', $monthNumber)
             );
         }
         $this->month = str_pad($month, 2, '0', STR_PAD_LEFT);

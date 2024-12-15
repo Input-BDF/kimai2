@@ -18,7 +18,7 @@ use PHPUnit\Framework\TestCase;
  */
 class PageActionsEventTest extends TestCase
 {
-    public function testDefaultValues()
+    public function testDefaultValues(): void
     {
         $user = new User();
         $user->setAlias('foo');
@@ -26,12 +26,14 @@ class PageActionsEventTest extends TestCase
         $sut = new PageActionsEvent($user, [], 'foo', 'bar');
         $this->assertEquals('bar', $sut->getView());
         $this->assertEquals('foo', $sut->getActionName());
+        $this->assertEquals('actions.foo', $sut->getEventName());
         $this->assertTrue($sut->isView('bar'));
         $this->assertFalse($sut->isView('foo'));
         $this->assertFalse($sut->isIndexView());
         $this->assertSame($user, $sut->getUser());
         $this->assertEquals([], $sut->getActions());
         $this->assertEquals(['actions' => [], 'view' => 'bar'], $sut->getPayload());
+        $this->assertNull($sut->getLocale());
 
         $sut = new PageActionsEvent($user, ['hello' => 'world'], 'foo', 'bar');
         $this->assertSame($user, $sut->getUser());
@@ -39,7 +41,7 @@ class PageActionsEventTest extends TestCase
         $this->assertEquals(['hello' => 'world', 'actions' => [], 'view' => 'bar'], $sut->getPayload());
     }
 
-    public function testSetActions()
+    public function testSetActions(): void
     {
         $sut = new PageActionsEvent(new User(), ['hello' => 'world'], 'foo', 'xxx');
         $sut->addAction('foo', ['url' => 'bar']);
@@ -65,9 +67,15 @@ class PageActionsEventTest extends TestCase
         $this->assertEquals(['foo' => ['url' => 'bar']], $sut->getActions());
         $sut->replaceAction('foo', ['url' => 'xyz']);
         $this->assertEquals(['foo' => ['url' => 'xyz']], $sut->getActions());
+
+        $sut->setLocale('de');
+        $this->assertEquals('de', $sut->getLocale());
+
+        $sut->setLocale(null);
+        $this->assertNull($sut->getLocale());
     }
 
-    public function testSubmenu()
+    public function testSubmenu(): void
     {
         $sut = new PageActionsEvent(new User(), ['hello' => 'world'], 'foo', 'xxx');
         $this->assertFalse($sut->hasSubmenu('test'));
@@ -78,49 +86,44 @@ class PageActionsEventTest extends TestCase
         $this->assertEquals(2, $sut->countActions('test'));
     }
 
-    public function testAddHelper()
+    public function testAddHelper(): void
     {
         $sut = new PageActionsEvent(new User(), ['hello' => 'world'], 'foo', 'xxx');
 
-        $sut->addSearchToggle();
         $sut->addDivider();
-        $sut->addBack('foo1');
         $sut->addColumnToggle('foo2');
         $sut->addDelete('foo3');
-        $sut->addHelp('foo4');
         $sut->addCreate('foo5', true);
         $sut->addCreate('foo6', false);
         $sut->addQuickExport('foo7');
-
-        $this->assertEquals(8, $sut->countActions());
+        $sut->addEdit('trölölö');
 
         $expected = [
-            'search' => ['modal' => '#modal_search', 'label' => null],
             'divider0' => null,
-            'back' => ['url' => 'foo1', 'translation_domain' => 'actions'],
-            'visibility' => ['modal' => '#foo2'],
-            'help' => ['url' => 'foo4', 'target' => '_blank'],
-            'create' => ['url' => 'foo5', 'class' => 'modal-ajax-form'],
-            'download' => ['url' => 'foo7', 'class' => 'toolbar-action'],
-            'trash' => ['url' => 'foo3', 'class' => 'modal-ajax-form text-red'],
+            'columns' => ['modal' => '#foo2', 'title' => 'modal.columns.title'],
+            'create' => ['url' => 'foo5', 'class' => 'modal-ajax-form', 'title' => 'create', 'accesskey' => 'a'],
+            'download' => ['url' => 'foo7', 'class' => 'toolbar-action', 'title' => 'export'],
+            'edit' => ['url' => 'trölölö', 'class' => 'modal-ajax-form', 'title' => 'edit'],
+            'trash' => ['url' => 'foo3', 'class' => 'modal-ajax-form text-red', 'title' => 'trash'],
         ];
+        $this->assertEquals(\count($expected), $sut->countActions());
 
         $this->assertEquals($expected, $sut->getActions());
     }
 
-    public function testAddOthers()
+    public function testAddOthers(): void
     {
         $sut = new PageActionsEvent(new User(), ['hello' => 'world'], 'foo', 'xxx');
 
         // make sure that modal always start with #, no matter what was given
         $sut->addColumnToggle('#fooX');
-        $this->assertEquals(['visibility' => ['modal' => '#fooX']], $sut->getActions());
+        $this->assertEquals(['columns' => ['modal' => '#fooX', 'title' => 'modal.columns.title']], $sut->getActions());
         // make sure that a second toggle cannot be added
         $sut->addColumnToggle('fooY');
-        $this->assertEquals(['visibility' => ['modal' => '#fooX']], $sut->getActions());
+        $this->assertEquals(['columns' => ['modal' => '#fooX', 'title' => 'modal.columns.title']], $sut->getActions());
 
-        $sut->removeAction('visibility');
+        $sut->removeAction('columns');
         $sut->addColumnToggle('fooY');
-        $this->assertEquals(['visibility' => ['modal' => '#fooY']], $sut->getActions());
+        $this->assertEquals(['columns' => ['modal' => '#fooY', 'title' => 'modal.columns.title']], $sut->getActions());
     }
 }

@@ -11,127 +11,104 @@ namespace App\Form;
 
 use App\Entity\Activity;
 use App\Entity\Customer;
-use App\Form\Type\CustomerType;
+use App\Form\Type\InvoiceLabelType;
 use App\Form\Type\ProjectType;
-use App\Repository\CustomerRepository;
+use App\Form\Type\TeamType;
 use App\Repository\ProjectRepository;
-use App\Repository\Query\CustomerFormTypeQuery;
 use App\Repository\Query\ProjectFormTypeQuery;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
-use Symfony\Component\Form\FormEvent;
-use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class ActivityEditForm extends AbstractType
 {
     use EntityFormTrait;
 
-    /**
-     * {@inheritdoc}
-     */
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $project = null;
         $customer = null;
-        $new = true;
+        $isNew = true;
+        $isGlobal = false;
+        $options['currency'] = null;
 
         if (isset($options['data'])) {
             /** @var Activity $entry */
             $entry = $options['data'];
+            $isGlobal = $entry->isGlobal();
 
-            if (null !== $entry->getProject()) {
+            if (!$isGlobal) {
                 $project = $entry->getProject();
                 $customer = $project->getCustomer();
                 $options['currency'] = $customer->getCurrency();
             }
 
-            $new = $entry->getId() === null;
+            $isNew = $entry->getId() === null;
         }
 
         $builder
             ->add('name', TextType::class, [
-                'label' => 'label.name',
+                'label' => 'name',
                 'attr' => [
                     'autofocus' => 'autofocus'
                 ],
             ])
+            ->add('number', TextType::class, [
+                'label' => 'activity_number',
+                'required' => false,
+                'attr' => [
+                    'maxlength' => 10,
+                ],
+            ])
             ->add('comment', TextareaType::class, [
-                'label' => 'label.description',
+                'label' => 'description',
                 'required' => false,
             ])
+            ->add('invoiceText', InvoiceLabelType::class)
         ;
 
-        if ($new) {
-            if ($options['customer']) {
-                $builder
-                    ->add('customer', CustomerType::class, [
-                        'query_builder' => function (CustomerRepository $repo) use ($builder, $customer) {
-                            $query = new CustomerFormTypeQuery($customer);
-                            $query->setUser($builder->getOption('user'));
-
-                            return $repo->getQueryBuilderForFormType($query);
-                        },
-                        'data' => $customer ? $customer : null,
-                        'required' => false,
-                        'mapped' => false,
-                        'project_enabled' => true,
-                    ]);
-            }
-
+        if ($isNew || !$isGlobal) {
             $builder
                 ->add('project', ProjectType::class, [
                     'required' => false,
+                    'help' => 'help.globalActivity',
                     'query_builder' => function (ProjectRepository $repo) use ($builder, $project, $customer) {
                         $query = new ProjectFormTypeQuery($project, $customer);
                         $query->setUser($builder->getOption('user'));
                         $query->setIgnoreDate(true);
+                        $query->setWithCustomer(true);
 
                         return $repo->getQueryBuilderForFormType($query);
                     },
                 ]);
+        }
 
-            // replaces the project select after submission, to make sure only projects for the selected customer are displayed
-            $builder->addEventListener(
-                FormEvents::PRE_SUBMIT,
-                function (FormEvent $event) use ($builder, $project) {
-                    $data = $event->getData();
-                    if (!isset($data['customer']) || empty($data['customer'])) {
-                        return;
-                    }
-
-                    $event->getForm()->add('project', ProjectType::class, [
-                        'group_by' => null,
-                        'query_builder' => function (ProjectRepository $repo) use ($builder, $data, $project) {
-                            $query = new ProjectFormTypeQuery($project, $data['customer']);
-                            $query->setUser($builder->getOption('user'));
-                            $query->setIgnoreDate(true);
-
-                            return $repo->getQueryBuilderForFormType($query);
-                        },
-                    ]);
-                }
-            );
+        if ($isNew) {
+            $builder
+                ->add('teams', TeamType::class, [
+                    'required' => false,
+                    'multiple' => true,
+                    'expanded' => false,
+                    'by_reference' => false,
+                    'help' => 'help.teams',
+                ]);
         }
 
         $this->addCommonFields($builder, $options);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'data_class' => Activity::class,
             'csrf_protection' => true,
             'csrf_field_name' => '_token',
             'csrf_token_id' => 'admin_activity_edit',
-            'customer' => false,
             'currency' => Customer::DEFAULT_CURRENCY,
             'include_budget' => false,
+            'include_time' => false,
             'attr' => [
                 'data-form-event' => 'kimai.activityUpdate'
             ],

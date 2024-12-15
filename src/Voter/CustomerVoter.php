@@ -18,6 +18,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 /**
  * A voter to check authorization on Customers.
+ *
+ * @extends Voter<string, Customer>
  */
 final class CustomerVoter extends Voter
 {
@@ -29,49 +31,58 @@ final class CustomerVoter extends Voter
         'create',
         'edit',
         'budget',
+        'time',
         'delete',
         'permissions',
         'comments',
-        'comments_create',
         'details',
+        'access',
     ];
 
-    private $permissionManager;
-
-    public function __construct(RolePermissionManager $permissionManager)
+    public function __construct(private readonly RolePermissionManager $permissionManager)
     {
-        $this->permissionManager = $permissionManager;
     }
 
-    /**
-     * @param string $attribute
-     * @param Customer $subject
-     * @return bool
-     */
-    protected function supports($attribute, $subject)
+    public function supportsAttribute(string $attribute): bool
     {
-        if (!($subject instanceof Customer)) {
-            return false;
-        }
-
-        if (!\in_array($attribute, self::ALLOWED_ATTRIBUTES)) {
-            return false;
-        }
-
-        return true;
+        return \in_array($attribute, self::ALLOWED_ATTRIBUTES, true);
     }
 
-    /**
-     * @param string $attribute
-     * @param Customer $subject
-     * @param TokenInterface $token
-     * @return bool
-     */
-    protected function voteOnAttribute($attribute, $subject, TokenInterface $token)
+    public function supportsType(string $subjectType): bool
+    {
+        return str_contains($subjectType, Customer::class);
+    }
+
+    protected function supports(string $attribute, mixed $subject): bool
+    {
+        return $subject instanceof Customer && $this->supportsAttribute($attribute);
+    }
+
+    protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token): bool
     {
         $user = $token->getUser();
 
         if (!$user instanceof User) {
+            return false;
+        }
+
+        // this is a virtual permission, only meant to be used by developer
+        // it checks if access to the given customer is potentially possible
+        if ($attribute === 'access') {
+            if ($subject->getTeams()->count() === 0) {
+                return true;
+            }
+
+            foreach ($subject->getTeams() as $team) {
+                if ($user->isInTeam($team)) {
+                    return true;
+                }
+            }
+
+            if ($user->canSeeAllData()) {
+                return true;
+            }
+
             return false;
         }
 

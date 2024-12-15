@@ -19,13 +19,13 @@ trait EntityValidationTestTrait
 {
     /**
      * @param object $entity
-     * @param array|string $fieldNames
+     * @param array<string>|string $fieldNames
      */
-    protected function assertHasViolationForField(object $entity, $fieldNames, $groups = null)
+    public function assertHasViolationForField(object $entity, array|string $fieldNames, $groups = null): void
     {
         self::bootKernel();
         /** @var ValidatorInterface $validator */
-        $validator = static::$kernel->getContainer()->get('validator');
+        $validator = self::getContainer()->get('validator');
         $violations = $validator->validate($entity, null, $groups);
 
         if (!\is_array($fieldNames)) {
@@ -52,19 +52,19 @@ trait EntityValidationTestTrait
             $this->assertTrue($foundField, 'Failed finding violation for field: ' . $propertyPath);
         }
 
-        $this->assertEmpty($violatedFields, sprintf('Unexpected violations found: %s', implode(', ', $violatedFields)));
-        $this->assertEquals($expected, $countViolations, sprintf('Expected %s violations, found %s in %s.', $expected, $actual, implode(', ', array_keys($violatedFields))));
+        $this->assertEmpty($violatedFields, \sprintf('Unexpected violations found: %s', implode(', ', $violatedFields)));
+        $this->assertEquals($expected, $countViolations, \sprintf('Expected %s violations, found %s in %s.', $expected, $actual, implode(', ', array_keys($violatedFields))));
     }
 
-    protected function assertHasNoViolations($entity, $groups = null)
+    public function assertHasNoViolations($entity, $groups = null): void
     {
         self::bootKernel();
         /** @var ValidatorInterface $validator */
-        $validator = static::$kernel->getContainer()->get('validator');
+        $validator = self::getContainer()->get('validator');
 
         $violations = $validator->validate($entity, null, $groups);
         $actual = $violations->count();
 
-        $this->assertEquals(0, $actual, sprintf('Expected 0 violations, found %s.', $actual));
+        $this->assertEquals(0, $actual, \sprintf('Expected 0 violations, found %s.', $actual));
     }
 }

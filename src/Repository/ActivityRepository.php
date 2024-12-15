@@ -10,166 +10,101 @@
 namespace App\Repository;
 
 use App\Entity\Activity;
+use App\Entity\ActivityMeta;
 use App\Entity\Project;
 use App\Entity\Team;
 use App\Entity\Timesheet;
 use App\Entity\User;
-use App\Model\ActivityStatistic;
 use App\Repository\Loader\ActivityLoader;
-use App\Repository\Paginator\LoaderPaginator;
+use App\Repository\Paginator\LoaderQueryPaginator;
 use App\Repository\Paginator\PaginatorInterface;
 use App\Repository\Query\ActivityFormTypeQuery;
 use App\Repository\Query\ActivityQuery;
-use Doctrine\DBAL\Types\Types;
+use App\Repository\Query\ActivityQueryHydrate;
+use App\Utils\Pagination;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityRepository;
-use Doctrine\ORM\ORMException;
+use Doctrine\ORM\Exception\ORMException;
+use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Query;
+use Doctrine\ORM\Query\Expr\Andx;
 use Doctrine\ORM\QueryBuilder;
-use Pagerfanta\Pagerfanta;
 
 /**
  * @extends \Doctrine\ORM\EntityRepository<Activity>
  */
 class ActivityRepository extends EntityRepository
 {
-    /**
-     * @param mixed $id
-     * @param null $lockMode
-     * @param null $lockVersion
-     * @return Activity|null
-     */
-    public function find($id, $lockMode = null, $lockVersion = null)
-    {
-        /** @var Activity|null $activity */
-        $activity = parent::find($id, $lockMode, $lockVersion);
-        if (null === $activity) {
-            return null;
-        }
-
-        $loader = new ActivityLoader($this->getEntityManager(), true);
-        $loader->loadResults([$activity]);
-
-        return $activity;
-    }
-
-    /**
-     * @param Project $project
-     * @return Activity[]
-     */
-    public function findByProject(Project $project)
-    {
-        return $this->findBy(['project' => $project]);
-    }
+    use RepositorySearchTrait;
 
     /**
      * @param int[] $activityIds
-     * @return Activity[]
+     * @return array<Activity>
      */
-    public function findByIds(array $activityIds)
+    public function findByIds(array $activityIds): array
     {
+        $ids = array_filter(
+            array_unique($activityIds),
+            function ($value) {
+                return $value > 0;
+            }
+        );
+
+        if (\count($ids) === 0) {
+            return [];
+        }
+
         $qb = $this->createQueryBuilder('a');
         $qb
             ->where($qb->expr()->in('a.id', ':id'))
-            ->setParameter('id', $activityIds)
+            ->setParameter('id', $ids)
         ;
 
-        $activities = $qb->getQuery()->getResult();
-
-        $loader = new ActivityLoader($qb->getEntityManager(), true);
-        $loader->loadResults($activities);
-
-        return $activities;
+        return $this->getActivities($this->prepareActivityQuery($qb->getQuery()));
     }
 
-    /**
-     * @param Activity $activity
-     * @throws ORMException
-     * @throws \Doctrine\ORM\OptimisticLockException
-     */
-    public function saveActivity(Activity $activity)
+    public function saveActivity(Activity $activity): void
     {
         $entityManager = $this->getEntityManager();
         $entityManager->persist($activity);
         $entityManager->flush();
     }
 
-    /**
-     * @param null|bool $visible
-     * @return int
-     */
-    public function countActivity($visible = null)
+    public function countActivity(?bool $visible = null): int
     {
         if (null !== $visible) {
-            return $this->count(['visible' => (bool) $visible]);
+            return $this->count(['visible' => $visible]);
         }
 
         return $this->count([]);
     }
 
     /**
-     * @deprecated since 1.15 use ActivityStatisticService::getActivityStatistics() instead - will be removed with 2.0
-     * @codeCoverageIgnore
-     *
-     * @param Activity $activity
-     * @return ActivityStatistic
+     * @param array<Team> $teams
      */
-    public function getActivityStatistics(Activity $activity): ActivityStatistic
+    private function addPermissionCriteria(QueryBuilder $qb, ?User $user = null, array $teams = [], bool $globalsOnly = false): void
     {
-        $qb = $this->getEntityManager()->createQueryBuilder();
-        $qb
-            ->from(Timesheet::class, 't')
-            ->addSelect('COUNT(t.id) as amount')
-            ->addSelect('COALESCE(SUM(t.duration), 0) as duration')
-            ->addSelect('COALESCE(SUM(t.rate), 0) as rate')
-            ->addSelect('COALESCE(SUM(t.internalRate), 0) as internal_rate')
-            ->where('t.activity = :activity')
-            ->setParameter('activity', $activity)
-        ;
-
-        $timesheetResult = $qb->getQuery()->getOneOrNullResult();
-
-        $stats = new ActivityStatistic();
-
-        if (null !== $timesheetResult) {
-            $stats->setCounter($timesheetResult['amount']);
-            $stats->setRecordDuration($timesheetResult['duration']);
-            $stats->setRecordRate($timesheetResult['rate']);
-            $stats->setRecordInternalRate($timesheetResult['internal_rate']);
+        $permissions = $this->getPermissionCriteria($qb, $user, $teams, $globalsOnly);
+        if ($permissions->count() > 0) {
+            $qb->andWhere($permissions);
         }
-
-        $qb = $this->getEntityManager()->createQueryBuilder();
-        $qb
-            ->from(Timesheet::class, 't')
-            ->addSelect('COUNT(t.id) as amount')
-            ->addSelect('COALESCE(SUM(t.duration), 0) as duration')
-            ->addSelect('COALESCE(SUM(t.rate), 0) as rate')
-            ->where('t.activity = :activity')
-            ->andWhere('t.billable = :billable')
-            ->setParameter('activity', $activity)
-            ->setParameter('billable', true, Types::BOOLEAN)
-        ;
-
-        $timesheetResult = $qb->getQuery()->getOneOrNullResult();
-
-        if (null !== $timesheetResult) {
-            $stats->setDurationBillable($timesheetResult['duration']);
-            $stats->setRateBillable($timesheetResult['rate']);
-            $stats->setRecordAmountBillable($timesheetResult['amount']);
-        }
-
-        return $stats;
     }
 
-    private function addPermissionCriteria(QueryBuilder $qb, ?User $user = null, array $teams = [], bool $globalsOnly = false)
+    /**
+     * @param array<Team> $teams
+     */
+    private function getPermissionCriteria(QueryBuilder $qb, ?User $user = null, array $teams = [], bool $globalsOnly = false): Andx
     {
+        $andX = $qb->expr()->andX();
+
         // make sure that all queries without a user see all projects
         if (null === $user && empty($teams)) {
-            return;
+            return $andX;
         }
 
         // make sure that admins see all activities
         if (null !== $user && $user->canSeeAllData()) {
-            return;
+            return $andX;
         }
 
         if (null !== $user) {
@@ -177,33 +112,33 @@ class ActivityRepository extends EntityRepository
         }
 
         if (empty($teams)) {
-            $qb->andWhere('SIZE(a.teams) = 0');
+            $andX->add('SIZE(a.teams) = 0');
             if (!$globalsOnly) {
-                $qb->andWhere('SIZE(p.teams) = 0');
-                $qb->andWhere('SIZE(c.teams) = 0');
+                $andX->add('SIZE(p.teams) = 0');
+                $andX->add('SIZE(c.teams) = 0');
             }
 
-            return;
+            return $andX;
         }
 
         $orActivity = $qb->expr()->orX(
             'SIZE(a.teams) = 0',
             $qb->expr()->isMemberOf(':teams', 'a.teams')
         );
-        $qb->andWhere($orActivity);
+        $andX->add($orActivity);
 
         if (!$globalsOnly) {
             $orProject = $qb->expr()->orX(
                 'SIZE(p.teams) = 0',
                 $qb->expr()->isMemberOf(':teams', 'p.teams')
             );
-            $qb->andWhere($orProject);
+            $andX->add($orProject);
 
             $orCustomer = $qb->expr()->orX(
                 'SIZE(c.teams) = 0',
                 $qb->expr()->isMemberOf(':teams', 'c.teams')
             );
-            $qb->andWhere($orCustomer);
+            $andX->add($orCustomer);
         }
 
         $ids = array_values(array_unique(array_map(function (Team $team) {
@@ -211,26 +146,14 @@ class ActivityRepository extends EntityRepository
         }, $teams)));
 
         $qb->setParameter('teams', $ids);
-    }
 
-    /**
-     * @deprecated since 1.1 - use getQueryBuilderForFormType() instead - will be removed with 2.0
-     * @codeCoverageIgnore
-     */
-    public function builderForEntityType($activity, $project)
-    {
-        $query = new ActivityFormTypeQuery();
-        $query->addActivity($activity);
-        $query->addProject($project);
-
-        return $this->getQueryBuilderForFormType($query);
+        return $andX;
     }
 
     /**
      * Returns a query builder that is used for ActivityType and your own 'query_builder' option.
      *
-     * @param ActivityFormTypeQuery $query
-     * @return QueryBuilder
+     * @internal
      */
     public function getQueryBuilderForFormType(ActivityFormTypeQuery $query): QueryBuilder
     {
@@ -242,10 +165,10 @@ class ActivityRepository extends EntityRepository
             ->addOrderBy('a.name', 'ASC')
         ;
 
-        $where = $qb->expr()->andX();
+        $mainQuery = $qb->expr()->andX();
 
-        $where->add($qb->expr()->eq('a.visible', ':visible'));
-        $qb->setParameter('visible', true, \PDO::PARAM_BOOL);
+        $mainQuery->add($qb->expr()->eq('a.visible', ':visible'));
+        $qb->setParameter('visible', true, ParameterType::BOOLEAN);
 
         if (!$query->isGlobalsOnly()) {
             $qb
@@ -254,7 +177,7 @@ class ActivityRepository extends EntityRepository
                 ->leftJoin('a.project', 'p')
                 ->leftJoin('p.customer', 'c');
 
-            $where->add(
+            $mainQuery->add(
                 $qb->expr()->orX(
                     $qb->expr()->isNull('a.project'),
                     $qb->expr()->andX(
@@ -264,56 +187,76 @@ class ActivityRepository extends EntityRepository
                 )
             );
 
-            $qb->setParameter('is_visible', true, \PDO::PARAM_BOOL);
+            $qb->setParameter('is_visible', true, ParameterType::BOOLEAN);
         }
 
         if ($query->isGlobalsOnly()) {
-            $where->add($qb->expr()->isNull('a.project'));
+            $mainQuery->add($qb->expr()->isNull('a.project'));
         } elseif ($query->hasProjects()) {
-            $where->add(
-                $qb->expr()->orX(
-                    $qb->expr()->isNull('a.project'),
-                    $qb->expr()->in('a.project', ':project')
-                )
+            $orX = $qb->expr()->orX(
+                $qb->expr()->in('a.project', ':project')
             );
+
+            $includeGlobals = true;
+            // projects have a setting to disallow global activities, and we check for it only
+            // if we query for exactly one project (usually used in dropdown queries)
+            if (\count($query->getProjects()) === 1) {
+                $project = $query->getProjects()[0];
+                if (!$project instanceof Project) {
+                    $project = $this->getEntityManager()->getRepository(Project::class)->find($project);
+                }
+                if ($project instanceof Project) {
+                    $includeGlobals = $project->isGlobalActivities();
+                }
+            }
+
+            if ($includeGlobals) {
+                $orX->add($qb->expr()->isNull('a.project'));
+            }
+
+            $mainQuery->add($orX);
             $qb->setParameter('project', $query->getProjects());
         }
 
-        if (null !== $query->getActivityToIgnore()) {
-            $qb->andWhere($qb->expr()->neq('a.id', ':ignored'));
-            $qb->setParameter('ignored', $query->getActivityToIgnore());
+        $permissions = $this->getPermissionCriteria($qb, $query->getUser(), $query->getTeams(), $query->isGlobalsOnly());
+        if ($permissions->count() > 0) {
+            $mainQuery->add($permissions);
         }
 
-        $this->addPermissionCriteria($qb, $query->getUser(), $query->getTeams(), $query->isGlobalsOnly());
+        $outerQuery = $qb->expr()->orX();
 
-        $or = $qb->expr()->orX();
-
-        // this must always be the last part before the or
-        $or->add($where);
-
-        // this must always be the last part of the query
         if ($query->hasActivities()) {
-            $or->add($qb->expr()->in('a.id', ':activity'));
+            $outerQuery->add($qb->expr()->in('a.id', ':activity'));
             $qb->setParameter('activity', $query->getActivities());
         }
 
-        if ($or->count() > 0) {
-            $qb->andWhere($or);
+        if (null !== $query->getActivityToIgnore()) {
+            $mainQuery = $qb->expr()->andX(
+                $mainQuery,
+                $qb->expr()->neq('a.id', ':ignored')
+            );
+            $qb->setParameter('ignored', $query->getActivityToIgnore());
         }
+
+        $outerQuery->add($mainQuery);
+
+        $qb->andWhere($outerQuery);
 
         return $qb;
     }
 
     private function getQueryBuilderForQuery(ActivityQuery $query): QueryBuilder
     {
-        $qb = $this->getEntityManager()->createQueryBuilder();
+        $qb = $this->createQueryBuilder('a');
 
         $qb
-            ->select('a')
-            ->from(Activity::class, 'a')
             ->leftJoin('a.project', 'p')
             ->leftJoin('p.customer', 'c')
         ;
+
+        if (\count($query->getActivityIds()) > 0) {
+            $qb->andWhere($qb->expr()->in('a.id', ':id'))->setParameter('id', $query->getActivityIds());
+        }
 
         foreach ($query->getOrderGroups() as $orderBy => $order) {
             switch ($orderBy) {
@@ -345,13 +288,13 @@ class ActivityRepository extends EntityRepository
                         )
                     )
                 );
-                $qb->setParameter('is_visible', true, \PDO::PARAM_BOOL);
+                $qb->setParameter('is_visible', true, ParameterType::BOOLEAN);
             }
 
             if ($query->isShowVisible()) {
-                $qb->setParameter('visible', true, \PDO::PARAM_BOOL);
+                $qb->setParameter('visible', true, ParameterType::BOOLEAN);
             } elseif ($query->isShowHidden()) {
-                $qb->setParameter('visible', false, \PDO::PARAM_BOOL);
+                $qb->setParameter('visible', false, ParameterType::BOOLEAN);
             }
         }
 
@@ -363,14 +306,22 @@ class ActivityRepository extends EntityRepository
             );
 
             if (!$query->isExcludeGlobals()) {
-                $orX->add($qb->expr()->isNull('a.project'));
+                $includeGlobals = true;
+                // projects have a setting to disallow global activities, and we check for it only
+                // if we query for exactly one project (usually used in dropdown queries)
+                if (\count($query->getProjects()) === 1) {
+                    $includeGlobals = $query->getProjects()[0]->isGlobalActivities();
+                }
+                if ($includeGlobals) {
+                    $orX->add($qb->expr()->isNull('a.project'));
+                }
             }
 
             $where->add($orX);
-            $qb->setParameter('project', $query->getProjects());
+            $qb->setParameter('project', $query->getProjectIds());
         } elseif ($query->hasCustomers()) {
             $where->add($qb->expr()->in('p.customer', ':customer'));
-            $qb->setParameter('customer', $query->getCustomers());
+            $qb->setParameter('customer', $query->getCustomerIds());
         }
 
         if ($where->count() > 0) {
@@ -379,40 +330,32 @@ class ActivityRepository extends EntityRepository
 
         $this->addPermissionCriteria($qb, $query->getCurrentUser(), $query->getTeams(), $query->isGlobalsOnly());
 
-        if ($query->hasSearchTerm()) {
-            $searchAnd = $qb->expr()->andX();
-            $searchTerm = $query->getSearchTerm();
-
-            foreach ($searchTerm->getSearchFields() as $metaName => $metaValue) {
-                $qb->leftJoin('a.meta', 'meta');
-                $searchAnd->add(
-                    $qb->expr()->andX(
-                        $qb->expr()->eq('meta.name', ':metaName'),
-                        $qb->expr()->like('meta.value', ':metaValue')
-                    )
-                );
-                $qb->setParameter('metaName', $metaName);
-                $qb->setParameter('metaValue', '%' . $metaValue . '%');
-            }
-
-            if ($searchTerm->hasSearchTerm()) {
-                $searchAnd->add(
-                    $qb->expr()->orX(
-                        $qb->expr()->like('a.name', ':searchTerm'),
-                        $qb->expr()->like('a.comment', ':searchTerm')
-                    )
-                );
-                $qb->setParameter('searchTerm', '%' . $searchTerm->getSearchTerm() . '%');
-            }
-
-            if ($searchAnd->count() > 0) {
-                $qb->andWhere($searchAnd);
-            }
-        }
+        $this->addSearchTerm($qb, $query);
 
         return $qb;
     }
 
+    private function getMetaFieldClass(): string
+    {
+        return ActivityMeta::class;
+    }
+
+    private function getMetaFieldName(): string
+    {
+        return 'activity';
+    }
+
+    /**
+     * @return array<string>
+     */
+    private function getSearchableFields(): array
+    {
+        return ['a.name', 'a.comment', 'a.number'];
+    }
+
+    /**
+     * @return int<0, max>
+     */
     public function countActivitiesForQuery(ActivityQuery $query): int
     {
         $qb = $this->getQueryBuilderForQuery($query);
@@ -423,45 +366,49 @@ class ActivityRepository extends EntityRepository
             ->select($qb->expr()->countDistinct('a.id'))
         ;
 
-        return (int) $qb->getQuery()->getSingleScalarResult();
+        return (int) $qb->getQuery()->getSingleScalarResult(); // @phpstan-ignore-line
     }
 
-    public function getPagerfantaForQuery(ActivityQuery $query): Pagerfanta
+    public function getPagerfantaForQuery(ActivityQuery $query): Pagination
     {
-        $paginator = new Pagerfanta($this->getPaginatorForQuery($query));
-        $paginator->setMaxPerPage($query->getPageSize());
-        $paginator->setCurrentPage($query->getPage());
-
-        return $paginator;
-    }
-
-    protected function getPaginatorForQuery(ActivityQuery $query): PaginatorInterface
-    {
-        $counter = $this->countActivitiesForQuery($query);
-        $qb = $this->getQueryBuilderForQuery($query);
-
-        return new LoaderPaginator(new ActivityLoader($qb->getEntityManager()), $qb, $counter);
+        return new Pagination($this->getPaginatorForQuery($query), $query);
     }
 
     /**
-     * @param ActivityQuery $query
+     * @return PaginatorInterface<Activity>
+     */
+    private function getPaginatorForQuery(ActivityQuery $activityQuery): PaginatorInterface
+    {
+        $counter = $this->countActivitiesForQuery($activityQuery);
+        $query = $this->createActivityQuery($activityQuery);
+
+        return new LoaderQueryPaginator(new ActivityLoader($this->getEntityManager()), $query, $counter);
+    }
+
+    /**
      * @return Activity[]
      */
-    public function getActivitiesForQuery(ActivityQuery $query): iterable
+    public function getActivitiesForQuery(ActivityQuery $query): array
     {
-        // this is using the paginator internally, as it will load all joined entities into the working unit
-        // do not "optimize" to use the query directly, as it would results in hundreds of additional lazy queries
-        $paginator = $this->getPaginatorForQuery($query);
-
-        return $paginator->getAll();
+        return $this->getActivities($this->createActivityQuery($query));
     }
 
     /**
-     * @param Activity $delete
-     * @param Activity|null $replace
-     * @throws \Doctrine\ORM\ORMException
+     * @param Query<Activity> $query
+     * @return Activity[]
      */
-    public function deleteActivity(Activity $delete, ?Activity $replace = null)
+    public function getActivities(Query $query): array
+    {
+        /** @var array<Activity> $activities */
+        $activities = $query->execute();
+
+        $loader = new ActivityLoader($this->getEntityManager());
+        $loader->loadResults($activities);
+
+        return $activities;
+    }
+
+    public function deleteActivity(Activity $delete, ?Activity $replace = null): void
     {
         $em = $this->getEntityManager();
         $em->beginTransaction();
@@ -485,5 +432,48 @@ class ActivityRepository extends EntityRepository
             $em->rollback();
             throw $ex;
         }
+    }
+
+    /**
+     * @return Query<Activity>
+     */
+    private function createActivityQuery(ActivityQuery $activityQuery): Query
+    {
+        $query = $this->getQueryBuilderForQuery($activityQuery)->getQuery();
+        $query = $this->prepareActivityQuery($query);
+
+        foreach ($activityQuery->getHydrate() as $hydrate) {
+            switch ($hydrate) {
+                case ActivityQueryHydrate::TEAMS:
+                    // does not yet work, see https://github.com/doctrine/orm/pull/8391
+                    // $query->setFetchMode(Activity::class, 'teams', ClassMetadata::FETCH_EAGER);
+                    break;
+
+                case ActivityQueryHydrate::TEAM_MEMBER:
+                    // does not yet work, see https://github.com/doctrine/orm/issues/11254
+                    // $query->setFetchMode(Activity::class, 'teams', ClassMetadata::FETCH_EAGER);
+                    // $query->setFetchMode(Team::class, 'members', ClassMetadata::FETCH_EAGER);
+                    // $query->setFetchMode(TeamMember::class, 'user', ClassMetadata::FETCH_EAGER);
+                    break;
+            }
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param Query<Activity> $query
+     * @return Query<Activity>
+     */
+    public function prepareActivityQuery(Query $query): Query
+    {
+        $this->getEntityManager()->getConfiguration()->setEagerFetchBatchSize(300);
+
+        $query->setFetchMode(Activity::class, 'meta', ClassMetadata::FETCH_EAGER);
+        $query->setFetchMode(Activity::class, 'project', ClassMetadata::FETCH_EAGER);
+
+        // $query->setFetchMode(Project::class, 'customer', ClassMetadata::FETCH_EAGER);
+
+        return $query;
     }
 }

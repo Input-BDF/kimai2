@@ -9,36 +9,26 @@
 
 namespace App\Entity;
 
+use App\Repository\ProjectRateRepository;
 use Doctrine\ORM\Mapping as ORM;
 use JMS\Serializer\Annotation as Serializer;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Validator\Constraints as Assert;
 
-/**
- * @ORM\Table(name="kimai2_projects_rates",
- *     uniqueConstraints={
- *          @ORM\UniqueConstraint(columns={"user_id", "project_id"}),
- *     }
- * )
- * @ORM\Entity(repositoryClass="App\Repository\ProjectRateRepository")
- * @UniqueEntity({"user", "project"}, ignoreNull=false)
- *
- * @Serializer\ExclusionPolicy("all")
- */
+#[ORM\Table(name: 'kimai2_projects_rates')]
+#[ORM\UniqueConstraint(columns: ['user_id', 'project_id'])]
+#[ORM\Entity(repositoryClass: ProjectRateRepository::class)]
+#[ORM\ChangeTrackingPolicy('DEFERRED_EXPLICIT')]
+#[UniqueEntity(['user', 'project'], ignoreNull: false)]
+#[Serializer\ExclusionPolicy('all')]
 class ProjectRate implements RateInterface
 {
     use Rate;
 
-    /**
-     * @var Project
-     *
-     * @Serializer\Exclude()
-     *
-     * @ORM\ManyToOne(targetEntity="App\Entity\Project")
-     * @ORM\JoinColumn(onDelete="CASCADE", nullable=false)
-     * @Assert\NotNull
-     */
-    private $project;
+    #[ORM\ManyToOne(targetEntity: Project::class)]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[Assert\NotNull]
+    private ?Project $project = null;
 
     public function setProject(?Project $project): ProjectRate
     {

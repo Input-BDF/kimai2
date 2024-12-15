@@ -9,17 +9,15 @@
 
 namespace App\Model\Statistic;
 
-final class Year extends Timesheet
+final class Year
 {
-    private $year;
     /**
      * @var Month[]
      */
-    private $months = [];
+    private array $months = [];
 
-    public function __construct(string $year)
+    public function __construct(private string $year)
     {
-        $this->year = $year;
     }
 
     public function getYear(): string
@@ -49,5 +47,60 @@ final class Year extends Timesheet
     public function getMonths(): array
     {
         return array_values($this->months);
+    }
+
+    public function getDuration(): int
+    {
+        $duration = 0;
+
+        foreach ($this->months as $month) {
+            $duration += $month->getDuration();
+        }
+
+        return $duration;
+    }
+
+    public function getBillableDuration(): int
+    {
+        $duration = 0;
+
+        foreach ($this->months as $month) {
+            $duration += $month->getBillableDuration();
+        }
+
+        return $duration;
+    }
+
+    public function getRate(): float
+    {
+        $rate = 0.0;
+
+        foreach ($this->months as $month) {
+            $rate += $month->getRate();
+        }
+
+        return $rate;
+    }
+
+    public function getBillableRate(): float
+    {
+        $rate = 0.0;
+
+        foreach ($this->months as $month) {
+            $rate += $month->getBillableRate();
+        }
+
+        return $rate;
+    }
+
+    public function getInternalRate(): float
+    {
+        $rate = 0.0;
+
+        foreach ($this->months as $month) {
+            $rate += $month->getInternalRate();
+        }
+
+        return $rate;
     }
 }

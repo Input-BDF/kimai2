@@ -24,10 +24,9 @@ class TimesheetValidationTest extends KernelTestCase
 {
     use EntityValidationTestTrait;
 
-    protected function getEntity()
+    protected function getEntity(): Timesheet
     {
-        $customer = new Customer();
-        $customer->setName('Test Customer');
+        $customer = new Customer('Test Customer');
 
         $project = new Project();
         $project->setName('Test Project');
@@ -45,154 +44,205 @@ class TimesheetValidationTest extends KernelTestCase
         return $entity;
     }
 
-    public function testValidationNeedsActivity()
+    public function testValidationNeedsActivity(): void
     {
+        $project = new Project();
+        $project->setCustomer(new Customer('foo'));
+
         $entity = new Timesheet();
-        $entity
-            ->setUser(new User())
-            ->setProject(new Project())
-            ->setBegin(new \DateTime())
-        ;
+        $entity->setUser(new User());
+        $entity->setProject($project);
+        $entity->setBegin(new \DateTime());
 
         $this->assertHasViolationForField($entity, 'activity');
     }
 
-    public function testValidationNeedsProject()
+    public function testValidationNeedsProject(): void
     {
         $entity = new Timesheet();
-        $entity
-            ->setUser(new User())
-            ->setActivity(new Activity())
-            ->setBegin(new \DateTime())
-        ;
+        $entity->setUser(new User());
+        $entity->setActivity(new Activity());
+        $entity->setBegin(new \DateTime());
 
         $this->assertHasViolationForField($entity, 'project');
     }
 
-    public function testValidationProjectMismatch()
+    public function testValidationProjectMismatch(): void
     {
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $project = (new Project())->setName('foo')->setCustomer($customer);
         $project2 = (new Project())->setName('bar')->setCustomer($customer);
         $activity = (new Activity())->setName('hello-world')->setProject($project);
 
         $entity = new Timesheet();
-        $entity
-            ->setUser(new User())
-            ->setActivity($activity)
-            ->setProject($project2)
-            ->setBegin(new \DateTime())
-        ;
+        $entity->setUser(new User());
+        $entity->setActivity($activity);
+        $entity->setProject($project2);
+        $entity->setBegin(new \DateTime());
 
         $this->assertHasViolationForField($entity, 'project');
     }
 
-    public function testValidationCustomerInvisible()
+    public function testValidationCustomerInvisible(): void
     {
-        $customer = (new Customer())->setVisible(false);
-        $project = (new Project())->setName('foo')->setCustomer($customer);
-        $activity = (new Activity())->setName('hello-world')->setProject($project);
+        $customer = new Customer('foo');
+        $customer->setVisible(false);
+        $project = new Project();
+        $project->setName('foo');
+        $project->setCustomer($customer);
+        $activity = new Activity();
+        $activity->setName('hello-world');
+        $activity->setProject($project);
 
         $entity = new Timesheet();
-        $entity
-            ->setUser(new User())
-            ->setActivity($activity)
-            ->setProject($project)
-            ->setBegin(new \DateTime())
-        ;
+        $entity->setUser(new User());
+        $entity->setActivity($activity);
+        $entity->setProject($project);
+        $entity->setBegin(new \DateTime());
+        $entity->setEnd(new \DateTime());
 
         $this->assertHasViolationForField($entity, 'customer');
     }
 
-    public function testValidationCustomerInvisibleDoesNotTriggerOnStoppedEntites()
+    private function createStoppedTimesheet(Project $project, Activity $activity, ?int $id = null): Timesheet
     {
-        $customer = (new Customer())->setVisible(false);
-        $project = (new Project())->setName('foo')->setCustomer($customer);
-        $activity = (new Activity())->setName('hello-world')->setProject($project);
-
         $entity = new Timesheet();
-        $entity
-            ->setUser(new User())
-            ->setActivity($activity)
-            ->setProject($project)
-            ->setBegin(new \DateTime())
-            ->setEnd(new \DateTime())
-        ;
+        $entity->setUser(new User());
+        $entity->setActivity($activity);
+        $entity->setProject($project);
+        $entity->setBegin(new \DateTime());
+        $entity->setEnd(new \DateTime());
+
+        if ($id !== null) {
+            $o = new \ReflectionClass($entity);
+            $p = $o->getProperty('id');
+            $p->setAccessible(true);
+            $p->setValue($entity, $id);
+            $p->setAccessible(false);
+        }
+
+        return $entity;
+    }
+
+    public function testValidationCustomerInvisibleDoesNotTriggerOnStoppedEntities(): void
+    {
+        $customer = new Customer('foo');
+        $customer->setVisible(false);
+        $project = new Project();
+        $project->setName('foo');
+        $project->setCustomer($customer);
+        $activity = new Activity();
+        $activity->setName('hello-world');
+        $activity->setProject($project);
+
+        $entity = $this->createStoppedTimesheet($project, $activity, 99);
 
         $this->assertHasNoViolations($entity);
     }
 
-    public function testValidationProjectInvisible()
+    public function testValidationCustomerInvisibleDoesTriggerOnNewEntities(): void
     {
-        $customer = new Customer();
+        $customer = new Customer('foo');
+        $customer->setVisible(false);
+        $project = new Project();
+        $project->setName('foo');
+        $project->setCustomer($customer);
+        $activity = new Activity();
+        $activity->setName('hello-world');
+        $activity->setProject($project);
+
+        $entity = $this->createStoppedTimesheet($project, $activity);
+
+        $this->assertHasViolationForField($entity, 'customer');
+    }
+
+    public function testValidationProjectInvisible(): void
+    {
+        $customer = new Customer('foo');
         $project = (new Project())->setName('foo')->setCustomer($customer)->setVisible(false);
         $activity = (new Activity())->setName('hello-world')->setProject($project);
 
         $entity = new Timesheet();
-        $entity
-            ->setUser(new User())
-            ->setActivity($activity)
-            ->setProject($project)
-            ->setBegin(new \DateTime())
-        ;
+        $entity->setUser(new User());
+        $entity->setActivity($activity);
+        $entity->setProject($project);
+        $entity->setBegin(new \DateTime());
+        $entity->setEnd(new \DateTime());
 
         $this->assertHasViolationForField($entity, 'project');
     }
 
-    public function testValidationProjectInvisibleDoesNotTriggerOnStoppedEntites()
+    public function testValidationProjectInvisibleDoesNotTriggerOnStoppedEntities(): void
     {
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $project = (new Project())->setName('foo')->setCustomer($customer)->setVisible(false);
         $activity = (new Activity())->setName('hello-world')->setProject($project);
 
-        $entity = new Timesheet();
-        $entity
-            ->setUser(new User())
-            ->setActivity($activity)
-            ->setProject($project)
-            ->setBegin(new \DateTime())
-            ->setEnd(new \DateTime())
-        ;
+        $entity = $this->createStoppedTimesheet($project, $activity, 1);
 
         $this->assertHasNoViolations($entity);
     }
 
-    public function testValidationActivityInvisible()
+    public function testValidationProjectInvisibleDoesTriggerOnNewEntities(): void
     {
-        $customer = new Customer();
+        $customer = new Customer('foo');
+        $project = (new Project())->setName('foo')->setCustomer($customer)->setVisible(false);
+        $activity = (new Activity())->setName('hello-world')->setProject($project);
+
+        $entity = $this->createStoppedTimesheet($project, $activity);
+
+        $this->assertHasViolationForField($entity, 'project');
+    }
+
+    public function testValidationActivityInvisible(): void
+    {
+        $customer = new Customer('foo');
         $project = (new Project())->setName('foo')->setCustomer($customer);
         $activity = (new Activity())->setName('hello-world')->setProject($project)->setVisible(false);
 
         $entity = new Timesheet();
-        $entity
-            ->setUser(new User())
-            ->setActivity($activity)
-            ->setProject($project)
-            ->setBegin(new \DateTime())
-        ;
+        $entity->setUser(new User());
+        $entity->setActivity($activity);
+        $entity->setProject($project);
+        $entity->setBegin(new \DateTime());
+        $entity->setEnd(new \DateTime());
 
         $this->assertHasViolationForField($entity, 'activity');
     }
 
-    public function testValidationActivityInvisibleDoesNotTriggerOnStoppedEntites()
+    public function testValidationActivityInvisibleDoesNotTriggerOnStoppedEntities(): void
     {
-        $customer = new Customer();
-        $project = (new Project())->setName('foo')->setCustomer($customer);
-        $activity = (new Activity())->setName('hello-world')->setProject($project)->setVisible(false);
+        $customer = new Customer('foo');
+        $project = new Project();
+        $project->setName('foo');
+        $project->setCustomer($customer);
+        $activity = new Activity();
+        $activity->setName('hello-world');
+        $activity->setProject($project);
+        $activity->setVisible(false);
 
-        $entity = new Timesheet();
-        $entity
-            ->setUser(new User())
-            ->setActivity($activity)
-            ->setProject($project)
-            ->setBegin(new \DateTime())
-            ->setEnd(new \DateTime())
-        ;
+        $entity = $this->createStoppedTimesheet($project, $activity, 2);
 
         $this->assertHasNoViolations($entity);
     }
 
-    public function testValidationEndNotEarlierThanBegin()
+    public function testValidationActivityInvisibleDoesTriggerOnNewEntities(): void
+    {
+        $customer = new Customer('foo');
+        $project = new Project();
+        $project->setName('foo');
+        $project->setCustomer($customer);
+        $activity = new Activity();
+        $activity->setName('hello-world');
+        $activity->setProject($project);
+        $activity->setVisible(false);
+
+        $entity = $this->createStoppedTimesheet($project, $activity);
+
+        $this->assertHasViolationForField($entity, 'activity');
+    }
+
+    public function testValidationEndNotEarlierThanBegin(): void
     {
         $entity = $this->getEntity();
         $begin = new \DateTime();
@@ -201,7 +251,7 @@ class TimesheetValidationTest extends KernelTestCase
         $entity->setBegin($begin);
         $entity->setEnd($end);
 
-        $this->assertHasViolationForField($entity, 'end');
+        $this->assertHasViolationForField($entity, 'end_date');
 
         // allow same begin and end
         $entity = $this->getEntity();
@@ -209,28 +259,6 @@ class TimesheetValidationTest extends KernelTestCase
         $end = clone $begin;
         $entity->setBegin($begin);
         $entity->setEnd($end);
-
-        $this->assertHasViolationForField($entity, []);
-    }
-
-    public function testDurationMustBeGreatorOrEqualThanZero()
-    {
-        $entity = $this->getEntity();
-        $begin = new \DateTime();
-        $end = clone $begin;
-        $entity->setBegin($begin);
-        $entity->setEnd($end);
-        $entity->setDuration(-1);
-
-        $this->assertHasViolationForField($entity, 'duration');
-
-        // allow zero duration
-        $entity = $this->getEntity();
-        $begin = new \DateTime();
-        $end = clone $begin;
-        $entity->setBegin($begin);
-        $entity->setEnd($end);
-        $entity->setDuration(0);
 
         $this->assertHasViolationForField($entity, []);
     }

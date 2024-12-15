@@ -21,6 +21,8 @@ use App\Entity\User;
 use App\Repository\CustomerRateRepository;
 use App\Repository\CustomerRepository;
 use App\Tests\Mocks\CustomerTestMetaFieldSubscriberMock;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -47,10 +49,10 @@ class CustomerControllerTest extends APIControllerBaseTest
     protected function getRateUrl($id = '1', $rateId = null): string
     {
         if (null !== $rateId) {
-            return sprintf('/api/customers/%s/rates/%s', $id, $rateId);
+            return \sprintf('/api/customers/%s/rates/%s', $id, $rateId);
         }
 
-        return sprintf('/api/customers/%s/rates', $id);
+        return \sprintf('/api/customers/%s/rates', $id);
     }
 
     protected function importTestRates($id): array
@@ -63,10 +65,9 @@ class CustomerControllerTest extends APIControllerBaseTest
         $customer = $repository->find($id);
 
         if (null === $customer) {
-            $customer = new Customer();
+            $customer = new Customer('foooo');
             $customer->setCountry('DE');
             $customer->setTimezone('Europre/Paris');
-            $customer->setName('foooo');
             $repository->saveCustomer($customer);
         }
 
@@ -89,49 +90,104 @@ class CustomerControllerTest extends APIControllerBaseTest
         return [$rate1, $rate2];
     }
 
-    public function testIsSecure()
+    /**
+     * @return array{0: Customer, 1: Customer}
+     */
+    private function loadCustomerData(): array
+    {
+        /** @var CustomerRateRepository $rateRepository */
+        $rateRepository = $this->getEntityManager()->getRepository(CustomerRate::class);
+        /** @var CustomerRepository $repository */
+        $repository = $this->getEntityManager()->getRepository(Customer::class);
+
+        $customer1 = new Customer('foooo');
+        $customer1->setCountry('DE');
+        $customer1->setTimezone('Europe/Paris');
+        $repository->saveCustomer($customer1);
+
+        $customer2 = new Customer('baaaaar');
+        $customer2->setCountry('RU');
+        $customer2->setTimezone('Europe/Moscow');
+        $repository->saveCustomer($customer2);
+
+        $rate1 = new CustomerRate();
+        $rate1->setCustomer($customer1);
+        $rate1->setRate(17.45);
+        $rate1->setIsFixed(false);
+
+        $rateRepository->saveRate($rate1);
+
+        $rate2 = new CustomerRate();
+        $rate2->setCustomer($customer1);
+        $rate2->setRate(99);
+        $rate2->setInternalRate(9);
+        $rate2->setIsFixed(true);
+        $rate2->setUser($this->getUserByName(UserFixtures::USERNAME_USER));
+
+        $rateRepository->saveRate($rate2);
+
+        return [$customer1, $customer2];
+    }
+
+    public function testIsSecure(): void
     {
         $this->assertUrlIsSecured('/api/customers');
     }
 
-    public function testGetCollection()
+    public function testGetCollection(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->assertAccessIsGranted($client, '/api/customers');
-        $result = json_decode($client->getResponse()->getContent(), true);
+
+        $content = $client->getResponse()->getContent();
+        $this->assertIsString($content);
+        $result = json_decode($content, true);
 
         $this->assertIsArray($result);
         $this->assertNotEmpty($result);
         $this->assertEquals(1, \count($result));
+        self::assertIsArray($result[0]);
         self::assertApiResponseTypeStructure('CustomerCollection', $result[0]);
     }
 
-    public function testGetCollectionWithQuery()
+    public function testGetCollectionWithQuery(): void
     {
         $query = ['order' => 'ASC', 'orderBy' => 'name', 'visible' => 3, 'term' => 'test'];
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->assertAccessIsGranted($client, '/api/customers', 'GET', $query);
-        $result = json_decode($client->getResponse()->getContent(), true);
+
+        $content = $client->getResponse()->getContent();
+        $this->assertIsString($content);
+        $result = json_decode($content, true);
 
         $this->assertIsArray($result);
         $this->assertNotEmpty($result);
         $this->assertEquals(1, \count($result));
+        self::assertIsArray($result[0]);
         self::assertApiResponseTypeStructure('CustomerCollection', $result[0]);
     }
 
-    public function testGetEntity()
+    public function testGetEntityIsSecure(): void
     {
-        $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
+        $this->assertUrlIsSecuredForRole(User::ROLE_USER, '/api/customers/1');
+    }
+
+    public function testGetEntity(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $this->assertAccessIsGranted($client, '/api/customers/1');
-        $result = json_decode($client->getResponse()->getContent(), true);
+
+        $content = $client->getResponse()->getContent();
+        $this->assertIsString($content);
+        $result = json_decode($content, true);
 
         $this->assertIsArray($result);
         self::assertApiResponseTypeStructure('CustomerEntity', $result);
     }
 
-    public function testGetEntityWithFullResponse()
+    public function testGetEntityWithFullResponse(): void
     {
-        $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
 
         $em = $this->getEntityManager();
 
@@ -158,27 +214,30 @@ class CustomerControllerTest extends APIControllerBaseTest
         $em->persist($activity);
 
         // and finally a team
-        $team = new Team();
-        $team->setName('Testing customer 1 team');
+        $team = new Team('Testing customer 1 team');
         $team->addTeamlead($this->getUserByRole(User::ROLE_USER));
         $team->addCustomer($customer);
         $team->addProject($project);
         $team->addUser($this->getUserByRole(User::ROLE_TEAMLEAD));
         $em->persist($team);
+        $em->flush();
 
         $this->assertAccessIsGranted($client, '/api/customers/1');
-        $result = json_decode($client->getResponse()->getContent(), true);
+
+        $content = $client->getResponse()->getContent();
+        $this->assertIsString($content);
+        $result = json_decode($content, true);
 
         $this->assertIsArray($result);
         self::assertApiResponseTypeStructure('CustomerEntity', $result);
     }
 
-    public function testNotFound()
+    public function testNotFound(): void
     {
-        $this->assertEntityNotFound(User::ROLE_USER, '/api/customers/2');
+        $this->assertEntityNotFound(User::ROLE_USER, '/api/customers/' . PHP_INT_MAX);
     }
 
-    public function testPostAction()
+    public function testPostAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $data = [
@@ -193,13 +252,16 @@ class CustomerControllerTest extends APIControllerBaseTest
         $this->request($client, '/api/customers', 'POST', [], json_encode($data));
         $this->assertTrue($client->getResponse()->isSuccessful());
 
-        $result = json_decode($client->getResponse()->getContent(), true);
+        $content = $client->getResponse()->getContent();
+        $this->assertIsString($content);
+        $result = json_decode($content, true);
+
         $this->assertIsArray($result);
         self::assertApiResponseTypeStructure('CustomerEntity', $result);
         $this->assertNotEmpty($result['id']);
     }
 
-    public function testPostActionWithLeastFields()
+    public function testPostActionWithLeastFields(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $data = [
@@ -211,13 +273,16 @@ class CustomerControllerTest extends APIControllerBaseTest
         $this->request($client, '/api/customers', 'POST', [], json_encode($data));
         $this->assertTrue($client->getResponse()->isSuccessful());
 
-        $result = json_decode($client->getResponse()->getContent(), true);
+        $content = $client->getResponse()->getContent();
+        $this->assertIsString($content);
+        $result = json_decode($content, true);
+
         $this->assertIsArray($result);
         self::assertApiResponseTypeStructure('CustomerEntity', $result);
         $this->assertNotEmpty($result['id']);
     }
 
-    public function testPostActionWithInvalidUser()
+    public function testPostActionWithInvalidUser(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $data = [
@@ -229,13 +294,10 @@ class CustomerControllerTest extends APIControllerBaseTest
         ];
         $this->request($client, '/api/customers', 'POST', [], json_encode($data));
         $response = $client->getResponse();
-        $this->assertFalse($response->isSuccessful());
-        $this->assertEquals(Response::HTTP_FORBIDDEN, $response->getStatusCode());
-        $json = json_decode($response->getContent(), true);
-        $this->assertEquals('User cannot create customers', $json['message']);
+        $this->assertApiResponseAccessDenied($response, 'User cannot create customers');
     }
 
-    public function testPostActionWithInvalidData()
+    public function testPostActionWithInvalidData(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $data = [
@@ -251,7 +313,7 @@ class CustomerControllerTest extends APIControllerBaseTest
         $this->assertApiCallValidationError($response, ['country', 'currency', 'timezone'], true);
     }
 
-    public function testPatchAction()
+    public function testPatchAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $data = [
@@ -267,13 +329,16 @@ class CustomerControllerTest extends APIControllerBaseTest
         $this->request($client, '/api/customers/1', 'PATCH', [], json_encode($data));
         $this->assertTrue($client->getResponse()->isSuccessful());
 
-        $result = json_decode($client->getResponse()->getContent(), true);
+        $content = $client->getResponse()->getContent();
+        $this->assertIsString($content);
+        $result = json_decode($content, true);
+
         $this->assertIsArray($result);
         self::assertApiResponseTypeStructure('CustomerEntity', $result);
         $this->assertNotEmpty($result['id']);
     }
 
-    public function testPatchActionWithInvalidUser()
+    public function testPatchActionWithInvalidUser(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
 
@@ -287,18 +352,15 @@ class CustomerControllerTest extends APIControllerBaseTest
         ];
         $this->request($client, '/api/customers/1', 'PATCH', [], json_encode($data));
         $response = $client->getResponse();
-        $this->assertFalse($response->isSuccessful());
-        $this->assertEquals(Response::HTTP_FORBIDDEN, $response->getStatusCode());
-        $json = json_decode($response->getContent(), true);
-        $this->assertEquals('User cannot update customer', $json['message']);
+        $this->assertApiResponseAccessDenied($response, 'User cannot update customer');
     }
 
-    public function testPatchActionWithUnknownActivity()
+    public function testPatchActionWithUnknownActivity(): void
     {
         $this->assertEntityNotFoundForPatch(User::ROLE_USER, '/api/customers/255', []);
     }
 
-    public function testInvalidPatchAction()
+    public function testInvalidPatchAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $data = [
@@ -315,46 +377,48 @@ class CustomerControllerTest extends APIControllerBaseTest
         $this->assertApiCallValidationError($response, ['currency']);
     }
 
-    public function testMetaActionNotAllowed()
+    public function testMetaActionNotAllowed(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->request($client, '/api/customers/1/meta', 'PATCH', [], json_encode(['name' => 'asdasd']));
         $this->assertApiResponseAccessDenied($client->getResponse(), 'You are not allowed to update this customer');
     }
 
-    public function testMetaActionThrowsNotFound()
+    public function testMetaActionThrowsNotFound(): void
     {
         $this->assertEntityNotFoundForPatch(User::ROLE_ADMIN, '/api/customers/42/meta', []);
     }
 
-    public function testMetaActionThrowsExceptionOnMissingName()
+    public function testMetaActionThrowsExceptionOnMissingName(): void
     {
-        return $this->assertExceptionForPatchAction(User::ROLE_ADMIN, '/api/customers/1/meta', ['value' => 'X'], [
+        $this->assertExceptionForPatchAction(User::ROLE_ADMIN, '/api/customers/1/meta', ['value' => 'X'], [
             'code' => 400,
-            'message' => 'Parameter "name" of value "NULL" violated a constraint "This value should not be null."'
+            'message' => 'Bad Request'
         ]);
     }
 
-    public function testMetaActionThrowsExceptionOnMissingValue()
+    public function testMetaActionThrowsExceptionOnMissingValue(): void
     {
-        return $this->assertExceptionForPatchAction(User::ROLE_ADMIN, '/api/customers/1/meta', ['name' => 'X'], [
+        $this->assertExceptionForPatchAction(User::ROLE_ADMIN, '/api/customers/1/meta', ['name' => 'X'], [
             'code' => 400,
-            'message' => 'Parameter "value" of value "NULL" violated a constraint "This value should not be null."'
+            'message' => 'Bad Request'
         ]);
     }
 
-    public function testMetaActionThrowsExceptionOnMissingMetafield()
+    public function testMetaActionThrowsExceptionOnMissingMetafield(): void
     {
-        return $this->assertExceptionForPatchAction(User::ROLE_ADMIN, '/api/customers/1/meta', ['name' => 'X', 'value' => 'Y'], [
-            'code' => 500,
-            'message' => 'Unknown meta-field requested'
+        $this->assertExceptionForPatchAction(User::ROLE_ADMIN, '/api/customers/1/meta', ['name' => 'X', 'value' => 'Y'], [
+            'code' => 404,
+            'message' => 'Not Found'
         ]);
     }
 
-    public function testMetaAction()
+    public function testMetaAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
-        static::$kernel->getContainer()->get('event_dispatcher')->addSubscriber(new CustomerTestMetaFieldSubscriberMock());
+        /** @var EventDispatcher $dispatcher */
+        $dispatcher = static::getContainer()->get('event_dispatcher');
+        $dispatcher->addSubscriber(new CustomerTestMetaFieldSubscriberMock());
 
         $data = [
             'name' => 'metatestmock',
@@ -368,5 +432,63 @@ class CustomerControllerTest extends APIControllerBaseTest
         /** @var Customer $customer */
         $customer = $em->getRepository(Customer::class)->find(1);
         $this->assertEquals('another,testing,bar', $customer->getMetaField('metatestmock')->getValue());
+    }
+
+    // ------------------------------- [DELETE] -------------------------------
+
+    public function testDeleteIsSecure(): void
+    {
+        $this->assertUrlIsSecured('/api/customers/1', Request::METHOD_DELETE);
+    }
+
+    public function testDeleteActionWithUnknownTimesheet(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
+        $this->assertNotFoundForDelete($client, '/api/customers/' . PHP_INT_MAX);
+    }
+
+    public function testDeleteEntityIsSecure(): void
+    {
+        $this->assertUrlIsSecuredForRole(User::ROLE_USER, '/api/customers/1', Request::METHOD_DELETE);
+    }
+
+    public function testDeleteActionWithoutAuthorization(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_TEAMLEAD);
+        $imports = $this->loadCustomerData();
+
+        $this->request($client, '/api/customers/' . $imports[1]->getId(), Request::METHOD_DELETE);
+
+        $response = $client->getResponse();
+        $this->assertApiResponseAccessDenied($response);
+    }
+
+    public function testDeleteAction(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
+        $imports = $this->loadCustomerData();
+        $getUrl = '/api/customers/' . $imports[0]->getId();
+        $this->assertAccessIsGranted($client, $getUrl);
+
+        $content = $client->getResponse()->getContent();
+        self::assertIsString($content);
+        $result = json_decode($content, true);
+
+        self::assertIsArray($result);
+        self::assertApiResponseTypeStructure('CustomerEntity', $result);
+        self::assertNotEmpty($result['id']);
+        self::assertIsNumeric($result['id']);
+        $id = $result['id'];
+
+        $this->request($client, '/api/customers/' . $id, Request::METHOD_DELETE);
+        $this->assertTrue($client->getResponse()->isSuccessful());
+        self::assertEquals(Response::HTTP_NO_CONTENT, $client->getResponse()->getStatusCode());
+        $this->assertEmpty($client->getResponse()->getContent());
+
+        $this->request($client, $getUrl);
+        $this->assertApiException($client->getResponse(), [
+            'code' => Response::HTTP_NOT_FOUND,
+            'message' => 'Not Found'
+        ]);
     }
 }

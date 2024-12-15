@@ -9,119 +9,136 @@
 
 namespace App\Form\Type;
 
+use App\Configuration\LocaleService;
+use App\Entity\User;
 use App\Form\Model\DateRange;
-use App\Utils\LocaleSettings;
+use App\Timesheet\DateTimeFactory;
+use App\Utils\FormFormatConverter;
+use IntlDateFormatter;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\CallbackTransformer;
 use Symfony\Component\Form\Exception\TransformationFailedException;
+use Symfony\Component\Form\Extension\Core\DataTransformer\DateTimeToLocalizedStringTransformer;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\Form\FormView;
+use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Custom form field type to select a date range
  */
-class DateRangeType extends AbstractType
+final class DateRangeType extends AbstractType
 {
     public const DATE_SPACER = ' - ';
 
-    private $localeSettings;
-
-    public function __construct(LocaleSettings $localeSettings)
+    public function __construct(private readonly LocaleService $localeService)
     {
-        $this->localeSettings = $localeSettings;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
-        $pickerFormat = $this->localeSettings->getDatePickerFormat();
-        $dateFormat = $this->localeSettings->getDateFormat();
-
         $resolver->setDefaults([
             'timezone' => date_default_timezone_get(),
-            'label' => 'label.daterange',
-            'format' => $dateFormat,
+            'label' => 'daterange',
             'separator' => self::DATE_SPACER,
-            'format_picker' => $pickerFormat,
             'allow_empty' => true,
+            'with_presets' => true,
+            'min_day' => null,
+            'max_day' => null,
+            'locale' => \Locale::getDefault(),
         ]);
+        $resolver->setAllowedTypes('separator', 'string');
+        $resolver->addAllowedTypes('timezone', 'string');
+        $resolver->addAllowedTypes('min_day', ['null', 'string', \DateTimeInterface::class]);
+        $resolver->addAllowedTypes('max_day', ['null', 'string', \DateTimeInterface::class]);
+
+        $resolver->setDefault('format', function (Options $options): string {
+            $format = $this->localeService->getDateFormat($options['locale']);
+            $converter = new FormFormatConverter();
+
+            return $converter->convert($format);
+        });
+        $resolver->setAllowedTypes('format', ['string']);
+
+        $resolver->setDefault('attr', function (Options $options): array {
+            $format = $this->localeService->getDateFormat($options['locale']);
+            $converter = new FormFormatConverter();
+            $formFormat = $converter->convert($format);
+            $pattern = $converter->convertToPattern($formFormat);
+
+            return ['pattern' => $pattern . self::DATE_SPACER . $pattern];
+        });
     }
 
-    public function buildView(FormView $view, FormInterface $form, array $options)
+    public function buildView(FormView $view, FormInterface $form, array $options): void
     {
+        /** @var User $user */
+        $user = $options['user'];
+        $factory = DateTimeFactory::createByUser($user);
+
+        if ($options['with_presets']) {
+            $ranges = [
+                'daterangepicker.allTime' => [null, null],
+                'daterangepicker.today' => [$factory->createDateTime('00:00:00'), $factory->createDateTime('23:59:59')],
+                'daterangepicker.yesterday' => [$factory->createDateTime('-1 day 00:00:00'), $factory->createDateTime('-1 day 23:59:59')],
+                'daterangepicker.thisWeek' => [$factory->getStartOfWeek(), $factory->getEndOfWeek()],
+                'daterangepicker.lastWeek' => [$factory->getStartOfWeek('-1 week'), $factory->getEndOfWeek('-1 week')],
+                'daterangepicker.thisMonth' => [$factory->getStartOfMonth(), $factory->getEndOfMonth()],
+                'daterangepicker.lastMonth' => [$factory->getStartOfLastMonth(), $factory->getEndOfLastMonth()],
+                'daterangepicker.thisYearUntilNow' => [$factory->createStartOfYear(), $factory->createDateTime('23:59:59')],
+            ];
+
+            $thisYear = (int) $factory->createStartOfYear()->format('Y');
+            for ($i = 0; $i < 3; $i++) {
+                $year = $thisYear - $i;
+                $ranges[$year] = [$year . '-01-01', $year . '-12-31'];
+            }
+
+            $view->vars['ranges'] = $ranges;
+            $view->vars['rangeFormat'] = $options['format'];
+        }
+
         $view->vars['attr'] = array_merge($view->vars['attr'], [
-            'autocomplete' => 'off',
-            'placeholder' => strtoupper($options['format_picker']) . $options['separator'] . strtoupper($options['format_picker']),
-            'data-format' => $options['format_picker'],
             'data-separator' => $options['separator'],
         ]);
+
+        if ($options['min_day'] !== null) {
+            $view->vars['attr'] = array_merge($view->vars['attr'], [
+                'min' => (\is_string($options['min_day']) ? $options['min_day'] : $options['min_day']->format('Y-m-d')), // @phpstan-ignore-line
+            ]);
+        }
+
+        if ($options['max_day'] !== null) {
+            $view->vars['attr'] = array_merge($view->vars['attr'], [
+                'max' => (\is_string($options['max_day']) ? $options['max_day'] : $options['max_day']->format('Y-m-d')), // @phpstan-ignore-line
+            ]);
+        }
     }
 
     /**
-     * A better way would be to use the Intl NumberFormatter, but if that is not available
-     * and the Symfony polyfill is used, this method would not work properly.
-     *
-     * @param string $string
-     * @return string
+     * @param array{'format': non-empty-string, 'separator': non-empty-string, 'allow_empty': true, 'timezone': non-empty-string} $options
      */
-    protected function convertArabicPersian($string)
-    {
-        return strtr(
-            $string,
-            [
-                '۰' => '0',
-                '۱' => '1',
-                '۲' => '2',
-                '۳' => '3',
-                '۴' => '4',
-                '۵' => '5',
-                '۶' => '6',
-                '۷' => '7',
-                '۸' => '8',
-                '۹' => '9',
-                '٠' => '0',
-                '١' => '1',
-                '٢' => '2',
-                '٣' => '3',
-                '٤' => '4',
-                '٥' => '5',
-                '٦' => '6',
-                '٧' => '7',
-                '٨' => '8',
-                '٩' => '9'
-            ]
-        );
-    }
-
-    protected function formatToPattern(string $format, string $separator)
-    {
-        $format = preg_quote($format, '/');
-
-        $pattern = str_replace('d', '[0-9]{2}', $format);
-        $pattern = str_replace('m', '[0-9]{2}', $pattern);
-        $pattern = str_replace('Y', '[0-9]{4}', $pattern);
-
-        return '/^' . $pattern . $separator . $pattern . '$/';
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    public function buildForm(FormBuilderInterface $builder, array $options): void // @phpstan-ignore-line
     {
         $formatDate = $options['format'];
         $separator = $options['separator'];
         $allowEmpty = $options['allow_empty'];
-        $timezone = new \DateTimeZone($options['timezone']);
-        $pattern = $this->formatToPattern($formatDate, $separator);
+        $timezone = $options['timezone'];
+        $pattern = (new FormFormatConverter())->convertToPattern($formatDate . $separator . $formatDate, false);
 
         $builder->addModelTransformer(new CallbackTransformer(
-            function ($range) use ($formatDate, $separator) {
+            function ($range) use ($formatDate, $separator, $timezone) {
+                $dateFormatter = new IntlDateFormatter(
+                    \Locale::getDefault(),
+                    IntlDateFormatter::MEDIUM,
+                    IntlDateFormatter::MEDIUM,
+                    $timezone,
+                    IntlDateFormatter::GREGORIAN,
+                    $formatDate
+                );
+
                 if (null === $range) {
                     return '';
                 }
@@ -134,40 +151,72 @@ class DateRangeType extends AbstractType
                     return '';
                 }
 
-                $display = $range->getBegin()->format($formatDate);
+                $display = $dateFormatter->format($range->getBegin());
                 if (null !== $range->getEnd()) {
-                    $display .= $separator . $range->getEnd()->format($formatDate);
+                    $display .= $separator . $dateFormatter->format($range->getEnd());
                 }
 
                 return $display;
             },
             function ($dates) use ($formatDate, $pattern, $separator, $allowEmpty, $timezone) {
+                $transformer = new DateTimeToLocalizedStringTransformer(
+                    $timezone,
+                    $timezone,
+                    IntlDateFormatter::MEDIUM,
+                    IntlDateFormatter::MEDIUM,
+                    IntlDateFormatter::GREGORIAN,
+                    $formatDate
+                );
+
+                $fallbackFormat = 'yyyy-MM-dd';
+                $fallbackPattern = (new FormFormatConverter())->convertToPattern($fallbackFormat . $separator . $fallbackFormat, false);
+
+                $fallbackTransformer = new DateTimeToLocalizedStringTransformer(
+                    $timezone,
+                    $timezone,
+                    IntlDateFormatter::MEDIUM,
+                    IntlDateFormatter::MEDIUM,
+                    IntlDateFormatter::GREGORIAN,
+                    $fallbackFormat
+                );
+
                 $range = new DateRange();
 
                 if (empty($dates) && $allowEmpty) {
                     return $range;
                 }
 
-                $dates = $this->convertArabicPersian($dates);
-
-                if (preg_match($pattern, $dates) !== 1) {
-                    throw new TransformationFailedException('Invalid date range given');
+                if ($dates === null) {
+                    throw new TransformationFailedException('Date range missing');
                 }
 
+                if (preg_match($pattern, $dates) !== 1 && preg_match($fallbackPattern, $dates) !== 1) {
+                    throw new TransformationFailedException('Invalid date range given');
+                }
                 $values = explode($separator, $dates);
 
                 if (\count($values) !== 2) {
                     throw new TransformationFailedException('Invalid date range given');
                 }
 
-                $begin = \DateTime::createFromFormat($formatDate, $values[0], $timezone);
-                if ($begin === false) {
+                try {
+                    $begin = $transformer->reverseTransform($values[0]);
+                } catch (TransformationFailedException $e) {
+                    // we always allow english format to simplify cross-linking
+                    $begin = $fallbackTransformer->reverseTransform($values[0]);
+                }
+                if ($begin === null) {
                     throw new TransformationFailedException('Invalid begin date given');
                 }
                 $range->setBegin($begin);
 
-                $end = \DateTime::createFromFormat($formatDate, $values[1], $timezone);
-                if ($end === false) {
+                try {
+                    $end = $transformer->reverseTransform($values[1]);
+                } catch (TransformationFailedException $e) {
+                    // we always allow english format to simplify cross-linking
+                    $end = $fallbackTransformer->reverseTransform($values[1]);
+                }
+                if ($end === null) {
                     throw new TransformationFailedException('Invalid end date given');
                 }
                 $range->setEnd($end);
@@ -181,18 +230,12 @@ class DateRangeType extends AbstractType
         ));
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getParent()
+    public function getParent(): string
     {
         return TextType::class;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getBlockPrefix()
+    public function getBlockPrefix(): string
     {
         return 'daterange';
     }

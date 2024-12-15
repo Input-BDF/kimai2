@@ -1,48 +1,39 @@
-# ========== KIMAI ==========
 # some hosters require a htaccess to change the PHP version
-.htaccess
-.env-*
-.idea/
+/public/.htaccess
+/.env-*
+/.idea/
 .DS_Store
 
+# custom apache rules e.g. to deactivate ioncube loader
+/public/.user.ini
+
 # for symfony local webserver
-php.ini
+/php.ini
+/.php-version
 
-/bin/*
-!bin/console
+# YARN 2
+/.yarnrc.yml
+/.yarn
+
+# for keeping empty directories
 /config/packages/local.yaml
-/config/packages/*-local.yaml
-/config/packages/*/local.yaml
-/config/packages/*/*-local.yaml
 /config/bundles-local.php
-
-public/avatars/*.png
-
-templates/invoice/renderer/.~lock*
-translations/branding.*.xlf
-
+/var/dev/*
 /var/data/*
-!/var/data/.gitkeep
-/var/coverage/
 /var/cache/*
-!var/cache/.gitkeep
-
-/var/invoices/*
-/var/export/*
-
-/var/packages/*
-!var/packages/.gitkeep
-/var/plugins/*
-!var/plugins/.gitkeep
-
+/var/invoices*
+/var/export*
 /var/log/*
-!var/log/.gitkeep
-
 /var/sessions/*
-!var/sessions/.gitkeep
-# ========== KIMAI ==========
+/var/packages/*
+/var/plugins*
+/var/plugins/*/*.disabled
 
 ###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
 .env
 /public/bundles/
 /vendor/
@@ -61,7 +52,6 @@ translations/branding.*.xlf
 
 ###> symfony/phpunit-bridge ###
 .phpunit
-/phpunit.xml
 ###< symfony/phpunit-bridge ###
 
 ###> symfony/webpack-encore-bundle ###
@@ -70,3 +60,5 @@ npm-debug.log
 yarn-error.log
 ###< symfony/webpack-encore-bundle ###
 /nbproject/*
+
+.dockerhub.secrets

@@ -17,16 +17,16 @@ use App\Tests\Controller\ControllerBaseTest;
  */
 class ApiDocControllerTest extends ControllerBaseTest
 {
-    public function testIsSecure()
+    public function testIsSecure(): void
     {
         $this->assertUrlIsSecured('/api/doc');
     }
 
-    public function testGetDocs()
+    public function testGetDocs(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->assertAccessIsGranted($client, '/api/doc');
-        $this->assertStringContainsString('<title>Kimai - API Docs</title>', $client->getResponse()->getContent());
+        $this->assertStringContainsString('<title>Kimai', $client->getResponse()->getContent());
         $result = $client->getCrawler()->filter('script#swagger-data');
         $swaggerJson = json_decode($result->text(), true);
         $tags = [];
@@ -38,20 +38,88 @@ class ApiDocControllerTest extends ControllerBaseTest
             }
         }
 
-        $expectedKeys = ['Activity', 'Default', 'Customer', 'Project', 'Tag', 'Team', 'Timesheet', 'User'];
+        $expectedKeys = ['Actions', 'Activity', 'Default', 'Customer', 'Project', 'Tag', 'Team', 'Timesheet', 'User', 'Invoice'];
         $actual = array_keys($tags);
 
         sort($actual);
         sort($expectedKeys);
 
-        self::assertEquals($expectedKeys, $actual, sprintf('Expected %s sections in API docs, but found %s.', \count($actual), \count($expectedKeys)));
+        self::assertEquals($expectedKeys, $actual, \sprintf('Expected %s sections in API docs, but found %s.', \count($actual), \count($expectedKeys)));
     }
 
-    public function testGetJsonDocs()
+    public function testGetJsonDocs(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->assertAccessIsGranted($client, '/api/doc.json');
-        $this->assertStringContainsString('"title":"Kimai - API Docs"', $client->getResponse()->getContent());
+        $json = json_decode($client->getResponse()->getContent(), true);
+
+        $paths = [
+            '/api/actions/timesheet/{id}/{view}/{locale}',
+            '/api/actions/activity/{id}/{view}/{locale}',
+            '/api/actions/project/{id}/{view}/{locale}',
+            '/api/actions/customer/{id}/{view}/{locale}',
+            '/api/activities',
+            '/api/activities/{id}',
+            '/api/activities/{id}/meta',
+            '/api/activities/{id}/rates',
+            '/api/activities/{id}/rates/{rateId}',
+            '/api/config/timesheet',
+            '/api/config/colors',
+            '/api/customers',
+            '/api/customers/{id}',
+            '/api/customers/{id}/meta',
+            '/api/customers/{id}/rates',
+            '/api/customers/{id}/rates/{rateId}',
+            '/api/invoices',
+            '/api/invoices/{id}',
+            '/api/projects',
+            '/api/projects/{id}',
+            '/api/projects/{id}/meta',
+            '/api/projects/{id}/rates',
+            '/api/projects/{id}/rates/{rateId}',
+            '/api/ping',
+            '/api/version',
+            '/api/plugins',
+            '/api/tags',
+            '/api/tags/find',
+            '/api/tags/{id}',
+            '/api/teams',
+            '/api/teams/{id}',
+            '/api/teams/{id}/members/{userId}',
+            '/api/teams/{id}/customers/{customerId}',
+            '/api/teams/{id}/projects/{projectId}',
+            '/api/teams/{id}/activities/{activityId}',
+            '/api/timesheets',
+            '/api/timesheets/{id}',
+            '/api/timesheets/recent',
+            '/api/timesheets/active',
+            '/api/timesheets/{id}/stop',
+            '/api/timesheets/{id}/restart',
+            '/api/timesheets/{id}/duplicate',
+            '/api/timesheets/{id}/export',
+            '/api/timesheets/{id}/meta',
+            '/api/users',
+            '/api/users/{id}',
+            '/api/users/me',
+            '/api/users/api-token/{id}',
+        ];
+
+        $this->assertArrayHasKey('openapi', $json);
+        $this->assertEquals('3.0.0', $json['openapi']);
+        $this->assertArrayHasKey('info', $json);
+        $this->assertStringStartsWith('Kimai', $json['info']['title']);
+        $this->assertEquals('1.0', $json['info']['version']);
+
+        $this->assertArrayHasKey('paths', $json);
+        $this->assertEquals($paths, array_keys($json['paths']));
+
+        $this->assertArrayHasKey('security', $json);
+        $this->assertEquals(['bearer' => []], $json['security'][0]);
+
+        $this->assertArrayHasKey('components', $json);
+        $this->assertArrayHasKey('schemas', $json['components']);
+        $this->assertArrayHasKey('securitySchemes', $json['components']);
+
         $result = json_decode($client->getResponse()->getContent(), true);
         $this->assertIsArray($result);
         $this->assertNotEmpty($result);

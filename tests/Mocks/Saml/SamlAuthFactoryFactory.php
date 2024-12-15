@@ -10,10 +10,11 @@
 namespace App\Tests\Mocks\Saml;
 
 use App\Configuration\SamlConfiguration;
-use App\Configuration\SystemConfiguration;
 use App\Saml\SamlAuthFactory;
 use App\Tests\Configuration\TestConfigLoader;
 use App\Tests\Mocks\AbstractMockFactory;
+use App\Tests\Mocks\SystemConfigurationFactory;
+use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 
@@ -81,13 +82,14 @@ class SamlAuthFactoryFactory extends AbstractMockFactory
 
         $mock = $this->getMockBuilder(Request::class)->getMock();
         $mock->method('isFromTrustedProxy')->willReturn($fromTrustedProxy);
-        /** @var Request $request */
+
+        /** @var Request&MockObject $request */
         $request = $mock;
 
         $requestStack = new RequestStack();
         $requestStack->push($request);
 
-        $configuration = new SystemConfiguration(new TestConfigLoader([]), [
+        $configuration = SystemConfigurationFactory::create(new TestConfigLoader([]), [
             'saml' => ['connection' => $connection]
         ]);
 

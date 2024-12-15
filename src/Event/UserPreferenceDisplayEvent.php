@@ -23,15 +23,10 @@ final class UserPreferenceDisplayEvent extends Event
     /**
      * @var UserPreference[]
      */
-    protected $preferences = [];
-    /**
-     * @var string
-     */
-    private $location;
+    private array $preferences = [];
 
-    public function __construct(string $location)
+    public function __construct(private string $location)
     {
-        $this->location = $location;
     }
 
     /**
@@ -42,7 +37,7 @@ final class UserPreferenceDisplayEvent extends Event
         return $this->preferences;
     }
 
-    public function addPreference(UserPreference $preference)
+    public function addPreference(UserPreference $preference): void
     {
         $this->preferences[] = $preference;
     }

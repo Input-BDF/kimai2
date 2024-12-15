@@ -10,7 +10,6 @@
 namespace App\Tests\Repository\Query;
 
 use App\Repository\Query\ProjectQuery;
-use App\Repository\Query\VisibilityInterface;
 
 /**
  * @covers \App\Repository\Query\ProjectQuery
@@ -18,22 +17,20 @@ use App\Repository\Query\VisibilityInterface;
  */
 class ProjectQueryTest extends BaseQueryTest
 {
-    public function testQuery()
+    public function testQuery(): void
     {
         $sut = new ProjectQuery();
 
         $this->assertBaseQuery($sut, 'name');
-        $this->assertInstanceOf(VisibilityInterface::class, $sut);
-
         $this->assertCustomer($sut);
-
         $this->assertResetByFormError(new ProjectQuery(), 'name');
 
         self::assertNull($sut->getProjectStart());
         self::assertNull($sut->getProjectEnd());
+        self::assertNull($sut->getGlobalActivities());
     }
 
-    public function testSetter()
+    public function testSetter(): void
     {
         $sut = new ProjectQuery();
 
@@ -44,5 +41,11 @@ class ProjectQueryTest extends BaseQueryTest
         $end = new \DateTime('-1 day');
         $sut->setProjectEnd($end);
         self::assertSame($end, $sut->getProjectEnd());
+
+        $sut->setGlobalActivities(false);
+        self::assertFalse($sut->getGlobalActivities());
+
+        $sut->setGlobalActivities(true);
+        self::assertTrue($sut->getGlobalActivities());
     }
 }

@@ -13,31 +13,17 @@ use App\Invoice\InvoiceFormatter;
 
 class DebugFormatter implements InvoiceFormatter
 {
-    /**
-     * @param \DateTime $date
-     * @return mixed
-     */
-    public function getFormattedDateTime(\DateTime $date)
+    public function getFormattedDateTime(\DateTimeInterface $date): string
     {
         return $date->format('d.m.Y');
     }
 
-    /**
-     * @param \DateTime $date
-     * @return mixed
-     */
-    public function getFormattedTime(\DateTime $date)
+    public function getFormattedTime(\DateTimeInterface $date): string
     {
         return $date->format('H:i');
     }
 
-    /**
-     * @param int|float $amount
-     * @param string|null $currency
-     * @param bool $withCurrency
-     * @return string
-     */
-    public function getFormattedMoney($amount, ?string $currency, bool $withCurrency = true)
+    public function getFormattedMoney(float $amount, ?string $currency, bool $withCurrency = true): string
     {
         if (null === $currency) {
             $withCurrency = false;
@@ -50,35 +36,38 @@ class DebugFormatter implements InvoiceFormatter
         return (string) $amount;
     }
 
-    /**
-     * @param \DateTime $date
-     * @return mixed
-     */
-    public function getFormattedMonthName(\DateTime $date)
+    public function getFormattedMonthName(\DateTimeInterface $date): string
     {
         return $date->format('m');
     }
 
-    /**
-     * @param mixed $seconds
-     * @return mixed
-     */
-    public function getFormattedDuration($seconds)
+    public function getFormattedDuration(int $seconds): string
     {
-        return $seconds;
+        return (string) $seconds;
     }
 
-    /**
-     * @param mixed $seconds
-     * @return mixed
-     */
-    public function getFormattedDecimalDuration($seconds)
+    public function getFormattedDecimalDuration(int $seconds): string
     {
-        return $seconds;
+        return (string) $seconds;
     }
 
     public function getCurrencySymbol(string $currency): string
     {
         return $currency;
+    }
+
+    public function getLocale(): string
+    {
+        return 'en';
+    }
+
+    public function setLocale(string $locale): void
+    {
+        // does nothing
+    }
+
+    public function getFormattedAmount(float $amount): string
+    {
+        return (string) $amount;
     }
 }

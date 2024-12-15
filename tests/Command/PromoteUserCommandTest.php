@@ -13,6 +13,7 @@ use App\Command\PromoteUserCommand;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\User\UserService;
+use Doctrine\Bundle\DoctrineBundle\Registry;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Exception\RuntimeException;
@@ -25,35 +26,30 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 class PromoteUserCommandTest extends KernelTestCase
 {
-    /**
-     * @var Application
-     */
-    private $application;
+    private Application $application;
 
     protected function setUp(): void
     {
+        parent::setUp();
         $kernel = self::bootKernel();
         $this->application = new Application($kernel);
         $container = self::$kernel->getContainer();
 
         $userService = $container->get(UserService::class);
+        $this->assertInstanceOf(UserService::class, $userService);
 
         $this->application->add(new PromoteUserCommand($userService));
     }
 
-    public function testCommandName()
+    public function testCommandName(): void
     {
         $application = $this->application;
 
         $command = $application->find('kimai:user:promote');
         self::assertInstanceOf(PromoteUserCommand::class, $command);
-
-        // test alias
-        $command = $application->find('fos:user:promote');
-        self::assertInstanceOf(PromoteUserCommand::class, $command);
     }
 
-    protected function callCommand(?string $username, ?string $role, bool $super = false)
+    protected function callCommand(?string $username, ?string $role, bool $super = false): CommandTester
     {
         $command = $this->application->find('kimai:user:promote');
         $input = [
@@ -78,7 +74,7 @@ class PromoteUserCommandTest extends KernelTestCase
         return $commandTester;
     }
 
-    public function testPromoteRole()
+    public function testPromoteRole(): void
     {
         $commandTester = $this->callCommand('john_user', 'ROLE_TEAMLEAD');
 
@@ -86,14 +82,16 @@ class PromoteUserCommandTest extends KernelTestCase
         $this->assertStringContainsString('[OK] Role "ROLE_TEAMLEAD" has been added to user "john_user".', $output);
 
         $container = self::$kernel->getContainer();
+        /** @var Registry $doctrine */
+        $doctrine = $container->get('doctrine');
         /** @var UserRepository $userRepository */
-        $userRepository = $container->get('doctrine')->getRepository(User::class);
-        $user = $userRepository->loadUserByUsername('john_user');
+        $userRepository = $doctrine->getRepository(User::class);
+        $user = $userRepository->loadUserByIdentifier('john_user');
         self::assertInstanceOf(User::class, $user);
         self::assertTrue($user->hasTeamleadRole());
     }
 
-    public function testPromoteSuper()
+    public function testPromoteSuper(): void
     {
         $commandTester = $this->callCommand('john_user', null, true);
 
@@ -101,14 +99,16 @@ class PromoteUserCommandTest extends KernelTestCase
         $this->assertStringContainsString('[OK] User "john_user" has been promoted as a super administrator.', $output);
 
         $container = self::$kernel->getContainer();
+        /** @var Registry $doctrine */
+        $doctrine = $container->get('doctrine');
         /** @var UserRepository $userRepository */
-        $userRepository = $container->get('doctrine')->getRepository(User::class);
-        $user = $userRepository->loadUserByUsername('john_user');
+        $userRepository = $doctrine->getRepository(User::class);
+        $user = $userRepository->loadUserByIdentifier('john_user');
         self::assertInstanceOf(User::class, $user);
         self::assertTrue($user->isSuperAdmin());
     }
 
-    public function testPromoteSuperFailsOnSuperAdmin()
+    public function testPromoteSuperFailsOnSuperAdmin(): void
     {
         $commandTester = $this->callCommand('susan_super', null, true);
 
@@ -116,7 +116,7 @@ class PromoteUserCommandTest extends KernelTestCase
         $this->assertStringContainsString('[WARNING] User "susan_super" does already have the super administrator role.', $output);
     }
 
-    public function testPromoteTeamleadFailsOnTeamlead()
+    public function testPromoteTeamleadFailsOnTeamlead(): void
     {
         $commandTester = $this->callCommand('tony_teamlead', 'ROLE_TEAMLEAD', false);
 
@@ -124,7 +124,7 @@ class PromoteUserCommandTest extends KernelTestCase
         $this->assertStringContainsString('[WARNING] User "tony_teamlead" did already have "ROLE_TEAMLEAD" role.', $output);
     }
 
-    public function testPromoteRoleAndSuperFails()
+    public function testPromoteRoleAndSuperFails(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('You can pass either the role or the --super option (but not both simultaneously).');
@@ -132,7 +132,7 @@ class PromoteUserCommandTest extends KernelTestCase
         $this->callCommand('john_user', 'ROLE_TEAMLEAD', true);
     }
 
-    public function testWithMissingUsername()
+    public function testWithMissingUsername(): void
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Not enough arguments (missing: "username").');

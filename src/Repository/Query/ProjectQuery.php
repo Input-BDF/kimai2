@@ -9,31 +9,36 @@
 
 namespace App\Repository\Query;
 
-use App\Entity\Customer;
-
-/**
- * Can be used for advanced queries with the: ProjectRepository
- */
 class ProjectQuery extends BaseQuery implements VisibilityInterface
 {
     use VisibilityTrait;
+    use CustomerTrait;
 
     public const PROJECT_ORDER_ALLOWED = [
-        'id', 'name', 'comment', 'customer', 'orderNumber', 'orderDate', 'project_start', 'project_end', 'budget', 'timeBudget', 'visible'
+        'name',
+        'description' => 'comment',
+        'project_number' => 'number',
+        'customer',
+        'orderNumber',
+        'orderDate',
+        'project_start',
+        'project_end',
+        'budget',
+        'timeBudget',
+        'visible'
     ];
 
+    private ?\DateTime $projectStart = null;
+    private ?\DateTime $projectEnd = null;
+    private ?bool $globalActivities = null;
     /**
-     * @var array<Customer|int>
+     * @var array<int>
      */
-    private $customers = [];
+    private array $projectIds = [];
     /**
-     * @var \DateTime|null
+     * @var array<ProjectQueryHydrate>
      */
-    private $projectStart;
-    /**
-     * @var \DateTime|null
-     */
-    private $projectEnd;
+    private array $hydrate = [];
 
     public function __construct()
     {
@@ -43,64 +48,28 @@ class ProjectQuery extends BaseQuery implements VisibilityInterface
             'projectStart' => null,
             'projectEnd' => null,
             'visibility' => VisibilityInterface::SHOW_VISIBLE,
+            'globalActivities' => null,
+            'projectIds' => [],
         ]);
     }
 
-    /**
-     * @return Customer|int|null
-     * @deprecated since 1.9 - use getCustomers() instead - will be removed with 2.0
-     */
-    public function getCustomer()
+    protected function copyFrom(BaseQuery $query): void
     {
-        if (\count($this->customers) > 0) {
-            return $this->customers[0];
+        parent::copyFrom($query);
+
+        if (method_exists($query, 'getCustomers')) {
+            $this->setCustomers($query->getCustomers());
         }
 
-        return null;
-    }
-
-    /**
-     * @param Customer|int|null $customer
-     * @return $this
-     * @deprecated since 1.9 - use setCustomers() or addCustomer() instead - will be removed with 2.0
-     */
-    public function setCustomer($customer = null)
-    {
-        if (null === $customer) {
-            $this->customers = [];
-        } else {
-            $this->customers = [$customer];
+        if ($query instanceof ProjectQuery) {
+            $this->setProjectIds($query->getProjectIds());
+            $this->setProjectStart($query->getProjectStart());
+            $this->setProjectEnd($query->getProjectEnd());
+            $this->setGlobalActivities($query->getGlobalActivities());
+            foreach ($query->getHydrate() as $hydrate) {
+                $this->addHydrate($hydrate);
+            }
         }
-
-        return $this;
-    }
-
-    /**
-     * @param Customer|int $customer
-     * @return $this
-     */
-    public function addCustomer($customer)
-    {
-        $this->customers[] = $customer;
-
-        return $this;
-    }
-
-    public function setCustomers(array $customers): self
-    {
-        $this->customers = $customers;
-
-        return $this;
-    }
-
-    public function getCustomers(): array
-    {
-        return $this->customers;
-    }
-
-    public function hasCustomers(): bool
-    {
-        return !empty($this->customers);
     }
 
     public function getProjectStart(): ?\DateTime
@@ -125,5 +94,51 @@ class ProjectQuery extends BaseQuery implements VisibilityInterface
         $this->projectEnd = $projectEnd;
 
         return $this;
+    }
+
+    public function getGlobalActivities(): ?bool
+    {
+        return $this->globalActivities;
+    }
+
+    public function setGlobalActivities(?bool $globalActivities): void
+    {
+        $this->globalActivities = $globalActivities;
+    }
+
+    /**
+     * @param array<int> $ids
+     */
+    public function setProjectIds(array $ids): void
+    {
+        $this->projectIds = $ids;
+    }
+
+    /**
+     * @return int[]
+     */
+    public function getProjectIds(): array
+    {
+        return $this->projectIds;
+    }
+
+    private function addHydrate(ProjectQueryHydrate $hydrate): void
+    {
+        if (!\in_array($hydrate, $this->hydrate, true)) {
+            $this->hydrate[] = $hydrate;
+        }
+    }
+
+    /**
+     * @return ProjectQueryHydrate[]
+     */
+    public function getHydrate(): array
+    {
+        return $this->hydrate;
+    }
+
+    public function loadTeams(): void
+    {
+        $this->addHydrate(ProjectQueryHydrate::TEAMS);
     }
 }

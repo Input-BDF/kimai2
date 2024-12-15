@@ -9,17 +9,16 @@
 
 namespace App\Form\Model;
 
+use App\Utils\EquatableInterface;
 use DateTime;
 
-final class DateRange
+final class DateRange implements EquatableInterface
 {
-    private $resetTimes;
-    private $begin;
-    private $end;
+    private ?DateTime $begin = null;
+    private ?DateTime $end = null;
 
-    public function __construct(bool $resetTimes = true)
+    public function __construct(private bool $resetTimes = true)
     {
-        $this->resetTimes = $resetTimes;
     }
 
     public function getBegin(): ?DateTime
@@ -27,9 +26,9 @@ final class DateRange
         return $this->begin;
     }
 
-    public function setBegin(DateTime $begin): DateRange
+    public function setBegin(\DateTimeInterface $begin): DateRange
     {
-        $this->begin = $begin;
+        $this->begin = DateTime::createFromInterface($begin);
         if ($this->resetTimes) {
             $this->begin->setTime(0, 0, 0);
         }
@@ -42,13 +41,38 @@ final class DateRange
         return $this->end;
     }
 
-    public function setEnd(DateTime $end): DateRange
+    public function setEnd(\DateTimeInterface $end): DateRange
     {
-        $this->end = $end;
+        $this->end = DateTime::createFromInterface($end);
         if ($this->resetTimes) {
             $this->end->setTime(23, 59, 59);
         }
 
         return $this;
+    }
+
+    public function isEqualTo(object $compare): bool
+    {
+        if (!$compare instanceof DateRange) {
+            return false;
+        }
+
+        if (($this->getBegin() === null && $compare->getBegin() !== null) || ($this->getBegin() !== null && $compare->getBegin() === null)) {
+            return false;
+        }
+
+        if (($this->getEnd() === null && $compare->getEnd() !== null) || ($this->getEnd() !== null && $compare->getEnd() === null)) {
+            return false;
+        }
+
+        if ($this->getBegin() !== null && $compare->getBegin() !== null && $this->getBegin()->getTimestamp() !== $compare->getBegin()->getTimestamp()) {
+            return false;
+        }
+
+        if ($this->getEnd() !== null && $compare->getEnd() !== null && $this->getEnd()->getTimestamp() !== $compare->getEnd()->getTimestamp()) {
+            return false;
+        }
+
+        return true;
     }
 }

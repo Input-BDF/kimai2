@@ -11,35 +11,28 @@ namespace App\Command;
 
 use App\Entity\User;
 use App\User\UserService;
-use App\Utils\CommandStyle;
 use App\Validator\ValidationFailedException;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Question\Question;
+use Symfony\Component\Console\Style\SymfonyStyle;
 
-final class CreateUserCommand extends Command
+#[AsCommand(name: 'kimai:user:create')]
+final class CreateUserCommand extends AbstractUserCommand
 {
-    private $userService;
-
-    public function __construct(UserService $userService)
+    public function __construct(private UserService $userService)
     {
         parent::__construct();
-        $this->userService = $userService;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function configure()
+    protected function configure(): void
     {
         $roles = implode(',', [User::DEFAULT_ROLE, User::ROLE_ADMIN]);
 
         $this
-            ->setName('kimai:user:create')
-            ->setAliases(['kimai:create-user'])
             ->setDescription('Create a new user')
             ->setHelp('This command allows you to create a new user.')
             ->addArgument('username', InputArgument::REQUIRED, 'A name for the new user (must be unique)')
@@ -51,15 +44,13 @@ final class CreateUserCommand extends Command
                 User::DEFAULT_ROLE
             )
             ->addArgument('password', InputArgument::OPTIONAL, 'Password for the new user (requested if not provided)')
+            ->addOption('request-password', null, InputOption::VALUE_NONE, 'The user needs to set a new password during next login')
         ;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new CommandStyle($input, $output);
+        $io = new SymfonyStyle($input, $output);
 
         $username = $input->getArgument('username');
         $email = $input->getArgument('email');
@@ -74,48 +65,25 @@ final class CreateUserCommand extends Command
         $role = $role ?: User::DEFAULT_ROLE;
 
         $user = $this->userService->createNewUser();
-        $user->setUsername($username);
+        $user->setUserIdentifier($username);
         $user->setPlainPassword($password);
         $user->setEmail($email);
         $user->setEnabled(true);
         $user->setRoles(explode(',', $role));
 
-        try {
-            $this->userService->saveNewUser($user);
-            $io->success(sprintf('Success! Created user: %s', $username));
-        } catch (ValidationFailedException $ex) {
-            $io->validationError($ex);
-
-            return 2;
+        if ($input->getOption('request-password') === true) {
+            $user->setRequiresPasswordReset(true);
         }
 
-        return 0;
-    }
+        try {
+            $this->userService->saveUser($user);
+            $io->success(\sprintf('Success! Created user: %s', $username));
+        } catch (ValidationFailedException $ex) {
+            $this->validationError($ex, $io);
 
-    /**
-     * @param InputInterface $input
-     * @param OutputInterface $output
-     *
-     * @return string
-     */
-    protected function askForPassword(InputInterface $input, OutputInterface $output): string
-    {
-        /* @var QuestionHelper $helper */
-        $helper = $this->getHelper('question');
+            return Command::FAILURE;
+        }
 
-        $passwordQuestion = new Question('Please enter the password: ');
-        $passwordQuestion->setHidden(true);
-        $passwordQuestion->setHiddenFallback(false);
-        $passwordQuestion->setValidator(function (?string $value) {
-            $password = trim($value);
-            if (empty($password)) {
-                throw new \Exception('The password may not be empty');
-            }
-
-            return $value;
-        });
-        $passwordQuestion->setMaxAttempts(3);
-
-        return $helper->ask($input, $output, $passwordQuestion);
+        return Command::SUCCESS;
     }
 }

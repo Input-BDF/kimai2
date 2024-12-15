@@ -20,23 +20,25 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\TimesheetMultiUpdate
  * @covers \App\Validator\Constraints\TimesheetMultiUpdateValidator
+ * @extends ConstraintValidatorTestCase<TimesheetMultiUpdateValidator>
  */
 class TimesheetMultiUpdateValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator($isGranted = true)
+    protected function createValidator(): TimesheetMultiUpdateValidator
     {
         return new TimesheetMultiUpdateValidator();
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
         $this->validator->validate('foo', new NotBlank());
     }
 
-    public function testProjectMismatch()
+    public function testProjectMismatch(): void
     {
         $activity = new Activity();
         $project1 = new Project();
@@ -44,10 +46,8 @@ class TimesheetMultiUpdateValidatorTest extends ConstraintValidatorTestCase
         $activity->setProject($project1);
 
         $timesheet = new TimesheetMultiUpdateDTO();
-        $timesheet
-            ->setActivity($activity)
-            ->setProject($project2)
-        ;
+        $timesheet->setActivity($activity);
+        $timesheet->setProject($project2);
 
         $this->validator->validate($timesheet, new TimesheetMultiUpdateConstraint(['message' => 'myMessage']));
 
@@ -57,7 +57,7 @@ class TimesheetMultiUpdateValidatorTest extends ConstraintValidatorTestCase
             ->assertRaised();
     }
 
-    public function testProjectWithoutActivity()
+    public function testProjectWithoutActivity(): void
     {
         $timesheet = new TimesheetMultiUpdateDTO();
         $timesheet
@@ -72,7 +72,7 @@ class TimesheetMultiUpdateValidatorTest extends ConstraintValidatorTestCase
             ->assertRaised();
     }
 
-    public function testActivityWithoutProject()
+    public function testActivityWithoutProject(): void
     {
         $timesheet = new TimesheetMultiUpdateDTO();
         $timesheet
@@ -87,13 +87,11 @@ class TimesheetMultiUpdateValidatorTest extends ConstraintValidatorTestCase
             ->assertRaised();
     }
 
-    public function testHourlyRateAndFixedRateInParallelAreNotAllowed()
+    public function testHourlyRateAndFixedRateInParallelAreNotAllowed(): void
     {
         $timesheet = new TimesheetMultiUpdateDTO();
-        $timesheet
-            ->setHourlyRate(10.12)
-            ->setFixedRate(123.45)
-        ;
+        $timesheet->setHourlyRate(10.12);
+        $timesheet->setFixedRate(123.45);
 
         $this->validator->validate($timesheet, new TimesheetMultiUpdateConstraint(['message' => 'myMessage']));
 
@@ -106,9 +104,9 @@ class TimesheetMultiUpdateValidatorTest extends ConstraintValidatorTestCase
             ->assertRaised();
     }
 
-    public function testDisabledValues()
+    public function testDisabledValues(): void
     {
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $customer->setVisible(false);
         $activity = new Activity();
         $activity->setVisible(false);
@@ -118,10 +116,8 @@ class TimesheetMultiUpdateValidatorTest extends ConstraintValidatorTestCase
         $activity->setProject($project);
 
         $timesheet = new TimesheetMultiUpdateDTO();
-        $timesheet
-            ->setActivity($activity)
-            ->setProject($project)
-        ;
+        $timesheet->setActivity($activity);
+        $timesheet->setProject($project);
 
         $this->validator->validate($timesheet, new TimesheetMultiUpdateConstraint(['message' => 'myMessage']));
 

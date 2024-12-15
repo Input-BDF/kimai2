@@ -3,26 +3,27 @@
     {% set url = path(options.route, options.routeOptions|default([])) %}
 {% endif %}
 
-<div class="info-box">
-    <span class="info-box-icon bg-{{ options.color|default('green') }}"><i class="{{ options.icon|icon(options.icon) }}"></i></span>
+<div class="card card-sm">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-auto">
+                {% if not url is empty %}<a href="{{ url }}">{% endif %}
+                <span class="bg-{{ options.color|default('green') }} text-white avatar">
+                    {{ icon(options.icon, true) }}
+                </span>
+                {% if not url is empty %}</a>{% endif %}
+            </div>
+            <div class="col">
 
-    <div class="info-box-content">
-        {% if not url is empty %}<a href="{{ url }}" class="small-box-footer">{% endif %}
-        <span class="info-box-text">{{ title|trans }}</span>
-        <span class="info-box-number">
-            {% if data is iterable %}
-                {{ 'Invalid data' }}
-            {% else %}
-                {% block widget_data %}
-                    {% if options.dataType == 'duration' %}
-                        {% set data = data|duration %}
-                    {% elseif options.dataType == 'money' %}
-                        {% set data = data|money %}
-                    {% endif %}
-                    {{ data }}
-                {% endblock %}
-            {% endif %}
-        </span>
-        {% if not url is empty %}</a>{% endif %}
+                <div class="font-weight-medium">
+                    {{ title|trans }}
+                </div>
+                <div class="text-body-secondary">
+                    {% block widget_data %}
+                        {{ data }}
+                    {% endblock %}
+                </div>
+            </div>
+        </div>
     </div>
 </div>

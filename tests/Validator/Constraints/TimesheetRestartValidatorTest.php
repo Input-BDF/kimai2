@@ -18,22 +18,24 @@ use App\Tests\Mocks\TrackingModeServiceFactory;
 use App\Validator\Constraints\TimesheetOverlapping;
 use App\Validator\Constraints\TimesheetRestart;
 use App\Validator\Constraints\TimesheetRestartValidator;
-use Symfony\Component\Security\Core\Security;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\TimesheetRestart
  * @covers \App\Validator\Constraints\TimesheetRestartValidator
+ * @extends ConstraintValidatorTestCase<TimesheetRestartValidator>
  */
 class TimesheetRestartValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator()
+    protected function createValidator(): TimesheetRestartValidator
     {
         return $this->createMyValidator(false, 'default');
     }
 
-    protected function createMyValidator(bool $allowed, string $trackingMode)
+    protected function createMyValidator(bool $allowed, string $trackingMode): TimesheetRestartValidator
     {
         $auth = $this->createMock(Security::class);
         $auth->method('getUser')->willReturn(new User());
@@ -44,14 +46,14 @@ class TimesheetRestartValidatorTest extends ConstraintValidatorTestCase
         return new TimesheetRestartValidator($auth, $service);
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
         $this->validator->validate(new Timesheet(), new NotBlank());
     }
 
-    public function testInvalidValueThrowsException()
+    public function testInvalidValueThrowsException(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
@@ -61,13 +63,13 @@ class TimesheetRestartValidatorTest extends ConstraintValidatorTestCase
     /**
      * @dataProvider getTestData
      */
-    public function testRestartDisallowed(bool $allowed, ?string $property, string $trackingMode)
+    public function testRestartDisallowed(bool $allowed, ?string $property, string $trackingMode): void
     {
         $this->validator = $this->createMyValidator($allowed, $trackingMode);
         $this->validator->initialize($this->context);
 
         $begin = new \DateTime('-10 hour');
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $activity = new Activity();
         $project = new Project();
         $project->setCustomer($customer);
@@ -94,9 +96,8 @@ class TimesheetRestartValidatorTest extends ConstraintValidatorTestCase
 
     public function getTestData()
     {
-        yield [false, 'end', 'default'];
+        yield [false, 'end_date', 'default'];
         yield [true, null, 'default'];
-        yield [false, 'duration', 'duration_only'];
-        yield [false, 'start', 'punch'];
+        yield [false, 'start_date', 'punch'];
     }
 }

@@ -11,16 +11,13 @@ namespace App\Event;
 
 use Symfony\Contracts\EventDispatcher\Event;
 
-class CalendarConfigurationEvent extends Event
+final class CalendarConfigurationEvent extends Event
 {
     /**
-     * @var array<string, string|int|bool|array>
+     * @param array<string, string|int|bool|array> $configuration
      */
-    private $configuration;
-
-    public function __construct(array $configuration)
+    public function __construct(private array $configuration)
     {
-        $this->configuration = $configuration;
     }
 
     public function getConfiguration(): array
@@ -28,7 +25,7 @@ class CalendarConfigurationEvent extends Event
         return $this->configuration;
     }
 
-    public function setConfiguration(array $configuration)
+    public function setConfiguration(array $configuration): void
     {
         foreach ($configuration as $key => $value) {
             if (\array_key_exists($key, $this->configuration)) {

@@ -10,9 +10,8 @@
 namespace App\EventSubscriber\Actions;
 
 use App\Event\PageActionsEvent;
-use App\Repository\Query\CustomerQuery;
 
-class CustomersSubscriber extends AbstractActionsSubscriber
+final class CustomersSubscriber extends AbstractActionsSubscriber
 {
     public static function getActionName(): string
     {
@@ -21,19 +20,10 @@ class CustomersSubscriber extends AbstractActionsSubscriber
 
     public function onActions(PageActionsEvent $event): void
     {
-        $payload = $event->getPayload();
-
-        /** @var CustomerQuery $query */
-        $query = $payload['query'];
-
-        $event->addSearchToggle($query);
-        $event->addColumnToggle('#modal_customer_admin');
-        $event->addQuickExport($this->path('customer_export'));
-
         if ($this->isGranted('create_customer')) {
             $event->addCreate($this->path('admin_customer_create'));
         }
 
-        $event->addHelp($this->documentationLink('customer.html'));
+        $event->addQuickExport($this->path('customer_export'));
     }
 }

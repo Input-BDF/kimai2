@@ -14,32 +14,24 @@ use App\Entity\UserPreference;
 use Symfony\Contracts\EventDispatcher\Event;
 
 /**
- * This event should be used, if further user preferences should be added dynamically.
+ * Add further user-preference definitions dynamically.
+ * This is used on every page load, do not query the database when this is dispatched.
  */
 final class UserPreferenceEvent extends Event
 {
     /**
-     * @deprecated since 1.4, will be removed with 2.0
+     * @param array<UserPreference> $preferences
      */
-    public const CONFIGURE = UserPreferenceEvent::class;
-
-    /**
-     * @var User
-     */
-    private $user;
-    /**
-     * @var UserPreference[]
-     */
-    private $preferences = [];
-
-    /**
-     * @param User $user
-     * @param UserPreference[] $preferences
-     */
-    public function __construct(User $user, array $preferences)
+    public function __construct(private readonly User $user, private array $preferences, private readonly bool $booting = true)
     {
-        $this->user = $user;
-        $this->preferences = $preferences;
+    }
+
+    /**
+     * Whether this event is dispatched for the currently logged in user during kernel boot.
+     */
+    public function isBooting(): bool
+    {
+        return $this->booting;
     }
 
     /**
@@ -60,10 +52,7 @@ final class UserPreferenceEvent extends Event
         return $this->preferences;
     }
 
-    /**
-     * @param UserPreference $preference
-     */
-    public function addPreference(UserPreference $preference)
+    public function addPreference(UserPreference $preference): void
     {
         foreach ($this->preferences as $pref) {
             if (strtolower($pref->getName()) === strtolower($preference->getName())) {
@@ -73,15 +62,5 @@ final class UserPreferenceEvent extends Event
             }
         }
         $this->preferences[] = $preference;
-    }
-
-    /**
-     * @param UserPreference $preference
-     * @deprecated since 1.4, will be removed with 2.0
-     */
-    public function addUserPreference(UserPreference $preference)
-    {
-        @trigger_error('addUserPreference() is deprecated and will be removed with 2.0', E_USER_DEPRECATED);
-        $this->addPreference($preference);
     }
 }

@@ -14,6 +14,7 @@ use App\Export\Timesheet\HtmlRenderer;
 use App\Project\ProjectStatisticService;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Twig\Environment;
 
 /**
@@ -22,7 +23,7 @@ use Twig\Environment;
  */
 class HtmlRendererTest extends AbstractRendererTest
 {
-    public function testConfiguration()
+    public function testConfiguration(): void
     {
         $sut = new HtmlRenderer(
             $this->createMock(Environment::class),
@@ -32,14 +33,16 @@ class HtmlRendererTest extends AbstractRendererTest
         );
 
         $this->assertEquals('print', $sut->getId());
+        $this->assertEquals('print', $sut->getTitle());
     }
 
-    public function testRender()
+    public function testRender(): void
     {
         $kernel = self::bootKernel();
         /** @var Environment $twig */
-        $twig = $kernel->getContainer()->get('twig');
-        $stack = $kernel->getContainer()->get('request_stack');
+        $twig = self::getContainer()->get('twig');
+        /** @var RequestStack $stack */
+        $stack = self::getContainer()->get('request_stack');
         $request = new Request();
         $request->setLocale('en');
         $stack->push($request);
@@ -55,6 +58,6 @@ class HtmlRendererTest extends AbstractRendererTest
 
         $content = $response->getContent();
 
-        $this->assertStringContainsString('>01:50 h<', $content);
+        $this->assertStringContainsString('>1:50<', $content);
     }
 }

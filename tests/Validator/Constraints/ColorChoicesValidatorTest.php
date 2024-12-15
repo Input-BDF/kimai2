@@ -16,11 +16,13 @@ use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
 
 /**
+ * @covers \App\Validator\Constraints\ColorChoices
  * @covers \App\Validator\Constraints\ColorChoicesValidator
+ * @extends ConstraintValidatorTestCase<ColorChoicesValidator>
  */
 class ColorChoicesValidatorTest extends ConstraintValidatorTestCase
 {
-    protected function createValidator()
+    protected function createValidator(): ColorChoicesValidator
     {
         return new ColorChoicesValidator();
     }
@@ -38,7 +40,7 @@ class ColorChoicesValidatorTest extends ConstraintValidatorTestCase
         yield [null];
     }
 
-    public function testConstraintIsInvalid()
+    public function testConstraintIsInvalid(): void
     {
         $this->expectException(UnexpectedTypeException::class);
 
@@ -49,7 +51,7 @@ class ColorChoicesValidatorTest extends ConstraintValidatorTestCase
      * @dataProvider getValidColors
      * @param string $color
      */
-    public function testConstraintWithValidColor($color)
+    public function testConstraintWithValidColor($color): void
     {
         $constraint = new ColorChoices();
         $this->validator->validate($color, $constraint);
@@ -82,7 +84,7 @@ class ColorChoicesValidatorTest extends ConstraintValidatorTestCase
      * @param string|null $invalidName
      * @param string|null $invalidNameCode
      */
-    public function testValidationError(string $color, $invalidColor = null, $invalidName = null, $invalidNameCode = null)
+    public function testValidationError(string $color, $invalidColor = null, $invalidName = null, $invalidNameCode = null): void
     {
         $constraint = new ColorChoices();
 

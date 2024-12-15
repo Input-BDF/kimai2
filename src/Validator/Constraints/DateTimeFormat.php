@@ -11,17 +11,19 @@ namespace App\Validator\Constraints;
 
 use Symfony\Component\Validator\Constraint;
 
-class DateTimeFormat extends Constraint
+final class DateTimeFormat extends Constraint
 {
     public const INVALID_FORMAT = 'kimai-datetime-00';
 
-    protected static $errorNames = [
-        self::INVALID_FORMAT => 'The given value is not a valid datetime format.',
+    protected const ERROR_NAMES = [
+        self::INVALID_FORMAT => 'This value is not a valid datetime.',
     ];
 
-    public $message = 'This datetime format is invalid.';
+    public ?string $separator = null;
+    public ?string $message = 'This value is not a valid datetime.';
 
-    public function getTargets()
+    // Before: The given value is not a valid datetime format.
+    public function getTargets(): string
     {
         return self::PROPERTY_CONSTRAINT;
     }

@@ -9,18 +9,22 @@
 
 namespace App\Repository;
 
-use App\Entity\InvoiceDocument;
+use App\Model\InvoiceDocument;
 use Symfony\Component\Finder\Finder;
+use Symfony\Component\Finder\SplFileInfo;
 
 final class InvoiceDocumentRepository
 {
     public const DEFAULT_DIRECTORY = 'templates/invoice/renderer/';
 
     /**
-     * @var array
+     * @var array<string>
      */
-    private $documentDirs = [];
+    private array $documentDirs = [];
 
+    /**
+     * @param array<string> $directories
+     */
     public function __construct(array $directories)
     {
         foreach ($directories as $directory) {
@@ -31,31 +35,36 @@ final class InvoiceDocumentRepository
     /**
      * @CloudRequired
      */
-    public function addDirectory(string $directory)
+    public function addDirectory(string $directory): void
     {
         $this->documentDirs[] = $directory;
-
-        return $this;
     }
 
     /**
      * @CloudRequired
      */
-    public function removeDirectory(string $directory)
+    public function removeDirectory(string $directory): void
     {
-        if (($key = array_search($directory, $this->documentDirs)) !== false) {
+        if (($key = array_search($directory, $this->documentDirs, true)) !== false) {
             unset($this->documentDirs[$key]);
         }
-
-        return $this;
     }
 
     /**
-     * @deprecated since 1.10 - will be removed with 2.0 - use getUploadDirectory() instead
+     * @codeCoverageIgnore
      */
-    public function getCustomInvoiceDirectory(): string
+    public function remove(InvoiceDocument $invoiceDocument): void
     {
-        return $this->getUploadDirectory();
+        if (stripos($invoiceDocument->getFilename(), $this->getUploadDirectory()) === false) {
+            throw new \InvalidArgumentException('Cannot delete built-in invoice template');
+        }
+
+        $realpath = realpath($invoiceDocument->getFilename());
+        if ($realpath === false) {
+            throw new \InvalidArgumentException('Template does not exist: ' . $invoiceDocument->getFilename());
+        }
+
+        @unlink($realpath);
     }
 
     public function getUploadDirectory(): string
@@ -89,7 +98,7 @@ final class InvoiceDocumentRepository
      *
      * @return InvoiceDocument[]
      */
-    public function findCustom()
+    public function findCustom(): array
     {
         $paths = [];
         foreach ($this->documentDirs as $dir) {
@@ -107,7 +116,7 @@ final class InvoiceDocumentRepository
      *
      * @return InvoiceDocument[]
      */
-    public function findBuiltIn()
+    public function findBuiltIn(): array
     {
         foreach ($this->documentDirs as $dir) {
             if ($dir === self::DEFAULT_DIRECTORY) {
@@ -123,7 +132,7 @@ final class InvoiceDocumentRepository
      *
      * @return InvoiceDocument[]
      */
-    public function findAll()
+    public function findAll(): array
     {
         return $this->findByPaths($this->documentDirs);
     }
@@ -131,9 +140,10 @@ final class InvoiceDocumentRepository
     /**
      * Returns an array of invoice documents.
      *
+     * @param array<string> $paths
      * @return InvoiceDocument[]
      */
-    private function findByPaths(array $paths)
+    private function findByPaths(array $paths): array
     {
         $base = \dirname(\dirname(__DIR__)) . DIRECTORY_SEPARATOR;
 
@@ -149,7 +159,8 @@ final class InvoiceDocumentRepository
                 continue;
             }
 
-            $finder = Finder::create()->ignoreDotFiles(true)->files()->in($searchDir)->name('*.*');
+            $finder = Finder::create()->ignoreDotFiles(true)->files()->in($searchDir)->depth(0)->name('*.*');
+            /** @var SplFileInfo $file */
             foreach ($finder->getIterator() as $file) {
                 $doc = new InvoiceDocument($file);
                 // the first found invoice document wins

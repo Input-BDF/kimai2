@@ -16,25 +16,25 @@ use App\Form\Model\DateRange;
 /**
  * Query for created invoices.
  */
-class InvoiceArchiveQuery extends BaseQuery
+class InvoiceArchiveQuery extends BaseQuery implements DateRangeInterface
 {
     use DateRangeTrait;
 
     public const INVOICE_ARCHIVE_ORDER_ALLOWED = [
-        'date', 'total_rate',
+        'date', 'invoice.number', 'status', 'total_rate'
         // TODO other fields have a problem with translation
-        // 'number', 'tax', 'payed', 'status'
+        // , 'tax', 'payed'
     ];
 
     /**
      * Filter for invoice status (by default all)
      * @var string[]
      */
-    private $status = [];
+    private array $status = [];
     /**
      * @var Customer[]
      */
-    private $customers = [];
+    private array $customers = [];
 
     public function __construct()
     {
@@ -94,7 +94,7 @@ class InvoiceArchiveQuery extends BaseQuery
 
     public function addStatus(string $status): void
     {
-        if (!\in_array($status, [Invoice::STATUS_NEW, Invoice::STATUS_PENDING, Invoice::STATUS_PAID])) {
+        if (!\in_array($status, [Invoice::STATUS_NEW, Invoice::STATUS_PENDING, Invoice::STATUS_PAID, Invoice::STATUS_CANCELED])) {
             throw new \InvalidArgumentException('Unknown invoice status given.');
         }
 

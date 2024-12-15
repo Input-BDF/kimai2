@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+  <file source-language="en" target-language="hr" datatype="plaintext" original="email.en.xlf">
+    <body>
+      <trans-unit id="8jDJmrK" resname="automated_email_dont_answer">
+        <source>automated_email_dont_answer</source>
+        <target>Ovo je automatski generirani e-mail. Nemoj odgovarati, adresa se neće čitati.</target>
+      </trans-unit>
+      <trans-unit id="pjr3FDv" resname="registration.subject">
+        <source>registration.subject</source>
+        <target>Aktiviraj svoj račun</target>
+      </trans-unit>
+      <trans-unit id="QtcznHC" resname="registration.title">
+        <source>registration.title</source>
+        <target>Zdravo %username%</target>
+      </trans-unit>
+      <trans-unit id="YMLel3P" resname="registration.button">
+        <source>registration.button</source>
+        <target>Aktiviraj svoj račun</target>
+      </trans-unit>
+      <trans-unit id="IkjnHoP" resname="registration.intro">
+        <source>registration.intro</source>
+        <target state="translated">Prijavio/prijavila si se na Kimaijevo evidentiranje vremena s e-mail adresom %email%. Aktiviraj svoj račun u idućih par sati prije nego što poveznica istekne.</target>
+      </trans-unit>
+      <trans-unit id="1ZLD_Y0" resname="reset.subject" xml:space="preserve">
+        <source>reset.subject</source>
+        <target state="needs-translation">Obnovi lozinku</target>
+      </trans-unit>
+      <trans-unit id="G2mhn_2" resname="reset.title" xml:space="preserve">
+        <source>Forgot your password?</source>
+        <target state="needs-translation">Ne sjećaš se više kako glasi lozinka?</target>
+      </trans-unit>
+      <trans-unit id="qbt.84Y" resname="reset.button" xml:space="preserve">
+        <source>reset.button</source>
+        <target state="needs-translation">Obnovi lozinku</target>
+      </trans-unit>
+      <trans-unit id="rhkMAep" resname="reset.intro" xml:space="preserve">
+        <source>Don't worry, Kimai will help you create a new one!</source>
+        <target state="needs-translation">Ne brini, Kimai će ti pomoći stvoriti novu!</target>
+      </trans-unit>
+      <trans-unit id="yohIAA_" resname="absence_created_supervisor_subject">
+        <source>absence_created_supervisor_subject</source>
+        <target state="translated">Nova odsutnost | %user% | %type%</target>
+      </trans-unit>
+      <trans-unit id="wwLx._J" resname="absence_created_supervisor_message" xml:space="preserve">
+        <source>A new absence was created for %user%.
+
+%list%
+
+Please review them at: %url%</source>
+        <target state="translated">Stvorena je nova odsutnost za %user%.
+
+%list%
+
+Pregledaj ih na: %url%</target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>

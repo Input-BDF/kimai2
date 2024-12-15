@@ -19,59 +19,38 @@ use PHPUnit\Framework\TestCase;
  */
 class UserPreferenceEventTest extends TestCase
 {
-    public function testGetterAndSetter()
+    public function testGetterAndSetter(): void
     {
         $user = new User();
         $user->setAlias('foo');
-        $pref = new UserPreference();
-        $pref->setName('foo')->setValue('bar');
+        $pref = new UserPreference('foo', 'bar');
 
         $sut = new UserPreferenceEvent($user, []);
 
         $this->assertEquals($user, $sut->getUser());
+        $this->assertTrue($sut->isBooting());
         $this->assertEquals([], $sut->getPreferences());
 
         $sut->addPreference($pref);
 
         $this->assertEquals([$pref], $sut->getPreferences());
+
+        $sut = new UserPreferenceEvent($user, [], false);
+        $this->assertFalse($sut->isBooting());
     }
 
-    public function testDuplicatePreferenceThrowsException()
+    public function testDuplicatePreferenceThrowsException(): void
     {
         $this->expectException(\InvalidArgumentException::class);
 
         $user = new User();
         $user->setAlias('foo');
-        $pref = new UserPreference();
-        $pref->setName('foo')->setValue('bar');
-
-        $pref2 = new UserPreference();
-        $pref2->setName('foo')->setValue('hello');
+        $pref = new UserPreference('foo', 'bar');
+        $pref2 = new UserPreference('foo', 'hello');
 
         $sut = new UserPreferenceEvent($user, []);
 
         $sut->addPreference($pref);
         $sut->addPreference($pref2);
-    }
-
-    /**
-     * @group legacy
-     */
-    public function testDeprecations()
-    {
-        $this->expectException(\InvalidArgumentException::class);
-
-        $user = new User();
-        $user->setAlias('foo');
-        $pref = new UserPreference();
-        $pref->setName('foo')->setValue('bar');
-
-        $pref2 = new UserPreference();
-        $pref2->setName('foo')->setValue('hello');
-
-        $sut = new UserPreferenceEvent($user, []);
-
-        $sut->addUserPreference($pref); // change me, once the deprecated method will be deleted
-        $sut->addUserPreference($pref2); // change me, once the deprecated method will be deleted
     }
 }

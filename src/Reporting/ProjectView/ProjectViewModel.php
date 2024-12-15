@@ -11,50 +11,24 @@ namespace App\Reporting\ProjectView;
 
 use App\Entity\Project;
 use App\Model\BudgetStatisticModelInterface;
+use App\Model\ProjectBudgetStatisticModel;
+use App\Model\Statistic\BudgetStatistic;
 use DateTime;
 
 final class ProjectViewModel
 {
-    private $project;
-    private $timesheetCounter = 0;
-    private $durationDay = 0;
-    private $durationWeek = 0;
-    private $durationMonth = 0;
-    private $durationTotal = 0;
-    private $rateTotal = 0.00;
-    private $notExportedDuration = 0;
-    private $notExportedRate = 0.00;
-    private $notBilledDuration = 0;
-    private $notBilledRate = 0.00;
-    private $billableDuration = 0;
-    private $billableRate = 0.00;
-    /**
-     * @var \DateTime|null
-     */
-    private $lastRecord;
-    /**
-     * @var BudgetStatisticModelInterface
-     */
-    private $budgetStatisticModel;
+    private int $durationDay = 0;
+    private int $durationWeek = 0;
+    private int $durationMonth = 0;
+    private ?DateTime $lastRecord = null;
 
-    public function __construct(Project $project)
+    public function __construct(private ProjectBudgetStatisticModel $budgetStatisticModel)
     {
-        $this->project = $project;
     }
 
     public function getProject(): Project
     {
-        return $this->project;
-    }
-
-    public function getTimesheetCounter(): int
-    {
-        return $this->timesheetCounter;
-    }
-
-    public function setTimesheetCounter(int $timesheetCounter): void
-    {
-        $this->timesheetCounter = $timesheetCounter;
+        return $this->budgetStatisticModel->getProject();
     }
 
     public function getDurationDay(): int
@@ -87,84 +61,47 @@ final class ProjectViewModel
         $this->durationMonth = $durationMonth;
     }
 
-    public function getDurationTotal(): int
+    private function getTotals(): BudgetStatistic
     {
-        return $this->durationTotal;
+        if ($this->budgetStatisticModel->getStatisticTotal() === null) {
+            throw new \InvalidArgumentException('Totals must not be null');
+        }
+
+        return $this->budgetStatisticModel->getStatisticTotal();
     }
 
-    public function setDurationTotal(int $durationTotal): void
+    public function getDurationTotal(): int
     {
-        $this->durationTotal = $durationTotal;
+        return $this->getTotals()->getDuration();
     }
 
     public function getNotExportedDuration(): int
     {
-        return $this->notExportedDuration;
-    }
+        $totals = $this->getTotals();
 
-    public function setNotExportedDuration(int $notExportedDuration): void
-    {
-        $this->notExportedDuration = $notExportedDuration;
+        return $totals->getDurationBillable() - $totals->getDurationBillableExported();
     }
 
     public function getNotExportedRate(): float
     {
-        return $this->notExportedRate;
-    }
+        $totals = $this->getTotals();
 
-    public function setNotExportedRate(float $notExportedRate): void
-    {
-        $this->notExportedRate = $notExportedRate;
-    }
-
-    public function getNotBilledDuration(): int
-    {
-        return $this->notBilledDuration;
-    }
-
-    public function setNotBilledDuration(int $notBilledDuration): void
-    {
-        $this->notBilledDuration = $notBilledDuration;
-    }
-
-    public function getNotBilledRate(): float
-    {
-        return $this->notBilledRate;
-    }
-
-    public function setNotBilledRate(float $notBilledRate): void
-    {
-        $this->notBilledRate = $notBilledRate;
+        return $totals->getRateBillable() - $totals->getRateBillableExported();
     }
 
     public function getBillableDuration(): int
     {
-        return $this->billableDuration;
-    }
-
-    public function setBillableDuration(int $billableDuration): void
-    {
-        $this->billableDuration = $billableDuration;
+        return $this->getTotals()->getDurationBillable();
     }
 
     public function getBillableRate(): float
     {
-        return $this->billableRate;
-    }
-
-    public function setBillableRate(float $billableRate): void
-    {
-        $this->billableRate = $billableRate;
+        return $this->getTotals()->getRateBillable();
     }
 
     public function getRateTotal(): float
     {
-        return $this->rateTotal;
-    }
-
-    public function setRateTotal(float $rateTotal): void
-    {
-        $this->rateTotal = $rateTotal;
+        return $this->getTotals()->getRate();
     }
 
     public function getLastRecord(): ?DateTime
@@ -180,10 +117,5 @@ final class ProjectViewModel
     public function getBudgetStatisticModel(): BudgetStatisticModelInterface
     {
         return $this->budgetStatisticModel;
-    }
-
-    public function setBudgetStatisticModel(BudgetStatisticModelInterface $budgetStatisticModel): void
-    {
-        $this->budgetStatisticModel = $budgetStatisticModel;
     }
 }

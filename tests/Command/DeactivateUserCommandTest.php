@@ -13,6 +13,7 @@ use App\Command\DeactivateUserCommand;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\User\UserService;
+use Doctrine\Bundle\DoctrineBundle\Registry;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Exception\RuntimeException;
@@ -24,35 +25,29 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 class DeactivateUserCommandTest extends KernelTestCase
 {
-    /**
-     * @var Application
-     */
-    private $application;
+    private Application $application;
 
     protected function setUp(): void
     {
+        parent::setUp();
         $kernel = self::bootKernel();
         $this->application = new Application($kernel);
         $container = self::$kernel->getContainer();
-
+        /** @var UserService $userService */
         $userService = $container->get(UserService::class);
 
         $this->application->add(new DeactivateUserCommand($userService));
     }
 
-    public function testCommandName()
+    public function testCommandName(): void
     {
         $application = $this->application;
 
         $command = $application->find('kimai:user:deactivate');
         self::assertInstanceOf(DeactivateUserCommand::class, $command);
-
-        // test alias
-        $command = $application->find('fos:user:deactivate');
-        self::assertInstanceOf(DeactivateUserCommand::class, $command);
     }
 
-    protected function callCommand(?string $username)
+    protected function callCommand(?string $username): CommandTester
     {
         $command = $this->application->find('kimai:user:deactivate');
         $input = [
@@ -69,7 +64,7 @@ class DeactivateUserCommandTest extends KernelTestCase
         return $commandTester;
     }
 
-    public function testDeactivate()
+    public function testDeactivate(): void
     {
         $commandTester = $this->callCommand('john_user');
 
@@ -77,14 +72,16 @@ class DeactivateUserCommandTest extends KernelTestCase
         $this->assertStringContainsString('[OK] User "john_user" has been deactivated.', $output);
 
         $container = self::$kernel->getContainer();
+        /** @var Registry $doctrine */
+        $doctrine = $container->get('doctrine');
         /** @var UserRepository $userRepository */
-        $userRepository = $container->get('doctrine')->getRepository(User::class);
-        $user = $userRepository->loadUserByUsername('john_user');
+        $userRepository = $doctrine->getRepository(User::class);
+        $user = $userRepository->loadUserByIdentifier('john_user');
         self::assertInstanceOf(User::class, $user);
         self::assertFalse($user->isEnabled());
     }
 
-    public function testDeactivateOnDeactivatedUser()
+    public function testDeactivateOnDeactivatedUser(): void
     {
         $commandTester = $this->callCommand('chris_user');
 
@@ -92,7 +89,7 @@ class DeactivateUserCommandTest extends KernelTestCase
         $this->assertStringContainsString('[WARNING] User "chris_user" is already deactivated.', $output);
     }
 
-    public function testWithMissingUsername()
+    public function testWithMissingUsername(): void
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Not enough arguments (missing: "username").');

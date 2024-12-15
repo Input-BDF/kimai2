@@ -9,28 +9,32 @@
 
 namespace App\Tests\Timesheet\TrackingMode;
 
-use App\Configuration\SystemConfiguration;
 use App\Entity\Timesheet;
 use App\Entity\User;
 use App\Tests\Configuration\TestConfigLoader;
+use App\Tests\Mocks\SystemConfigurationFactory;
 use App\Timesheet\TrackingMode\DurationFixedBeginMode;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 /**
  * @covers \App\Timesheet\TrackingMode\DurationFixedBeginMode
  */
 class DurationFixedBeginModeTest extends TestCase
 {
-    protected function createSut()
+    private function createSut(string $default = '13:47', bool $allowApiTimes = false): DurationFixedBeginMode
     {
         $loader = new TestConfigLoader([]);
-        $configuration = new SystemConfiguration($loader, ['timesheet' => ['default_begin' => '13:47']]);
+        $configuration = SystemConfigurationFactory::create($loader, ['timesheet' => ['default_begin' => $default]]);
 
-        return new DurationFixedBeginMode($configuration);
+        $auth = $this->createMock(AuthorizationCheckerInterface::class);
+        $auth->method('isGranted')->willReturn($allowApiTimes);
+
+        return new DurationFixedBeginMode($configuration, $auth);
     }
 
-    public function testDefaultValues()
+    public function testDefaultValues(): void
     {
         $sut = $this->createSut();
 
@@ -42,7 +46,31 @@ class DurationFixedBeginModeTest extends TestCase
         self::assertEquals('duration_fixed_begin', $sut->getId());
     }
 
-    public function testCreate()
+    public function testValuesForAdmin(): void
+    {
+        $sut = $this->createSut('now', true);
+
+        self::assertFalse($sut->canEditBegin());
+        self::assertFalse($sut->canEditEnd());
+        self::assertTrue($sut->canEditDuration());
+        self::assertTrue($sut->canUpdateTimesWithAPI());
+        self::assertFalse($sut->canSeeBeginAndEndTimes());
+        self::assertEquals('duration_fixed_begin', $sut->getId());
+    }
+
+    public function testNow(): void
+    {
+        $seconds = (new \DateTime())->getTimestamp();
+        $timesheet = new Timesheet();
+        $timesheet->setBegin(new \DateTime('18:50:32'));
+        $mode = $this->createSut('now');
+        $mode->create($timesheet);
+        $diff = $timesheet->getBegin()->getTimestamp() - $seconds;
+        // amount of seconds doesn't really matter, it must only be near "now"
+        self::assertLessThanOrEqual(2, $diff);
+    }
+
+    public function testCreate(): void
     {
         $timesheet = new Timesheet();
         $timesheet->setBegin(new \DateTime('22:54'));
@@ -54,7 +82,7 @@ class DurationFixedBeginModeTest extends TestCase
         self::assertEquals('13:47', $timesheet->getBegin()->format('H:i'));
     }
 
-    public function testCreateWithoutBeginInjectsBegin()
+    public function testCreateWithoutBeginInjectsBegin(): void
     {
         $timesheet = (new Timesheet())->setUser(new User());
         $request = new Request();

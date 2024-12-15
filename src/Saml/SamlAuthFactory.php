@@ -9,7 +9,7 @@
 
 namespace App\Saml;
 
-use App\Configuration\SamlConfiguration;
+use App\Configuration\SamlConfigurationInterface;
 use OneLogin\Saml2\Auth;
 use OneLogin\Saml2\Utils;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -19,18 +19,15 @@ use Symfony\Component\HttpFoundation\RequestStack;
  */
 class SamlAuthFactory
 {
-    private $request;
-    private $configuration;
-
-    public function __construct(RequestStack $request, SamlConfiguration $configuration)
-    {
-        $this->request = $request;
-        $this->configuration = $configuration;
+    public function __construct(
+        private readonly RequestStack $request,
+        private readonly SamlConfigurationInterface $configuration
+    ) {
     }
 
     public function create(): Auth
     {
-        if (null !== $this->request->getMasterRequest() && $this->request->getMasterRequest()->isFromTrustedProxy()) {
+        if (null !== $this->request->getMainRequest() && $this->request->getMainRequest()->isFromTrustedProxy()) {
             Utils::setProxyVars(true);
         }
 

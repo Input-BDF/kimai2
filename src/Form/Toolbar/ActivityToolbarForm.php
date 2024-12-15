@@ -10,19 +10,20 @@
 namespace App\Form\Toolbar;
 
 use App\Repository\Query\ActivityQuery;
+use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Defines the form used for filtering the activities.
+ * @extends AbstractType<ActivityQuery>
  */
-class ActivityToolbarForm extends AbstractToolbarForm
+final class ActivityToolbarForm extends AbstractType
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function buildForm(FormBuilderInterface $builder, array $options)
+    use ToolbarFormTrait;
+
+    public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $newOptions = [];
         if ($options['ignore_date'] === true) {
@@ -40,7 +41,7 @@ class ActivityToolbarForm extends AbstractToolbarForm
             'search' => false,
             'placeholder' => null,
             'required' => false,
-            'label' => 'label.globalsOnly',
+            'label' => 'globalsOnly',
         ]);
         $this->addVisibilityChoice($builder);
         $this->addPageSizeChoice($builder);
@@ -49,10 +50,7 @@ class ActivityToolbarForm extends AbstractToolbarForm
         $this->addOrderBy($builder, ActivityQuery::ACTIVITY_ORDER_ALLOWED);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'data_class' => ActivityQuery::class,

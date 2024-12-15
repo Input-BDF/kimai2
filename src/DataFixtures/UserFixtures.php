@@ -9,12 +9,14 @@
 
 namespace App\DataFixtures;
 
+use App\Entity\AccessToken;
 use App\Entity\User;
 use App\Entity\UserPreference;
 use Doctrine\Bundle\FixturesBundle\Fixture;
+use Doctrine\Bundle\FixturesBundle\FixtureGroupInterface;
 use Doctrine\Persistence\ObjectManager;
 use Faker\Factory;
-use Symfony\Component\Security\Core\Encoder\UserPasswordEncoderInterface;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Defines the sample data to load in the database when running the unit and
@@ -25,10 +27,10 @@ use Symfony\Component\Security\Core\Encoder\UserPasswordEncoderInterface;
  *
  * @codeCoverageIgnore
  */
-class UserFixtures extends Fixture
+final class UserFixtures extends Fixture implements FixtureGroupInterface
 {
-    public const DEFAULT_PASSWORD = 'kitten';
-    public const DEFAULT_API_TOKEN = 'api_kitten';
+    public const DEFAULT_PASSWORD = 'password';
+    public const DEFAULT_API_TOKEN = 'token';
     public const DEFAULT_AVATAR = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=retro&f=y';
 
     public const USERNAME_USER = 'john_user';
@@ -41,23 +43,16 @@ class UserFixtures extends Fixture
     public const MIN_RATE = 30;
     public const MAX_RATE = 120;
 
-    /**
-     * @var UserPasswordEncoderInterface
-     */
-    private $encoder;
-
-    /**
-     * @param UserPasswordEncoderInterface $encoder
-     */
-    public function __construct(UserPasswordEncoderInterface $encoder)
+    public function __construct(private readonly UserPasswordHasherInterface $passwordHasher)
     {
-        $this->encoder = $encoder;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function load(ObjectManager $manager)
+    public static function getGroups(): array
+    {
+        return ['user'];
+    }
+
+    public function load(ObjectManager $manager): void
     {
         $this->loadDefaultAccounts($manager);
         $this->loadTestUsers($manager);
@@ -65,60 +60,35 @@ class UserFixtures extends Fixture
 
     /**
      * Default users for all test cases
-     *
-     * @param ObjectManager $manager
      */
-    private function loadDefaultAccounts(ObjectManager $manager)
+    private function loadDefaultAccounts(ObjectManager $manager): void
     {
-        $passwordEncoder = $this->encoder;
-
         $allUsers = $this->getUserDefinition();
         foreach ($allUsers as $userData) {
-            $user = new User();
-            $user
-                ->setAlias($userData[0])
-                ->setTitle($userData[1])
-                ->setUsername($userData[2])
-                ->setEmail($userData[3])
-                ->setRoles([$userData[4]])
-                ->setAvatar($userData[5])
-                ->setEnabled($userData[6])
-                ->setPassword($passwordEncoder->encodePassword($user, self::DEFAULT_PASSWORD))
-                ->setApiToken($passwordEncoder->encodePassword($user, self::DEFAULT_API_TOKEN))
-            ;
-            $manager->persist($user);
-
-            $prefs = $this->getUserPreferences($user, $userData[7]);
-            $user->setPreferences($prefs);
-            $manager->persist($prefs[0]);
-            $manager->persist($prefs[1]);
+            $manager->persist($userData[0]);
+            $manager->persist($userData[1]);
         }
 
         $manager->flush();
-        $manager->clear(User::class);
-        $manager->clear(UserPreference::class);
+        $manager->clear();
     }
 
     /**
      * @param User $user
      * @param string|null $timezone
-     * @return array
+     * @return array<UserPreference>
      */
-    private function getUserPreferences(User $user, string $timezone = null)
+    private function getUserPreferences(User $user, string $timezone = null): array
     {
         $preferences = [];
 
-        $prefHourlyRate = new UserPreference();
-        $prefHourlyRate->setName(UserPreference::HOURLY_RATE);
-        $prefHourlyRate->setValue(rand(self::MIN_RATE, self::MAX_RATE));
-        $prefHourlyRate->setUser($user);
+        $prefHourlyRate = new UserPreference(UserPreference::HOURLY_RATE, rand(self::MIN_RATE, self::MAX_RATE));
+        $user->addPreference($prefHourlyRate);
         $preferences[] = $prefHourlyRate;
 
         if (null !== $timezone) {
-            $prefTimezone = new UserPreference();
-            $prefTimezone->setName(UserPreference::TIMEZONE);
-            $prefTimezone->setValue($timezone);
-            $prefTimezone->setUser($user);
+            $prefTimezone = new UserPreference(UserPreference::TIMEZONE, $timezone);
+            $user->addPreference($prefTimezone);
             $preferences[] = $prefTimezone;
         }
 
@@ -126,20 +96,17 @@ class UserFixtures extends Fixture
     }
 
     /**
-     * Generate randomized test users, which don't have API access.
-     *
-     * @param ObjectManager $manager
+     * Generate randomized test users, without API access.
      */
-    private function loadTestUsers(ObjectManager $manager)
+    private function loadTestUsers(ObjectManager $manager): void
     {
-        $passwordEncoder = $this->encoder;
         $faker = Factory::create();
         $existingName = [];
         $existingEmail = [];
 
         for ($i = 1; $i <= self::AMOUNT_EXTRA_USER; $i++) {
-            $username = $faker->userName;
-            $email = $faker->email;
+            $username = $faker->userName();
+            $email = $faker->email();
 
             if (\in_array($username, $existingName)) {
                 continue;
@@ -153,15 +120,13 @@ class UserFixtures extends Fixture
             $existingEmail[] = $email;
 
             $user = new User();
-            $user
-                ->setAlias($faker->name)
-                ->setTitle(substr($faker->jobTitle, 0, 49))
-                ->setUsername($username)
-                ->setEmail($email)
-                ->setRoles([User::ROLE_USER])
-                ->setEnabled(true)
-                ->setPassword($passwordEncoder->encodePassword($user, self::DEFAULT_PASSWORD))
-            ;
+            $user->setAlias($faker->name());
+            $user->setTitle(substr($faker->jobTitle(), 0, 49));
+            $user->setUserIdentifier($username);
+            $user->setEmail($email);
+            $user->setRoles([User::ROLE_USER]);
+            $user->setEnabled(true);
+            $user->setPassword($this->passwordHasher->hashPassword($user, self::DEFAULT_PASSWORD));
             $manager->persist($user);
 
             $prefs = $this->getUserPreferences($user);
@@ -170,78 +135,161 @@ class UserFixtures extends Fixture
         }
 
         $manager->flush();
-        $manager->clear(User::class);
-        $manager->clear(UserPreference::class);
+        $manager->clear();
     }
 
     /**
-     * @return array
+     * Do NOT set wizard as seen here, because they should be visible in the demo installation.
+     *
+     * @return array<int, array{0: User, 1:  AccessToken}>
      */
-    protected function getUserDefinition()
+    private function getUserDefinition(): array
     {
-        // alias = $userData[0]
-        // title = $userData[1]
-        // username = $userData[2]
-        // email = $userData[3]
-        // roles = [$userData[4]]
-        // avatar = $userData[5]
-        // enabled = $userData[6]
-        // timezone = $userData[7]
+        $all = [];
 
-        return [
-            [
-                'John Doe',
-                'Developer',
-                self::USERNAME_USER,
-                'john_user@example.com',
-                User::ROLE_USER,
-                self::DEFAULT_AVATAR,
-                true,
-                'America/Vancouver',
-            ],
-            // inactive user to test login
-            [
-                'Chris Deactive',
-                'Developer (left company)',
-                'chris_user',
-                'chris_user@example.com',
-                User::ROLE_USER,
-                self::DEFAULT_AVATAR,
-                false,
-                'Australia/Sydney',
-            ],
-            [
-                'Tony Maier',
-                'Head of Sales',
-                self::USERNAME_TEAMLEAD,
-                'tony_teamlead@example.com',
-                User::ROLE_TEAMLEAD,
-                'https://en.gravatar.com/userimage/3533186/bf2163b1dd23f3107a028af0195624e9.jpeg',
-                true,
-                'Asia/Bangkok',
-            ],
-            // no avatar to test default image macro
-            [
-                'Anna Smith',
-                'Administrator',
-                self::USERNAME_ADMIN,
-                'anna_admin@example.com',
-                User::ROLE_ADMIN,
-                null,
-                true,
-                'Europe/London',
-            ],
-            // no alias to test twig username macro
-            [
-                null,
-                'Super Administrator',
-                self::USERNAME_SUPER_ADMIN,
-                'susan_super@example.com',
-                User::ROLE_SUPER_ADMIN,
-                '/build/images/default_avatar.png',
-                true,
-                'Europe/Berlin',
-            ]
-        ];
+        $user = new User();
+        $user->setAlias('John Doe');
+        $user->setTitle('Developer');
+        $user->setUserIdentifier(self::USERNAME_USER);
+        $user->setEmail('john_user@example.com');
+        $user->setRoles([User::ROLE_USER]);
+        $user->setAvatar(self::DEFAULT_AVATAR);
+        $user->setEnabled(true);
+        $prefs = $this->getUserPreferences($user, 'America/Vancouver');
+        $user->setPreferences($prefs);
+        $user->setPassword($this->passwordHasher->hashPassword($user, self::DEFAULT_PASSWORD));
+        $user->setApiToken($this->passwordHasher->hashPassword($user, self::DEFAULT_API_TOKEN));
+        $token = new AccessToken($user, self::DEFAULT_API_TOKEN . '_john');
+        $token->setName('User fixture');
+        $all[] = [$user, $token];
+
+        $user = new User();
+        $user->setAlias('John Doe');
+        $user->setTitle('Developer');
+        $user->setUserIdentifier('user');
+        $user->setEmail('user@example.com');
+        $user->setRoles([User::ROLE_USER]);
+        $user->setAvatar(self::DEFAULT_AVATAR);
+        $user->setEnabled(true);
+        $prefs = $this->getUserPreferences($user, 'America/Vancouver');
+        $user->setPreferences($prefs);
+        $user->setPassword($this->passwordHasher->hashPassword($user, self::DEFAULT_PASSWORD));
+        $user->setApiToken($this->passwordHasher->hashPassword($user, self::DEFAULT_API_TOKEN));
+        $token = new AccessToken($user, self::DEFAULT_API_TOKEN . '_user');
+        $token->setName('User fixture');
+        $all[] = [$user, $token];
+
+        // inactive user to test login
+        $user = new User();
+        $user->setAlias('Chris Deactive');
+        $user->setTitle('Developer (left company)');
+        $user->setUserIdentifier('chris_user');
+        $user->setEmail('chris_user@example.com');
+        $user->setRoles([User::ROLE_USER]);
+        $user->setAvatar(self::DEFAULT_AVATAR);
+        $user->setEnabled(false);
+        $prefs = $this->getUserPreferences($user, 'Australia/Sydney');
+        $user->setPreferences($prefs);
+        $user->setPassword($this->passwordHasher->hashPassword($user, self::DEFAULT_PASSWORD));
+        $user->setApiToken($this->passwordHasher->hashPassword($user, self::DEFAULT_API_TOKEN));
+        $token = new AccessToken($user, self::DEFAULT_API_TOKEN . '_inactive');
+        $token->setName('User fixture');
+        $all[] = [$user, $token];
+
+        $user = new User();
+        $user->setAlias('Tony Maier');
+        $user->setTitle('Head of Sales');
+        $user->setUserIdentifier(self::USERNAME_TEAMLEAD);
+        $user->setEmail('tony_teamlead@example.com');
+        $user->setRoles([User::ROLE_TEAMLEAD]);
+        $user->setAvatar('https://en.gravatar.com/userimage/3533186/bf2163b1dd23f3107a028af0195624e9.jpeg');
+        $user->setEnabled(true);
+        $prefs = $this->getUserPreferences($user, 'Asia/Bangkok');
+        $user->setPreferences($prefs);
+        $user->setPassword($this->passwordHasher->hashPassword($user, self::DEFAULT_PASSWORD));
+        $user->setApiToken($this->passwordHasher->hashPassword($user, self::DEFAULT_API_TOKEN));
+        $token = new AccessToken($user, self::DEFAULT_API_TOKEN . '_teamlead');
+        $token->setName('User fixture');
+        $all[] = [$user, $token];
+
+        $user = new User();
+        $user->setAlias('Tony Maier');
+        $user->setTitle('Head of Sales');
+        $user->setUserIdentifier('teamlead');
+        $user->setEmail('teamlead@example.com');
+        $user->setRoles([User::ROLE_TEAMLEAD]);
+        $user->setAvatar('https://en.gravatar.com/userimage/3533186/bf2163b1dd23f3107a028af0195624e9.jpeg');
+        $user->setEnabled(true);
+        $prefs = $this->getUserPreferences($user, 'Asia/Bangkok');
+        $user->setPreferences($prefs);
+        $user->setPassword($this->passwordHasher->hashPassword($user, self::DEFAULT_PASSWORD));
+        $user->setApiToken($this->passwordHasher->hashPassword($user, self::DEFAULT_API_TOKEN));
+        $token = new AccessToken($user, self::DEFAULT_API_TOKEN . '_tony');
+        $token->setName('User fixture');
+        $all[] = [$user, $token];
+
+        // no avatar to test default image macro
+        $user = new User();
+        $user->setAlias('Anna Smith');
+        $user->setTitle('Administrator');
+        $user->setUserIdentifier(self::USERNAME_ADMIN);
+        $user->setEmail('anna_admin@example.com');
+        $user->setRoles([User::ROLE_ADMIN]);
+        $user->setEnabled(true);
+        $prefs = $this->getUserPreferences($user, 'Europe/London');
+        $user->setPreferences($prefs);
+        $user->setPassword($this->passwordHasher->hashPassword($user, self::DEFAULT_PASSWORD));
+        $user->setApiToken($this->passwordHasher->hashPassword($user, self::DEFAULT_API_TOKEN));
+        $token = new AccessToken($user, self::DEFAULT_API_TOKEN . '_anna');
+        $token->setName('User fixture');
+        $all[] = [$user, $token];
+
+        $user = new User();
+        $user->setAlias('Anna Smith');
+        $user->setTitle('Administrator');
+        $user->setUserIdentifier('administrator');
+        $user->setEmail('administrator@example.com');
+        $user->setRoles([User::ROLE_ADMIN]);
+        $user->setEnabled(true);
+        $prefs = $this->getUserPreferences($user, 'Europe/London');
+        $user->setPreferences($prefs);
+        $user->setPassword($this->passwordHasher->hashPassword($user, self::DEFAULT_PASSWORD));
+        $user->setApiToken($this->passwordHasher->hashPassword($user, self::DEFAULT_API_TOKEN));
+        $token = new AccessToken($user, self::DEFAULT_API_TOKEN . '_admin');
+        $token->setName('User fixture');
+        $all[] = [$user, $token];
+
+        // no alias to test twig username macro
+        $user = new User();
+        $user->setTitle('Super Administrator');
+        $user->setUserIdentifier(self::USERNAME_SUPER_ADMIN);
+        $user->setEmail('susan_super@example.com');
+        $user->setRoles([User::ROLE_SUPER_ADMIN]);
+        $user->setAvatar('/touch-icon-192x192.png');
+        $user->setEnabled(true);
+        $prefs = $this->getUserPreferences($user, 'Europe/Berlin');
+        $user->setPreferences($prefs);
+        $user->setPassword($this->passwordHasher->hashPassword($user, self::DEFAULT_PASSWORD));
+        $user->setApiToken($this->passwordHasher->hashPassword($user, self::DEFAULT_API_TOKEN));
+        $token = new AccessToken($user, self::DEFAULT_API_TOKEN . '_susan');
+        $token->setName('User fixture');
+        $all[] = [$user, $token];
+
+        $user = new User();
+        $user->setTitle('Super Administrator');
+        $user->setUserIdentifier('super_admin');
+        $user->setEmail('super_admin@example.com');
+        $user->setRoles([User::ROLE_SUPER_ADMIN]);
+        $user->setAvatar('/touch-icon-192x192.png');
+        $user->setEnabled(true);
+        $prefs = $this->getUserPreferences($user, 'Europe/Berlin');
+        $user->setPreferences($prefs);
+        $user->setPassword($this->passwordHasher->hashPassword($user, self::DEFAULT_PASSWORD));
+        $user->setApiToken($this->passwordHasher->hashPassword($user, self::DEFAULT_API_TOKEN));
+        $token = new AccessToken($user, self::DEFAULT_API_TOKEN . '_super');
+        $token->setName('User fixture');
+        $all[] = [$user, $token];
+
+        return $all;
     }
 }

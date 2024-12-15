@@ -20,17 +20,17 @@ use Doctrine\ORM\EntityManager;
  */
 class ExportControllerTest extends ControllerBaseTest
 {
-    public function testIsSecure()
+    public function testIsSecure(): void
     {
         $this->assertUrlIsSecured('/export/');
     }
 
-    public function testIsSecureForrole()
+    public function testIsSecureForrole(): void
     {
         $this->assertUrlIsSecuredForRole(User::ROLE_USER, '/export/');
     }
 
-    public function testIndexActionHasErrorMessageOnEmptyQuery()
+    public function testIndexActionHasErrorMessageOnEmptyQuery(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_TEAMLEAD);
 
@@ -40,7 +40,7 @@ class ExportControllerTest extends ControllerBaseTest
         $this->assertHasNoEntriesWithFilter($client);
     }
 
-    public function testIndexActionWithEntriesAndTeams()
+    public function testIndexActionWithEntriesAndTeams(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_TEAMLEAD);
         $em = $this->getEntityManager();
@@ -48,8 +48,7 @@ class ExportControllerTest extends ControllerBaseTest
         $teamlead = $this->getUserByRole(User::ROLE_TEAMLEAD);
         $user = $this->getUserByRole(User::ROLE_USER);
         /** @var Team $team */
-        $team = new Team();
-        $team->setName('fooo');
+        $team = new Team('fooo');
         $team->addTeamlead($teamlead);
         $team->addUser($user);
         $em->persist($team);
@@ -110,7 +109,7 @@ class ExportControllerTest extends ControllerBaseTest
         $this->assertEmpty($expected);
     }
 
-    public function testIndexActionWithEntriesForTeamleadDoesNotShowUserWithoutTeam()
+    public function testIndexActionWithEntriesForTeamleadDoesNotShowUserWithoutTeam(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_TEAMLEAD);
 
@@ -169,18 +168,14 @@ class ExportControllerTest extends ControllerBaseTest
         $this->assertEmpty($expected);
     }
 
-    public function testExportActionWithMissingRenderer()
+    public function testExportActionWithMissingRenderer(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_TEAMLEAD);
         $this->request($client, '/export/data', 'POST');
-
-        $response = $client->getResponse();
-        $this->assertFalse($response->isSuccessful());
-        $this->assertEquals(404, $response->getStatusCode());
-        $this->assertStringContainsString('Missing export renderer', $response->getContent());
+        $this->assertRouteNotFound($client);
     }
 
-    public function testExportActionWithInvalidRenderer()
+    public function testExportActionWithInvalidRenderer(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_TEAMLEAD);
 
@@ -196,13 +191,10 @@ class ExportControllerTest extends ControllerBaseTest
             'renderer' => 'default'
         ]);
 
-        $response = $client->getResponse();
-        $this->assertFalse($response->isSuccessful());
-        $this->assertEquals(404, $response->getStatusCode());
-        $this->assertStringContainsString('Unknown export renderer', $response->getContent());
+        $this->assertRouteNotFound($client);
     }
 
-    public function testExportAction()
+    public function testExportAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         /** @var EntityManager $em */
@@ -238,9 +230,11 @@ class ExportControllerTest extends ControllerBaseTest
         $this->assertEquals(1, $node->count());
 
         // poor mans assertions ;-)
-        $this->assertStringContainsString('export_print', $node->getIterator()[0]->getAttribute('class'));
+        /** @var \DOMElement $element */
+        $element = $node->getIterator()[0];
+        $this->assertStringContainsString('export_print', $element->getAttribute('class'));
         $this->assertStringContainsString('<h2 id="doc-title" contenteditable="true"', $content);
-        $this->assertStringContainsString('<h3 id="doc-summary" contenteditable="true" data-original="Summary">Summary</h3>', $content);
+        $this->assertStringContainsString('<h3 class="card-title" id="doc-summary" contenteditable="true" data-original="Summary">Summary</h3>', $content);
 
         $node = $client->getCrawler()->filter('section.export div#export-records table.dataTable tbody tr');
         // 20 rows + the summary footer

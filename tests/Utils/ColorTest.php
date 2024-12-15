@@ -22,7 +22,7 @@ use PHPUnit\Framework\TestCase;
  */
 class ColorTest extends TestCase
 {
-    public function testGetColorAndGetTimesheetColor()
+    public function testGetColorAndGetTimesheetColor(): void
     {
         $sut = new Color();
 
@@ -32,7 +32,7 @@ class ColorTest extends TestCase
         $globalActivity->setColor('#000001');
         self::assertEquals('#000001', $sut->getColor($globalActivity));
 
-        $customer = new Customer();
+        $customer = new Customer('foo');
         self::assertNull($sut->getColor($customer));
 
         $customer->setColor('#000004');
@@ -82,14 +82,14 @@ class ColorTest extends TestCase
         $timesheet = new Timesheet();
         $timesheet->setActivity(new Activity());
         $project = new Project();
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $customer->setColor('#123456');
         $project->setCustomer($customer);
         $timesheet->setProject($project);
         self::assertEquals('#123456', $sut->getColor($timesheet, true));
     }
 
-    public function testGetFontContrastColor()
+    public function testGetFontContrastColor(): void
     {
         $sut = new Color();
         $this->assertEquals('#ffffff', $sut->getFontContrastColor('#666'));
@@ -100,7 +100,7 @@ class ColorTest extends TestCase
         $this->assertEquals('#000000', $sut->getFontContrastColor('#ffffff'));
     }
 
-    public function testGetFontContrastColorReturnsContrastForDefaultColorOnInvalidColor()
+    public function testGetFontContrastColorReturnsContrastForDefaultColorOnInvalidColor(): void
     {
         $sut = new Color();
         $this->assertEquals('#000000', $sut->getFontContrastColor(''));
@@ -114,7 +114,7 @@ class ColorTest extends TestCase
         $this->assertEquals('#000000', $sut->getFontContrastColor('#ccccccc'));
     }
 
-    public function testGetRandomColor()
+    public function testGetRandomColor(): void
     {
         $sut = new Color();
 

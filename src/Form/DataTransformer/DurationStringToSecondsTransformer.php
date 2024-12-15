@@ -14,58 +14,62 @@ use App\Validator\Constraints\Duration as DurationConstraint;
 use Symfony\Component\Form\DataTransformerInterface;
 use Symfony\Component\Form\Exception\TransformationFailedException;
 
-class DurationStringToSecondsTransformer implements DataTransformerInterface
+/**
+ * @implements DataTransformerInterface<string|int|null, string|null>
+ */
+final class DurationStringToSecondsTransformer implements DataTransformerInterface
 {
-    /**
-     * @var Duration
-     */
-    protected $formatter;
-    /**
-     * @var string
-     */
-    private $pattern;
-
-    public function __construct()
+    public function transform(mixed $value): ?string
     {
-        $this->formatter = new Duration();
-        $constraint = new DurationConstraint();
-        $this->pattern = $constraint->pattern;
-    }
+        if ($value === null) {
+            return null;
+        }
 
-    /**
-     * @param int $intToFormat
-     * @return string|null
-     */
-    public function transform($intToFormat)
-    {
         try {
-            return $this->formatter->format($intToFormat);
+            if (!\is_int($value) && is_numeric($value)) {
+                $value = (int) $value;
+            }
+
+            if (!\is_int($value)) {
+                // do not throw an exception, that would break the frontend, make it null / empty instead
+                return null;
+            }
+
+            return (new Duration())->format($value);
         } catch (\Exception | \TypeError $e) {
             throw new TransformationFailedException($e->getMessage());
         }
     }
 
-    /**
-     * @param string|null $formatToInt
-     * @return int|null
-     */
-    public function reverseTransform($formatToInt)
+    public function reverseTransform(mixed $value): ?int
     {
-        if (null === $formatToInt) {
+        if ($value === null) {
             return null;
         }
 
-        if (empty($formatToInt)) {
+        if ($value === '') {
             return 0;
         }
 
+        if (\is_int($value) || \is_float($value)) {
+            $value = (string) $value;
+        }
+
         // we need this one here, because the data transformer is executed BEFORE the constraint is called
-        if (!preg_match($this->pattern, $formatToInt)) {
+        if (!preg_match((new DurationConstraint())->pattern, $value)) {
             throw new TransformationFailedException('Invalid duration format given');
         }
 
         try {
-            return $this->formatter->parseDurationString($formatToInt);
+            $seconds = (new Duration())->parseDurationString($value);
+
+            // DateTime throws if a duration with too many seconds is passed and an amount of so
+            // many seconds is likely not required in a time-tracking application ;-)
+            if ($seconds > 315360000000000) {
+                throw new TransformationFailedException('Maximum duration exceeded.');
+            }
+
+            return $seconds;
         } catch (\Exception $e) {
             throw new TransformationFailedException($e->getMessage());
         }

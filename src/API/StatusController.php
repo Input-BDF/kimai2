@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /*
  * This file is part of the Kimai time-tracking app.
  *
@@ -14,46 +12,27 @@ namespace App\API;
 use App\API\Model\Plugin;
 use App\API\Model\Version;
 use App\Plugin\PluginManager;
-use FOS\RestBundle\Controller\Annotations as Rest;
 use FOS\RestBundle\View\View;
 use FOS\RestBundle\View\ViewHandlerInterface;
-use Nelmio\ApiDocBundle\Annotation\Model;
-use Nelmio\ApiDocBundle\Annotation\Security as ApiSecurity;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
-use Swagger\Annotations as SWG;
+use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-/**
- * @SWG\Tag(name="Default")
- *
- * @Security("is_granted('IS_AUTHENTICATED_REMEMBERED')")
- */
-class StatusController extends BaseApiController
+#[IsGranted('API')]
+#[OA\Tag(name: 'Default')]
+final class StatusController extends BaseApiController
 {
-    /**
-     * @var ViewHandlerInterface
-     */
-    private $viewHandler;
-
-    public function __construct(ViewHandlerInterface $viewHandler)
+    public function __construct(private readonly ViewHandlerInterface $viewHandler)
     {
-        $this->viewHandler = $viewHandler;
     }
 
     /**
      * A testing route for the API
-     *
-     * @SWG\Response(
-     *     response=200,
-     *     description="A simple route that returns a 'pong', which you can use for testing the API",
-     *     examples={"{'message': 'pong'}"}
-     * )
-     *
-     * @Rest\Get(path="/ping")
-     *
-     * @ApiSecurity(name="apiUser")
-     * @ApiSecurity(name="apiToken")
      */
+    #[OA\Response(response: 200, description: "A simple route that returns a 'pong', which you can use for testing the API", content: new OA\JsonContent(example: "{'message': 'pong'}"))]
+    #[Route(methods: ['GET'], path: '/ping')]
     public function pingAction(): Response
     {
         $view = new View(['message' => 'pong'], 200);
@@ -63,18 +42,9 @@ class StatusController extends BaseApiController
 
     /**
      * Returns information about the Kimai release
-     *
-     * @SWG\Response(
-     *     response=200,
-     *     description="Returns version information about the current release",
-     *      @SWG\Schema(ref=@Model(type=Version::class))
-     * )
-     *
-     * @Rest\Get(path="/version")
-     *
-     * @ApiSecurity(name="apiUser")
-     * @ApiSecurity(name="apiToken")
      */
+    #[OA\Response(response: 200, description: 'Returns version information about the current release', content: new OA\JsonContent(ref: new Model(type: Version::class)))]
+    #[Route(methods: ['GET'], path: '/version')]
     public function versionAction(): Response
     {
         return $this->viewHandler->handle(new View(new Version(), 200));
@@ -82,26 +52,13 @@ class StatusController extends BaseApiController
 
     /**
      * Returns information about installed Plugins
-     *
-     * @SWG\Response(
-     *     response=200,
-     *     description="Returns a list of plugin names and versions",
-     *      @SWG\Schema(
-     *          type="array",
-     *          @SWG\Items(ref=@Model(type=Plugin::class))
-     *      )
-     * )
-     *
-     * @Rest\Get(path="/plugins")
-     *
-     * @ApiSecurity(name="apiUser")
-     * @ApiSecurity(name="apiToken")
      */
+    #[OA\Response(response: 200, description: 'Returns a list of plugin names and versions', content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: new Model(type: Plugin::class))))]
+    #[Route(methods: ['GET'], path: '/plugins')]
     public function pluginAction(PluginManager $pluginManager): Response
     {
         $plugins = [];
         foreach ($pluginManager->getPlugins() as $plugin) {
-            $pluginManager->loadMetadata($plugin);
             $plugins[] = new Plugin($plugin);
         }
 

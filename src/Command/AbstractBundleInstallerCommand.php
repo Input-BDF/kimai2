@@ -72,7 +72,7 @@ abstract class AbstractBundleInstallerCommand extends Command
      */
     protected function getInstallerCommandName(): string
     {
-        return sprintf('kimai:bundle:%s:install', $this->getBundleCommandNamePart());
+        return \sprintf('kimai:bundle:%s:install', $this->getBundleCommandNamePart());
     }
 
     /**
@@ -87,17 +87,14 @@ abstract class AbstractBundleInstallerCommand extends Command
 
         if ($parts[0] !== 'KimaiPlugin') {
             throw new LogicException(
-                sprintf('Unsupported namespace given, expected "KimaiPlugin" but received "%s". Please overwrite getBundleName() and return the correct bundle name.', $parts[0])
+                \sprintf('Unsupported namespace given, expected "KimaiPlugin" but received "%s". Please overwrite getBundleName() and return the correct bundle name.', $parts[0])
             );
         }
 
         return $parts[1];
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName($this->getInstallerCommandName())
@@ -106,12 +103,7 @@ abstract class AbstractBundleInstallerCommand extends Command
         ;
     }
 
-    /**
-     * @param InputInterface $input
-     * @param OutputInterface $output
-     * @return int|null
-     */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
 
@@ -122,17 +114,17 @@ abstract class AbstractBundleInstallerCommand extends Command
 
         $bundleName = $this->getBundleName();
         $io->title(
-            sprintf('Starting installation of plugin: %s ...', $bundleName)
+            \sprintf('Starting installation of plugin: %s ...', $bundleName)
         );
 
         try {
             $this->importMigrations($io, $output);
         } catch (\Exception $ex) {
             $io->error(
-                sprintf('Failed to install database for bundle %s. %s', $bundleName, $ex->getMessage())
+                \sprintf('Failed to install database for bundle %s. %s', $bundleName, $ex->getMessage())
             );
 
-            return 1;
+            return Command::FAILURE;
         }
 
         if ($this->hasAssets()) {
@@ -140,23 +132,23 @@ abstract class AbstractBundleInstallerCommand extends Command
                 $this->installAssets($io, $output);
             } catch (\Exception $ex) {
                 $io->error(
-                    sprintf('Failed to install assets for bundle %s. %s', $bundleName, $ex->getMessage())
+                    \sprintf('Failed to install assets for bundle %s. %s', $bundleName, $ex->getMessage())
                 );
 
-                return 1;
+                return Command::FAILURE;
             }
         }
 
         chdir($path);
 
         $io->success(
-            sprintf('Congratulations! Plugin was successful installed: %s', $bundleName)
+            \sprintf('Congratulations! Plugin was successful installed: %s', $bundleName)
         );
 
-        return 0;
+        return Command::SUCCESS;
     }
 
-    protected function installAssets(SymfonyStyle $io, OutputInterface $output)
+    protected function installAssets(SymfonyStyle $io, OutputInterface $output): void
     {
         $command = $this->getApplication()->find('assets:install');
         $cmdInput = new ArrayInput([]);
@@ -168,12 +160,12 @@ abstract class AbstractBundleInstallerCommand extends Command
         $io->writeln('');
     }
 
-    protected function importMigrations(SymfonyStyle $io, OutputInterface $output)
+    protected function importMigrations(SymfonyStyle $io, OutputInterface $output): void
     {
         $config = $this->getMigrationConfigFilename();
 
         if (null === $config) {
-            return false;
+            return;
         }
 
         if (!file_exists($config)) {

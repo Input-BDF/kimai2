@@ -9,44 +9,74 @@
 
 namespace App\Invoice\Hydrator;
 
+use App\Activity\ActivityStatisticService;
 use App\Entity\Activity;
 use App\Invoice\InvoiceModel;
 use App\Invoice\InvoiceModelHydrator;
 
-class InvoiceModelActivityHydrator implements InvoiceModelHydrator
+final class InvoiceModelActivityHydrator implements InvoiceModelHydrator
 {
+    use BudgetHydratorTrait;
+
+    public function __construct(private ActivityStatisticService $activityStatistic)
+    {
+    }
+
     public function hydrate(InvoiceModel $model): array
     {
-        if (!$model->getQuery()->hasActivities()) {
+        $activities = [];
+
+        foreach ($model->getEntries() as $entry) {
+            if ($entry->getActivity() === null) {
+                continue;
+            }
+
+            $key = 'A_' . $entry->getActivity()->getId();
+            if (!\array_key_exists($key, $activities)) {
+                $activities[$key] = $entry->getActivity();
+            }
+        }
+
+        if (\count($activities) === 0) {
             return [];
         }
+
+        $activities = array_values($activities);
 
         $values = [];
         $i = 0;
 
-        foreach ($model->getQuery()->getActivities() as $activity) {
+        foreach ($activities as $activity) {
             $prefix = '';
             if ($i > 0) {
                 $prefix = $i . '.';
             }
-            $values = array_merge($values, $this->getValuesFromActivity($activity, $prefix));
+            $values = array_merge($values, $this->getValuesFromActivity($model, $activity, $prefix));
             $i++;
         }
 
         return $values;
     }
 
-    private function getValuesFromActivity(Activity $activity, string $prefix): array
+    private function getValuesFromActivity(InvoiceModel $model, Activity $activity, string $prefix): array
     {
         $prefix = 'activity.' . $prefix;
 
         $values = [
             $prefix . 'id' => $activity->getId(),
-            $prefix . 'name' => $activity->getName(),
-            $prefix . 'comment' => $activity->getComment(),
+            $prefix . 'name' => $activity->getName() ?? '',
+            $prefix . 'comment' => $activity->getComment() ?? '',
+            $prefix . 'number' => $activity->getNumber() ?? '',
+            $prefix . 'invoice_text' => $activity->getInvoiceText() ?? '',
         ];
 
-        foreach ($activity->getVisibleMetaFields() as $metaField) {
+        if ($model->getQuery()?->getEnd() !== null) {
+            $statistic = $this->activityStatistic->getBudgetStatisticModel($activity, $model->getQuery()->getEnd());
+
+            $values = array_merge($values, $this->getBudgetValues($prefix, $statistic, $model));
+        }
+
+        foreach ($activity->getMetaFields() as $metaField) {
             $values = array_merge($values, [
                 $prefix . 'meta.' . $metaField->getName() => $metaField->getValue(),
             ]);

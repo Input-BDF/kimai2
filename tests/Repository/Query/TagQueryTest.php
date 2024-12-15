@@ -16,13 +16,11 @@ use App\Repository\Query\TagQuery;
  */
 class TagQueryTest extends BaseQueryTest
 {
-    public function testQuery()
+    public function testQuery(): void
     {
         $sut = new TagQuery();
 
         $this->assertBaseQuery($sut, 'name');
-        $this->assertInstanceOf(TagQuery::class, $sut);
-
         $this->assertResetByFormError(new TagQuery(), 'name');
     }
 }

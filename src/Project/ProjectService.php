@@ -9,48 +9,42 @@
 
 namespace App\Project;
 
+use App\Configuration\SystemConfiguration;
 use App\Entity\Customer;
 use App\Entity\Project;
 use App\Event\ProjectCreateEvent;
 use App\Event\ProjectCreatePostEvent;
 use App\Event\ProjectCreatePreEvent;
+use App\Event\ProjectDeleteEvent;
 use App\Event\ProjectMetaDefinitionEvent;
 use App\Event\ProjectUpdatePostEvent;
 use App\Event\ProjectUpdatePreEvent;
 use App\Repository\ProjectRepository;
+use App\Utils\Context;
+use App\Utils\NumberGenerator;
 use App\Validator\ValidationFailedException;
 use InvalidArgumentException;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
  * @final
  */
-class ProjectService
+final class ProjectService
 {
-    /**
-     * @var ProjectRepository
-     */
-    private $repository;
-    /**
-     * @var EventDispatcherInterface
-     */
-    private $dispatcher;
-    /**
-     * @var ValidatorInterface
-     */
-    private $validator;
-
-    public function __construct(ProjectRepository $projectRepository, EventDispatcherInterface $dispatcher, ValidatorInterface $validator)
+    public function __construct(
+        private readonly ProjectRepository $repository,
+        private readonly SystemConfiguration $configuration,
+        private readonly EventDispatcherInterface $dispatcher,
+        private readonly ValidatorInterface $validator
+    )
     {
-        $this->repository = $projectRepository;
-        $this->dispatcher = $dispatcher;
-        $this->validator = $validator;
     }
 
     public function createNewProject(?Customer $customer = null): Project
     {
         $project = new Project();
+        $project->setNumber($this->calculateNextProjectNumber());
 
         if ($customer !== null) {
             $project->setCustomer($customer);
@@ -62,13 +56,20 @@ class ProjectService
         return $project;
     }
 
-    public function saveNewProject(Project $project): Project
+    public function saveNewProject(Project $project, ?Context $context = null): Project
     {
         if (null !== $project->getId()) {
             throw new InvalidArgumentException('Cannot create project, already persisted');
         }
 
         $this->validateProject($project);
+
+        if ($context !== null && $this->configuration->isProjectCopyTeamsOnCreate()) {
+            foreach ($context->getUser()->getTeams() as $team) {
+                $project->addTeam($team);
+                $team->addProject($project);
+            }
+        }
 
         $this->dispatcher->dispatch(new ProjectCreatePreEvent($project));
         $this->repository->saveProject($project);
@@ -77,8 +78,13 @@ class ProjectService
         return $project;
     }
 
+    public function deleteProject(Project $project): void
+    {
+        $this->dispatcher->dispatch(new ProjectDeleteEvent($project));
+        $this->repository->deleteProject($project);
+    }
+
     /**
-     * @param Project $project
      * @param string[] $groups
      * @throws ValidationFailedException
      */
@@ -105,5 +111,42 @@ class ProjectService
     public function findProjectByName(string $name): ?Project
     {
         return $this->repository->findOneBy(['name' => $name]);
+    }
+
+    public function findProjectByNumber(string $number): ?Project
+    {
+        return $this->repository->findOneBy(['number' => $number]);
+    }
+
+    public function calculateNextProjectNumber(): ?string
+    {
+        $format = $this->configuration->find('project.number_format');
+        if (empty($format) || !\is_string($format)) {
+            return null;
+        }
+
+        // we cannot use max(number) because a varchar column returns unexpected results
+        $start = $this->repository->countProject();
+        $i = 0;
+
+        do {
+            $start++;
+
+            $numberGenerator = new NumberGenerator($format, function (string $originalFormat, string $format, int $increaseBy) use ($start): string|int {
+                return match ($format) {
+                    'pc' => $start + $increaseBy,
+                    default => $originalFormat,
+                };
+            });
+
+            $number = $numberGenerator->getNumber();
+            $project = $this->findProjectByNumber($number);
+        } while ($project !== null && $i++ < 100);
+
+        if ($project !== null) {
+            return null;
+        }
+
+        return $number;
     }
 }

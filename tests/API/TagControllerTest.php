@@ -33,17 +33,20 @@ class TagControllerTest extends APIControllerBaseTest
         return $this->importFixture($fixture);
     }
 
-    public function testIsSecure()
+    public function testIsSecure(): void
     {
         $this->assertUrlIsSecured('/api/tags');
     }
 
-    public function testGetCollection()
+    public function testGetCollection(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->importTagFixtures();
         $this->assertAccessIsGranted($client, '/api/tags');
-        $result = json_decode($client->getResponse()->getContent(), true);
+
+        $content = $client->getResponse()->getContent();
+        $this->assertNotFalse($content);
+        $result = json_decode($content, true);
 
         $this->assertIsArray($result);
         $this->assertNotEmpty($result);
@@ -51,20 +54,39 @@ class TagControllerTest extends APIControllerBaseTest
         $this->assertEquals('Test', $result[9]);
     }
 
-    public function testEmptyCollection()
+    public function testFindCollection(): void
+    {
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
+        $this->importTagFixtures();
+        $this->assertAccessIsGranted($client, '/api/tags/find', 'GET', ['name' => '2018']);
+        $content = $client->getResponse()->getContent();
+        $this->assertNotFalse($content);
+        $result = json_decode($content, true);
+
+        $this->assertIsArray($result);
+        $this->assertNotEmpty($result);
+        $this->assertEquals(3, \count($result));
+        self::assertIsArray($result[0]);
+        self::assertApiResponseTypeStructure('TagEntity', $result[0]);
+    }
+
+    public function testEmptyCollection(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->importTagFixtures();
         $query = ['name' => 'nothing'];
         $this->assertAccessIsGranted($client, '/api/tags', 'GET', $query);
-        $result = json_decode($client->getResponse()->getContent(), true);
+
+        $content = $client->getResponse()->getContent();
+        $this->assertNotFalse($content);
+        $result = json_decode($content, true);
 
         $this->assertIsArray($result);
         $this->assertEmpty($result);
         $this->assertEquals(0, \count($result));
     }
 
-    public function testPostAction()
+    public function testPostAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $this->importTagFixtures();
@@ -75,14 +97,17 @@ class TagControllerTest extends APIControllerBaseTest
         $this->request($client, '/api/tags', 'POST', [], json_encode($data));
         $this->assertTrue($client->getResponse()->isSuccessful());
 
-        $result = json_decode($client->getResponse()->getContent(), true);
+        $content = $client->getResponse()->getContent();
+        $this->assertNotFalse($content);
+        $result = json_decode($content, true);
+
         $this->assertIsArray($result);
         self::assertApiResponseTypeStructure('TagEntity', $result);
         $this->assertNotEmpty($result['id']);
         self::assertEquals('#00ff00', $result['color']);
     }
 
-    public function testPostActionWithValidationErrors()
+    public function testPostActionWithValidationErrors(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $this->importTagFixtures();
@@ -96,7 +121,7 @@ class TagControllerTest extends APIControllerBaseTest
         $this->assertApiCallValidationError($response, ['name', 'color']);
     }
 
-    public function testPostActionWithInvalidUser()
+    public function testPostActionAsRegularUser(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->importTagFixtures();
@@ -104,20 +129,28 @@ class TagControllerTest extends APIControllerBaseTest
             'name' => 'foo',
         ];
         $this->request($client, '/api/tags', 'POST', [], json_encode($data));
-        $response = $client->getResponse();
-        $this->assertFalse($response->isSuccessful());
-        $this->assertEquals(Response::HTTP_FORBIDDEN, $response->getStatusCode());
-        $json = json_decode($response->getContent(), true);
-        $this->assertEquals('User cannot create tags', $json['message']);
+        $this->assertTrue($client->getResponse()->isSuccessful());
+
+        $content = $client->getResponse()->getContent();
+        $this->assertNotFalse($content);
+        $result = json_decode($content, true);
+
+        $this->assertIsArray($result);
+        self::assertApiResponseTypeStructure('TagEntity', $result);
+        $this->assertNotEmpty($result['id']);
+        self::assertEquals('foo', $result['name']);
     }
 
-    public function testPartOfEntries()
+    public function testPartOfEntries(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_USER);
         $this->importTagFixtures();
         $query = ['name' => 'in'];
         $this->assertAccessIsGranted($client, '/api/tags', 'GET', $query);
-        $result = json_decode($client->getResponse()->getContent(), true);
+
+        $content = $client->getResponse()->getContent();
+        $this->assertNotFalse($content);
+        $result = json_decode($content, true);
 
         $this->assertIsArray($result);
         $this->assertNotEmpty($result);
@@ -128,7 +161,7 @@ class TagControllerTest extends APIControllerBaseTest
         $this->assertEquals('Marketing', $result[2]);
     }
 
-    public function testDeleteAction()
+    public function testDeleteAction(): void
     {
         $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
         $tags = $this->importTagFixtures();
@@ -140,13 +173,17 @@ class TagControllerTest extends APIControllerBaseTest
         $this->assertEmpty($client->getResponse()->getContent());
 
         $this->assertAccessIsGranted($client, '/api/tags');
-        $result = json_decode($client->getResponse()->getContent(), true);
+
+        $content = $client->getResponse()->getContent();
+        $this->assertNotFalse($content);
+        $result = json_decode($content, true);
 
         $this->assertEquals(9, \count($result));
     }
 
-    public function testDeleteActionWithUnknownTimesheet()
+    public function testDeleteActionWithUnknownTimesheet(): void
     {
-        $this->assertEntityNotFoundForDelete(User::ROLE_ADMIN, '/api/tags/' . PHP_INT_MAX);
+        $client = $this->getClientForAuthenticatedUser(User::ROLE_ADMIN);
+        $this->assertNotFoundForDelete($client, '/api/tags/' . PHP_INT_MAX);
     }
 }

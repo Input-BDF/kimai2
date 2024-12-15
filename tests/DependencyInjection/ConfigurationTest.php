@@ -26,7 +26,7 @@ class ConfigurationTest extends TestCase
         ];
     }
 
-    protected function assertConfig($inputConfig, $expectedConfig)
+    public function assertConfig($inputConfig, $expectedConfig): void
     {
         $finalizedConfig = $this->getCompiledConfig($inputConfig);
 
@@ -43,7 +43,7 @@ class ConfigurationTest extends TestCase
         return $node->finalize($normalizedConfig);
     }
 
-    public function testValidateDataDir()
+    public function testValidateDataDir(): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('Invalid configuration for path "kimai.data_dir": Data directory does not exist');
@@ -51,22 +51,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($this->getMinConfig('sdfsdfsdfds'), []);
     }
 
-    /**
-     * @expectedDeprecation Changing the plugin directory via "kimai.plugin_dir" is not supported since 1.9
-     * @group legacy
-     */
-    public function testValidatePluginDir()
-    {
-        $config = $this->getMinConfig();
-        $config['plugin_dir'] = '/tmp/';
-
-        $finalizedConfig = $this->getCompiledConfig($config);
-        $finalizedConfig['plugin_dir'] = '/tmp/';
-
-        $this->assertConfig($config, $finalizedConfig);
-    }
-
-    public function testValidateLdapConfigUserBaseDn()
+    public function testValidateLdapConfigUserBaseDn(): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('Invalid configuration for path "kimai.ldap": The "ldap.user.baseDn" config must be set if LDAP is activated.');
@@ -82,7 +67,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($config, []);
     }
 
-    public function testValidateLdapConfig()
+    public function testValidateLdapConfig(): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('Invalid configuration for path "kimai.ldap.connection": The ldap.connection.useSsl and ldap.connection.useStartTls options are mutually exclusive.');
@@ -98,7 +83,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($config, []);
     }
 
-    public function testValidateLdapFilterIncludingReplacer()
+    public function testValidateLdapFilterIncludingReplacer(): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('Invalid configuration for path "kimai.ldap.user.filter": The ldap.user.filter must be enclosed by a matching number of parentheses "()" and must NOT contain a "%s" replacer');
@@ -113,7 +98,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($config, []);
     }
 
-    public function testValidateLdapFilterMissingStartingParenthesis()
+    public function testValidateLdapFilterMissingStartingParenthesis(): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('Invalid configuration for path "kimai.ldap.user.filter": The ldap.user.filter must be enclosed by a matching number of parentheses "()" and must NOT contain a "%s" replacer');
@@ -128,7 +113,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($config, []);
     }
 
-    public function testValidateCalendarDragDropMaxEntries()
+    public function testValidateCalendarDragDropMaxEntries(): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('Invalid configuration for path "kimai.calendar.dragdrop_amount": The dragdrop_amount must be between 0 and 20');
@@ -141,7 +126,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($config, []);
     }
 
-    public function testValidateLdapFilterInvalidParenthesisCounter()
+    public function testValidateLdapFilterInvalidParenthesisCounter(): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('Invalid configuration for path "kimai.ldap.user.filter": The ldap.user.filter must be enclosed by a matching number of parentheses "()" and must NOT contain a "%s" replacer');
@@ -156,7 +141,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($config, []);
     }
 
-    public function testValidateLdapAccountFilterFormatMissingUserAttributeReplacer()
+    public function testValidateLdapAccountFilterFormatMissingUserAttributeReplacer(): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('Invalid configuration for path "kimai.ldap.connection.accountFilterFormat": The accountFilterFormat must be enclosed by a matching number of parentheses "()" and contain one "%s" replacer for the username');
@@ -171,7 +156,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($config, []);
     }
 
-    public function testValidateLdapAccountFilterFormatMissingStartingParenthesis()
+    public function testValidateLdapAccountFilterFormatMissingStartingParenthesis(): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('Invalid configuration for path "kimai.ldap.connection.accountFilterFormat": The accountFilterFormat must be enclosed by a matching number of parentheses "()" and contain one "%s" replacer for the username');
@@ -186,7 +171,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($config, []);
     }
 
-    public function testValidateLdapAccountFilterFormatInvalidParenthesisCounter()
+    public function testValidateLdapAccountFilterFormatInvalidParenthesisCounter(): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('Invalid configuration for path "kimai.ldap.connection.accountFilterFormat": The accountFilterFormat must be enclosed by a matching number of parentheses "()" and contain one "%s" replacer for the username');
@@ -201,7 +186,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($config, []);
     }
 
-    public function testValidateSamlIsMissingMappingForEmail()
+    public function testValidateSamlIsMissingMappingForEmail(): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('Invalid configuration for path "kimai.saml": You need to configure a SAML mapping for the email attribute.');
@@ -215,7 +200,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($config, []);
     }
 
-    public function testValidateSamlDoesNotTriggerOnDeactivatedSaml()
+    public function testValidateSamlDoesNotTriggerOnDeactivatedSaml(): void
     {
         $finalizedConfig = $this->getCompiledConfig($this->getMinConfig());
         $config = $this->getMinConfig();
@@ -227,7 +212,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($config, $finalizedConfig);
     }
 
-    public function testValidateSamlDoesNotTriggerWhenEmailMappingExists()
+    public function testValidateSamlDoesNotTriggerWhenEmailMappingExists(): void
     {
         $config = $this->getMinConfig();
         $config['saml'] = [
@@ -241,7 +226,7 @@ class ConfigurationTest extends TestCase
         $this->assertConfig($config, $finalizedConfig);
     }
 
-    public function testDefaultLdapSettings()
+    public function testDefaultLdapSettings(): void
     {
         $finalizedConfig = $this->getCompiledConfig($this->getMinConfig());
         $expected = [
@@ -272,7 +257,7 @@ class ConfigurationTest extends TestCase
         self::assertEquals($expected, $finalizedConfig['ldap']);
     }
 
-    public function testFullDefaultConfig()
+    public function testFullDefaultConfig(): void
     {
         $fullDefaultConfig = [
             'data_dir' => '/tmp/',
@@ -291,11 +276,11 @@ class ConfigurationTest extends TestCase
                 ],
                 'rates' => [],
                 'active_entries' => [
-                    'soft_limit' => 1,
                     'hard_limit' => 1,
                 ],
                 'rules' => [
                     'allow_future_times' => true,
+                    'allow_zero_duration' => true,
                     'allow_overlapping_records' => true,
                     'lockdown_period_start' => null,
                     'lockdown_period_end' => null,
@@ -304,15 +289,17 @@ class ConfigurationTest extends TestCase
                     'lockdown_period_timezone' => null,
                     'break_warning_duration' => 0,
                     'long_running_duration' => 0,
+                    'require_activity' => true,
+                    'break_time_active' => false,
                 ],
-                'duration_increment' => null,
-                'time_increment' => null,
+                'duration_increment' => 15,
+                'time_increment' => 15,
             ],
             'user' => [
                 'registration' => false,
                 'password_reset' => true,
                 'login' => true,
-                'password_reset_retry_ttl' => 7200,
+                'password_reset_retry_ttl' => 3600,
                 'password_reset_token_ttl' => 86400,
             ],
             'invoice' => [
@@ -322,8 +309,8 @@ class ConfigurationTest extends TestCase
                     0 => 'var/invoices/',
                     1 => 'templates/invoice/renderer/',
                 ],
-                'simple_form' => false,
                 'number_format' => '{Y}/{cy,3}',
+                'upload_twig' => false,
             ],
             'export' => [
                 'documents' => [
@@ -333,19 +320,11 @@ class ConfigurationTest extends TestCase
                     1 => 'templates/export/renderer/',
                 ],
             ],
-            'languages' => [],
             'calendar' => [
                 'week_numbers' => true,
                 'day_limit' => 4,
                 'slot_duration' => '00:30:00',
                 'businessHours' => [
-                    'days' => [
-                        0 => 1,
-                        1 => 2,
-                        2 => 3,
-                        3 => 4,
-                        4 => 5,
-                    ],
                     'begin' => '08:00',
                     'end' => '20:00',
                 ],
@@ -359,41 +338,22 @@ class ConfigurationTest extends TestCase
                     ],
                 ],
                 'weekends' => true,
-                'dragdrop_amount' => 10,
+                'dragdrop_amount' => 5,
+                'dragdrop_data' => false,
+                'title_pattern' => '{activity}',
             ],
             'theme' => [
-                'active_warning' => 3,
-                'box_color' => 'blue',
-                'select_type' => 'selectpicker',
                 'show_about' => true,
-                'chart' => [
-                    'background_color' => '#3c8dbc',
-                    'border_color' => '#3b8bba',
-                    'grid_color' => 'rgba(0,0,0,.05)',
-                    'height' => '200',
-                ],
                 'branding' => [
                     'logo' => null,
                     'mini' => null,
                     'company' => null,
                     'title' => null,
-                    'translation' => null,
-                ],
-                'autocomplete_chars' => 3,
-                'tags_create' => true,
-                'calendar' => [
-                    'background_color' => '#d2d6de'
                 ],
                 'colors_limited' => true,
                 'color_choices' => 'Silver|#c0c0c0,Gray|#808080,Black|#000000,Maroon|#800000,Brown|#a52a2a,Red|#ff0000,Orange|#ffa500,Gold|#ffd700,Yellow|#ffff00,Peach|#ffdab9,Khaki|#f0e68c,Olive|#808000,Lime|#00ff00,Jelly|#9acd32,Green|#008000,Teal|#008080,Aqua|#00ffff,LightBlue|#add8e6,DeepSky|#00bfff,Dodger|#1e90ff,Blue|#0000ff,Navy|#000080,Purple|#800080,Fuchsia|#ff00ff,Violet|#ee82ee,Rose|#ffe4e1,Lavender|#E6E6FA',
-                'random_colors' => true,
                 'avatar_url' => false,
             ],
-            'industry' => [
-                'translation' => null,
-            ],
-            'dashboard' => [],
-            'widgets' => [],
             'defaults' => [
                 'customer' => [
                     'timezone' => null,
@@ -403,7 +363,7 @@ class ConfigurationTest extends TestCase
                 'user' => [
                     'timezone' => null,
                     'language' => 'en',
-                    'theme' => null,
+                    'theme' => 'default',
                     'currency' => 'EUR',
                 ],
             ],
@@ -446,6 +406,7 @@ class ConfigurationTest extends TestCase
                 'activate' => false,
                 'title' => 'Login with SAML',
                 'roles' => [
+                    'resetOnLogin' => true,
                     'attribute' => null,
                     'mapping' => []
                 ],
@@ -453,10 +414,38 @@ class ConfigurationTest extends TestCase
                 'connection' => [
                     'organization' => []
                 ],
+                'provider' => 'default',
             ],
             'company' => [
                 'financial_year' => null,
-            ]
+            ],
+            'quick_entry' => [
+                'recent_activities' => 5,
+                'recent_activity_weeks' => null,
+                'minimum_rows' => 3,
+            ],
+            'project' => [
+                'copy_teams_on_create' => false,
+                'number_format' => '{pc,4}',
+                'allow_duplicate_number' => false,
+                'choice_pattern' => '{name}',
+            ],
+            'activity' => [
+                'allow_inline_create' => false,
+                'number_format' => '{ac,4}',
+                'allow_duplicate_number' => false,
+                'choice_pattern' => '{name}',
+            ],
+            'customer' => [
+                'number_format' => '{cc,4}',
+                'rules' => [
+                    'allow_duplicate_number' => false,
+                ],
+                'choice_pattern' => '{name}',
+            ],
+            'features' => [
+                'user_registration' => false,
+            ],
         ];
 
         $this->assertConfig($this->getMinConfig(), $fullDefaultConfig);

@@ -10,22 +10,31 @@
 namespace App\Event;
 
 use App\Model\ProjectBudgetStatisticModel;
+use DateTime;
+use DateTimeInterface;
 
 final class ProjectBudgetStatisticEvent
 {
-    private $models;
-    private $begin;
-    private $end;
+    private readonly ?DateTime $begin;
+    private readonly ?DateTime $end;
 
     /**
      * @param ProjectBudgetStatisticModel[] $models
-     * @param \DateTime|null $begin
-     * @param \DateTime|null $end
      */
-    public function __construct(array $models, ?\DateTime $begin = null, ?\DateTime $end = null)
+    public function __construct(
+        private readonly array $models,
+        ?DateTimeInterface $begin = null,
+        ?DateTimeInterface $end = null
+    )
     {
-        $this->models = $models;
+        if ($begin !== null) {
+            $begin = \DateTime::createFromInterface($begin);
+        }
         $this->begin = $begin;
+
+        if ($end !== null) {
+            $end = \DateTime::createFromInterface($end);
+        }
         $this->end = $end;
     }
 
@@ -52,12 +61,12 @@ final class ProjectBudgetStatisticEvent
         return $this->models;
     }
 
-    public function getBegin(): ?\DateTime
+    public function getBegin(): ?DateTime
     {
         return $this->begin;
     }
 
-    public function getEnd(): ?\DateTime
+    public function getEnd(): ?DateTime
     {
         return $this->end;
     }

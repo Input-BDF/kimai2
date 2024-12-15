@@ -13,19 +13,17 @@ use App\Configuration\SystemConfiguration;
 use App\Entity\Timesheet;
 use DateTime;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 final class DurationFixedBeginMode implements TrackingModeInterface
 {
     use TrackingModeTrait;
 
-    /**
-     * @var SystemConfiguration
-     */
-    private $configuration;
-
-    public function __construct(SystemConfiguration $configuration)
+    public function __construct(
+        private readonly SystemConfiguration $configuration,
+        private readonly AuthorizationCheckerInterface $authorizationChecker
+    )
     {
-        $this->configuration = $configuration;
     }
 
     public function canEditBegin(): bool
@@ -45,7 +43,7 @@ final class DurationFixedBeginMode implements TrackingModeInterface
 
     public function canUpdateTimesWithAPI(): bool
     {
-        return false;
+        return $this->authorizationChecker->isGranted('view_other_timesheet');
     }
 
     public function create(Timesheet $timesheet, ?Request $request = null): void
@@ -54,8 +52,13 @@ final class DurationFixedBeginMode implements TrackingModeInterface
             $timesheet->setBegin(new DateTime('now', $this->getTimezone($timesheet)));
         }
 
-        $newBegin = clone $timesheet->getBegin();
-        $newBegin->modify($this->configuration->getTimesheetDefaultBeginTime());
+        /** @var DateTime $newBegin */
+        $newBegin = clone $timesheet->getBegin(); // @phpstan-ignore-line
+
+        // this prevents the problem that "now" is being ignored in modify()
+        $beginTime = new DateTime($this->configuration->getTimesheetDefaultBeginTime(), $newBegin->getTimezone());
+        $newBegin->setTime((int) $beginTime->format('H'), (int) $beginTime->format('i'), 0, 0);
+
         $timesheet->setBegin($newBegin);
     }
 
@@ -67,5 +70,10 @@ final class DurationFixedBeginMode implements TrackingModeInterface
     public function canSeeBeginAndEndTimes(): bool
     {
         return false;
+    }
+
+    public function getEditTemplate(): string
+    {
+        return 'timesheet/edit-default.html.twig';
     }
 }

@@ -21,13 +21,11 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 class VersionCommandTest extends KernelTestCase
 {
-    /**
-     * @var Application
-     */
-    protected $application;
+    private Application $application;
 
     protected function setUp(): void
     {
+        parent::setUp();
         $kernel = self::bootKernel();
         $this->application = new Application($kernel);
 
@@ -37,26 +35,23 @@ class VersionCommandTest extends KernelTestCase
     /**
      * @dataProvider getTestData
      */
-    public function testVersion(array $options, $result)
+    public function testVersion(array $options, $result): void
     {
         $commandTester = $this->getCommandTester($options);
         $output = $commandTester->getDisplay();
         $this->assertEquals($result . PHP_EOL, $output);
     }
 
-    public function getTestData()
+    public function getTestData(): array // @phpstan-ignore missingType.iterableValue
     {
         return [
-            [[], 'Kimai ' . Constants::VERSION . ' by Kevin Papst and contributors.'],
-            [['--name' => true], Constants::NAME],
+            [[], 'Kimai ' . Constants::VERSION . ' by Kevin Papst.'],
             [['--short' => true], Constants::VERSION],
-            // @deprecated since 1.14.1
-            [['--candidate' => true], Constants::STATUS],
-            [['--semver' => true], Constants::VERSION . '-' . Constants::STATUS],
+            [['--number' => true], Constants::VERSION_ID],
         ];
     }
 
-    protected function getCommandTester(array $options = [])
+    protected function getCommandTester(array $options = []): CommandTester
     {
         $command = $this->application->find('kimai:version');
         $commandTester = new CommandTester($command);

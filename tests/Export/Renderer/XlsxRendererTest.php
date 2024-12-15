@@ -17,21 +17,19 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
  * @covers \App\Export\Base\AbstractSpreadsheetRenderer
  * @covers \App\Export\Base\RendererTrait
  * @covers \App\Export\Renderer\XlsxRenderer
- * @covers \App\Export\Renderer\AbstractSpreadsheetRenderer
  * @group integration
  */
 class XlsxRendererTest extends AbstractRendererTest
 {
-    public function testConfiguration()
+    public function testConfiguration(): void
     {
         $sut = $this->getAbstractRenderer(XlsxRenderer::class);
 
         $this->assertEquals('xlsx', $sut->getId());
         $this->assertEquals('xlsx', $sut->getTitle());
-        $this->assertEquals('xlsx', $sut->getIcon());
     }
 
-    public function testRender()
+    public function testRender(): void
     {
         $sut = $this->getAbstractRenderer(XlsxRenderer::class);
 
@@ -39,8 +37,9 @@ class XlsxRendererTest extends AbstractRendererTest
         $response = $this->render($sut);
 
         $file = $response->getFile();
+        $prefix = date('Ymd');
         $this->assertEquals('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $response->headers->get('Content-Type'));
-        $this->assertEquals('attachment; filename=kimai-export.xlsx', $response->headers->get('Content-Disposition'));
+        $this->assertEquals('attachment; filename=' . $prefix . '-Customer_Name-project_name.xlsx', $response->headers->get('Content-Disposition'));
 
         $this->assertTrue(file_exists($file->getRealPath()));
 

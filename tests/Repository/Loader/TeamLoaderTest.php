@@ -14,11 +14,10 @@ use App\Repository\Loader\TeamLoader;
 
 /**
  * @covers \App\Repository\Loader\TeamLoader
- * @covers \App\Repository\Loader\TeamIdLoader
  */
 class TeamLoaderTest extends AbstractLoaderTest
 {
-    public function testLoadResults()
+    public function testLoadResults(): void
     {
         $em = $this->getEntityManagerMock(2);
 

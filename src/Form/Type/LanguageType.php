@@ -9,45 +9,49 @@
 
 namespace App\Form\Type;
 
-use App\Utils\LanguageService;
+use App\Configuration\LocaleService;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Intl\Locales;
+use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Custom form field type to select the language.
  */
-class LanguageType extends AbstractType
+final class LanguageType extends AbstractType
 {
-    private $languageService;
-
-    public function __construct(LanguageService $languageService)
+    public function __construct(private readonly LocaleService $localeService)
     {
-        $this->languageService = $languageService;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
-        $choices = [];
-        foreach ($this->languageService->getAllLanguages() as $key) {
-            $name = ucfirst(Locales::getName($key, $key));
-            $choices[$name] = $key;
-        }
+        $resolver->setDefault('choices', function (Options $options) {
+            $choices = [];
+
+            if ($options['translated_only'] === true) {
+                $locales = $this->localeService->getTranslatedLocales();
+            } else {
+                $locales = $this->localeService->getAllLocales();
+            }
+
+            foreach ($locales as $key) {
+                $name = ucfirst(Locales::getName($key, $key));
+                $choices[$name] = $key;
+            }
+
+            return $choices;
+        });
 
         $resolver->setDefaults([
-            'choices' => $choices,
-            'label' => 'label.language',
+            'label' => 'language',
+            'translated_only' => false,
+            'choice_translation_domain' => false,
         ]);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getParent()
+    public function getParent(): string
     {
         return ChoiceType::class;
     }

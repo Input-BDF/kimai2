@@ -15,7 +15,6 @@ use App\Entity\CustomerMeta;
 use App\Entity\Team;
 use App\Export\Spreadsheet\ColumnDefinition;
 use App\Export\Spreadsheet\Extractor\AnnotationExtractor;
-use Doctrine\Common\Annotations\AnnotationReader;
 use Doctrine\Common\Collections\Collection;
 
 /**
@@ -23,14 +22,14 @@ use Doctrine\Common\Collections\Collection;
  */
 class CustomerTest extends AbstractEntityTest
 {
-    public function testDefaultValues()
+    public function testDefaultValues(): void
     {
-        $sut = new Customer();
+        $sut = new Customer('foo');
         self::assertNull($sut->getId());
-        self::assertNull($sut->getName());
         self::assertNull($sut->getNumber());
         self::assertNull($sut->getComment());
         self::assertTrue($sut->isVisible());
+        self::assertTrue($sut->isBillable());
 
         self::assertNull($sut->getCompany());
         self::assertNull($sut->getVatId());
@@ -55,22 +54,26 @@ class CustomerTest extends AbstractEntityTest
         self::assertEquals(0, $sut->getTeams()->count());
     }
 
-    public function testBudgets()
+    public function testBudgets(): void
     {
-        $this->assertBudget(new Customer());
+        $this->assertBudget(new Customer('foo'));
     }
 
-    public function testSetterAndGetter()
+    public function testSetterAndGetter(): void
     {
-        $sut = new Customer();
-        self::assertInstanceOf(Customer::class, $sut->setName('foo-bar'));
+        $sut = new Customer('foo-bar');
         self::assertEquals('foo-bar', $sut->getName());
         self::assertEquals('foo-bar', (string) $sut);
 
-        self::assertInstanceOf(Customer::class, $sut->setVisible(false));
+        $sut->setVisible(false);
         self::assertFalse($sut->isVisible());
 
-        self::assertInstanceOf(Customer::class, $sut->setComment('hello world'));
+        $sut->setVisible(false);
+        self::assertFalse($sut->isVisible());
+        $sut->setVisible(true);
+        self::assertTrue($sut->isVisible());
+
+        $sut->setComment('hello world');
         self::assertEquals('hello world', $sut->getComment());
 
         self::assertFalse($sut->hasColor());
@@ -82,47 +85,51 @@ class CustomerTest extends AbstractEntityTest
         self::assertNull($sut->getColor());
         self::assertFalse($sut->hasColor());
 
-        self::assertInstanceOf(Customer::class, $sut->setCompany('test company'));
+        $sut->setCompany('test company');
         self::assertEquals('test company', $sut->getCompany());
 
-        self::assertInstanceOf(Customer::class, $sut->setContact('test contact'));
+        $sut->setContact('test contact');
         self::assertEquals('test contact', $sut->getContact());
 
-        self::assertInstanceOf(Customer::class, $sut->setPhone('0123456789'));
+        $sut->setPhone('0123456789');
         self::assertEquals('0123456789', $sut->getPhone());
 
-        self::assertInstanceOf(Customer::class, $sut->setFax('asdfghjkl'));
+        $sut->setFax('asdfghjkl');
         self::assertEquals('asdfghjkl', $sut->getFax());
 
-        self::assertInstanceOf(Customer::class, $sut->setMobile('76576534'));
+        $sut->setMobile('76576534');
         self::assertEquals('76576534', $sut->getMobile());
 
-        self::assertInstanceOf(Customer::class, $sut->setEmail('test@example.com'));
+        $sut->setEmail('test@example.com');
         self::assertEquals('test@example.com', $sut->getEmail());
 
-        self::assertInstanceOf(Customer::class, $sut->setHomepage('https://www.example.com'));
+        $sut->setHomepage('https://www.example.com');
         self::assertEquals('https://www.example.com', $sut->getHomepage());
 
-        self::assertInstanceOf(Customer::class, $sut->setVatId('ID 1234567890'));
+        $sut->setVatId('ID 1234567890');
         self::assertEquals('ID 1234567890', $sut->getVatId());
 
-        self::assertInstanceOf(Customer::class, $sut->setCountry(null));
+        $sut->setCountry(null);
         self::assertNull($sut->getCountry());
 
-        self::assertInstanceOf(Customer::class, $sut->setCurrency(null));
+        $sut->setCurrency('USD');
+        self::assertEquals('USD', $sut->getCurrency());
+
+        $sut->setCurrency(null);
         self::assertNull($sut->getCurrency());
     }
 
-    public function testMetaFields()
+    public function testMetaFields(): void
     {
-        $sut = new Customer();
+        $sut = new Customer('foo');
         $meta = new CustomerMeta();
-        $meta->setName('foo')->setValue('bar')->setType('test');
+        $meta->setName('foo')->setValue('bar2')->setType('test');
         self::assertInstanceOf(Customer::class, $sut->setMetaField($meta));
         self::assertEquals(1, $sut->getMetaFields()->count());
         $result = $sut->getMetaField('foo');
         self::assertSame($result, $meta);
         self::assertEquals('test', $result->getType());
+        self::assertEquals('bar2', $result->getValue());
 
         $meta2 = new CustomerMeta();
         $meta2->setName('foo')->setValue('bar')->setType('test2');
@@ -140,10 +147,10 @@ class CustomerTest extends AbstractEntityTest
         self::assertCount(2, $sut->getVisibleMetaFields());
     }
 
-    public function testTeams()
+    public function testTeams(): void
     {
-        $sut = new Customer();
-        $team = new Team();
+        $sut = new Customer('foo');
+        $team = new Team('foo');
         self::assertEmpty($sut->getTeams());
         self::assertEmpty($team->getCustomers());
 
@@ -154,43 +161,47 @@ class CustomerTest extends AbstractEntityTest
         self::assertSame($sut, $team->getCustomers()[0]);
 
         // test remove unknown team doesn't do anything
-        $sut->removeTeam(new Team());
+        $sut->removeTeam(new Team('foo'));
         self::assertCount(1, $sut->getTeams());
         self::assertCount(1, $team->getCustomers());
 
-        $sut->removeTeam(new Team());
+        $sut->removeTeam(new Team('foo'));
         $sut->removeTeam($team);
         self::assertCount(0, $sut->getTeams());
         self::assertCount(0, $team->getCustomers());
     }
 
-    public function testExportAnnotations()
+    public function testExportAnnotations(): void
     {
-        $sut = new AnnotationExtractor(new AnnotationReader());
+        $sut = new AnnotationExtractor();
 
         $columns = $sut->extract(Customer::class);
 
         self::assertIsArray($columns);
 
         $expected = [
-            ['label.id', 'integer'],
-            ['label.name', 'string'],
-            ['label.company', 'string'],
-            ['label.number', 'string'],
-            ['label.vat_id', 'string'],
-            ['label.address', 'string'],
-            ['label.contact', 'string'],
-            ['label.email', 'string'],
-            ['label.phone', 'string'],
-            ['label.mobile', 'string'],
-            ['label.fax', 'string'],
-            ['label.homepage', 'string'],
-            ['label.country', 'string'],
-            ['label.currency', 'string'],
-            ['label.timezone', 'string'],
-            ['label.color', 'string'],
-            ['label.visible', 'boolean'],
-            ['label.comment', 'string'],
+            ['id', 'integer'],
+            ['name', 'string'],
+            ['company', 'string'],
+            ['number', 'string'],
+            ['vat_id', 'string'],
+            ['address', 'string'],
+            ['contact', 'string'],
+            ['email', 'string'],
+            ['phone', 'string'],
+            ['mobile', 'string'],
+            ['fax', 'string'],
+            ['homepage', 'string'],
+            ['country', 'string'],
+            ['currency', 'string'],
+            ['timezone', 'string'],
+            ['budget', 'float'],
+            ['timeBudget', 'duration'],
+            ['budgetType', 'string'],
+            ['color', 'string'],
+            ['visible', 'boolean'],
+            ['comment', 'string'],
+            ['billable', 'boolean'],
         ];
 
         self::assertCount(\count($expected), $columns);
@@ -208,15 +219,14 @@ class CustomerTest extends AbstractEntityTest
         }
     }
 
-    public function testClone()
+    public function testClone(): void
     {
-        $sut = new Customer();
-        $sut->setName('mycustomer');
+        $sut = new Customer('mycustomer');
         $sut->setVatId('DE-0123456789');
         $sut->setTimeBudget(123456);
         $sut->setBudget(1234.56);
 
-        $team = new Team();
+        $team = new Team('foo');
         $sut->addTeam($team);
 
         $meta = new CustomerMeta();

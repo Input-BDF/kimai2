@@ -17,10 +17,11 @@ use App\Entity\Tag;
 use App\Entity\Timesheet;
 use App\Entity\User;
 use App\Invoice\Calculator\ShortInvoiceCalculator;
+use App\Invoice\CalculatorInterface;
 use App\Invoice\InvoiceItem;
-use App\Invoice\InvoiceModel;
 use App\Repository\Query\InvoiceQuery;
 use App\Tests\Invoice\DebugFormatter;
+use App\Tests\Mocks\InvoiceModelFactoryFactory;
 
 /**
  * @covers \App\Invoice\Calculator\ShortInvoiceCalculator
@@ -29,14 +30,14 @@ use App\Tests\Invoice\DebugFormatter;
  */
 class ShortInvoiceCalculatorTest extends AbstractCalculatorTest
 {
-    public function testEmptyModel()
+    protected function getCalculator(): CalculatorInterface
     {
-        $this->assertEmptyModel(new ShortInvoiceCalculator());
+        return new ShortInvoiceCalculator();
     }
 
-    public function testWithMultipleEntries()
+    public function testWithMultipleEntries(): void
     {
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $template = new InvoiceTemplate();
         $template->setVat(19);
 
@@ -55,7 +56,7 @@ class ShortInvoiceCalculatorTest extends AbstractCalculatorTest
             ->setUser(new User())
             ->setActivity($activity)
             ->setProject($project)
-            ->setBegin(new \DateTime())
+            ->setBegin(new \DateTime('2018-11-29'))
             ->setEnd(new \DateTime())
             ->addTag((new Tag())->setName('foo'))
             ->addTag((new Tag())->setName('bar'))
@@ -69,7 +70,7 @@ class ShortInvoiceCalculatorTest extends AbstractCalculatorTest
             ->setUser(new User())
             ->setActivity($activity)
             ->setProject($project)
-            ->setBegin(new \DateTime())
+            ->setBegin(new \DateTime('2018-11-28'))
             ->setEnd(new \DateTime())
             ->addTag((new Tag())->setName('bar1'))
         ;
@@ -82,22 +83,19 @@ class ShortInvoiceCalculatorTest extends AbstractCalculatorTest
             ->setUser(new User())
             ->setActivity($activity)
             ->setProject($project)
-            ->setBegin(new \DateTime())
+            ->setBegin(new \DateTime('2018-11-29'))
             ->setEnd(new \DateTime())
         ;
 
         $entries = [$timesheet, $timesheet2, $timesheet3];
 
         $query = new InvoiceQuery();
-        $query->setActivity($activity);
+        $query->addActivity($activity);
 
-        $model = new InvoiceModel(new DebugFormatter());
-        $model->setCustomer($customer);
-        $model->setTemplate($template);
+        $model = (new InvoiceModelFactoryFactory($this))->create()->createModel(new DebugFormatter(), $customer, $template, $query);
         $model->addEntries($entries);
-        $model->setQuery($query);
 
-        $sut = new ShortInvoiceCalculator();
+        $sut = $this->getCalculator();
         $sut->setModel($model);
 
         $this->assertEquals('short', $sut->getId());
@@ -108,9 +106,12 @@ class ShortInvoiceCalculatorTest extends AbstractCalculatorTest
         $this->assertEquals(5800, $sut->getTimeWorked());
         $this->assertEquals(1, \count($sut->getEntries()));
 
-        /** @var InvoiceItem $result */
-        $result = $sut->getEntries()[0];
-        $this->assertEquals('activity description', $result->getDescription());
+        $entries = $sut->getEntries();
+        self::assertCount(1, $entries);
+        $result = $entries[0];
+
+        $this->assertEquals('2018-11-28', $result->getBegin()?->format('Y-m-d'));
+        $this->assertEquals('', $result->getDescription());
         $this->assertEquals(293.27, $result->getHourlyRate());
         $this->assertNull($result->getFixedRate());
         $this->assertEquals(472.5, $result->getRate());
@@ -119,9 +120,9 @@ class ShortInvoiceCalculatorTest extends AbstractCalculatorTest
         $this->assertEquals(['foo', 'bar', 'bar1'], $result->getTags());
     }
 
-    public function testWithMultipleEntriesDifferentRates()
+    public function testWithMultipleEntriesDifferentRates(): void
     {
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $template = new InvoiceTemplate();
         $template->setVat(19);
 
@@ -171,15 +172,12 @@ class ShortInvoiceCalculatorTest extends AbstractCalculatorTest
         $entries = [$timesheet, $timesheet2, $timesheet3];
 
         $query = new InvoiceQuery();
-        $query->setActivity($activity);
+        $query->addActivity($activity);
 
-        $model = new InvoiceModel(new DebugFormatter());
-        $model->setCustomer($customer);
-        $model->setTemplate($template);
+        $model = (new InvoiceModelFactoryFactory($this))->create()->createModel(new DebugFormatter(), $customer, $template, $query);
         $model->addEntries($entries);
-        $model->setQuery($query);
 
-        $sut = new ShortInvoiceCalculator();
+        $sut = $this->getCalculator();
         $sut->setModel($model);
 
         $this->assertEquals('short', $sut->getId());
@@ -192,7 +190,7 @@ class ShortInvoiceCalculatorTest extends AbstractCalculatorTest
 
         /** @var InvoiceItem $result */
         $result = $sut->getEntries()[0];
-        $this->assertEquals('activity description', $result->getDescription());
+        $this->assertNull($result->getDescription());
         $this->assertEquals(488.38, $result->getHourlyRate());
         $this->assertEquals(488.38, $result->getFixedRate());
         $this->assertEquals(488.38, $result->getRate());
@@ -200,9 +198,9 @@ class ShortInvoiceCalculatorTest extends AbstractCalculatorTest
         $this->assertEquals(1, $result->getAmount());
     }
 
-    public function testWithMixedRateTypes()
+    public function testWithMixedRateTypes(): void
     {
-        $customer = new Customer();
+        $customer = new Customer('foo');
         $template = new InvoiceTemplate();
         $template->setVat(19);
 
@@ -250,15 +248,12 @@ class ShortInvoiceCalculatorTest extends AbstractCalculatorTest
         $entries = [$timesheet, $timesheet2, $timesheet3];
 
         $query = new InvoiceQuery();
-        $query->setActivity($activity);
+        $query->addActivity($activity);
 
-        $model = new InvoiceModel(new DebugFormatter());
-        $model->setCustomer($customer);
-        $model->setTemplate($template);
+        $model = (new InvoiceModelFactoryFactory($this))->create()->createModel(new DebugFormatter(), $customer, $template, $query);
         $model->addEntries($entries);
-        $model->setQuery($query);
 
-        $sut = new ShortInvoiceCalculator();
+        $sut = $this->getCalculator();
         $sut->setModel($model);
 
         $this->assertEquals('short', $sut->getId());
@@ -266,12 +261,12 @@ class ShortInvoiceCalculatorTest extends AbstractCalculatorTest
         $this->assertEquals(19, $sut->getVat());
         $this->assertEquals('EUR', $model->getCurrency());
         $this->assertEquals(488.38, $sut->getSubtotal());
-        $this->assertEquals(5400, $sut->getTimeWorked());
+        $this->assertEquals(5800, $sut->getTimeWorked());
         $this->assertEquals(1, \count($sut->getEntries()));
 
         /** @var InvoiceItem $result */
         $result = $sut->getEntries()[0];
-        $this->assertEquals('activity description', $result->getDescription());
+        $this->assertNull($result->getDescription());
         $this->assertEquals(488.38, $result->getHourlyRate());
         $this->assertEquals(488.38, $result->getRate());
         $this->assertEquals(5800, $result->getDuration());
@@ -279,8 +274,8 @@ class ShortInvoiceCalculatorTest extends AbstractCalculatorTest
         $this->assertEquals(1, $result->getAmount());
     }
 
-    public function testDescriptionByTimesheet()
+    public function testDescriptionByTimesheet(): void
     {
-        $this->assertDescription(new ShortInvoiceCalculator(), false, false);
+        $this->assertDescription($this->getCalculator(), false, false);
     }
 }

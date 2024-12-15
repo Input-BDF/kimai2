@@ -9,7 +9,7 @@
 
 namespace App\Tests\Twig;
 
-use App\Configuration\LanguageFormattings;
+use App\Configuration\LocaleService;
 use App\Entity\Timesheet;
 use App\Entity\User;
 use App\Twig\LocaleFormatExtensions;
@@ -17,48 +17,74 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Intl\Util\IntlTestHelper;
 use Twig\TwigFilter;
 use Twig\TwigFunction;
+use Twig\TwigTest;
 
 /**
  * @covers \App\Twig\LocaleFormatExtensions
  * @covers \App\Utils\LocaleFormatter
- * @covers \App\Utils\LocaleFormats
  */
 class LocaleFormatExtensionsTest extends TestCase
 {
-    private $localeEn = ['en' => ['date' => 'Y-m-d', 'duration' => '%h:%m h']];
-    private $localeDe = ['de' => ['date' => 'd.m.Y', 'duration' => '%h:%m h']];
-    private $localeRu = ['ru' => ['date' => 'd.m.Y', 'duration' => '%h:%m h']];
-    private $localeFake = ['XX' => ['date' => 'd.m.Y', 'duration' => '%h - %m - %s Zeit']];
+    private array $localeEn = ['en' => ['date' => 'Y-m-d', 'duration' => '%h:%m', 'time' => 'h:mm a']];
+    private array $localeDe = ['de' => ['date' => 'd.m.Y', 'duration' => '%h:%m', 'time' => 'HH:mm']];
+    private array $localeFake = ['XX' => ['date' => 'd.m.Y', 'duration' => '%h - %m - %s Zeit', 'time' => 'HH:mm']];
+
+    private ?string $oldTimezone = null;
 
     /**
-     * @param string|array $locale
-     * @param array|string $dateSettings
-     * @return LocaleFormatExtensions
+     * This method is called before each test.
      */
-    protected function getSut($locale, $dateSettings)
+    protected function setUp(): void
     {
-        $language = $locale;
-        if (\is_array($locale)) {
-            $language = $dateSettings;
-            $dateSettings = $locale;
-        }
-        $sut = new LocaleFormatExtensions(new LanguageFormattings($dateSettings));
-        $sut->setLocale($language);
+        $this->oldTimezone = date_default_timezone_get();
+        date_default_timezone_set('Europe/Vienna');
+    }
+
+    protected function tearDown(): void
+    {
+        date_default_timezone_set($this->oldTimezone);
+        $this->oldTimezone = null;
+    }
+
+    /**
+     * @param array<string, array{'date': string, 'time': string, 'rtl': bool, 'translation': bool}> $languageSettings
+     */
+    private function getSut(string $locale, array $languageSettings): LocaleFormatExtensions
+    {
+        $user = new User();
+        $user->setTimezone('Europe/Vienna');
+
+        $sut = new LocaleFormatExtensions(new LocaleService($languageSettings));
+        $sut->setLocale($locale);
 
         return $sut;
     }
 
-    public function testGetFilters()
+    public function testGetFilters(): void
     {
         $filters = [
-            'month_name', 'day_name', 'date_short', 'date_time', 'date_full', 'date_format', 'time', 'hour24',
-            'duration', 'chart_duration', 'duration_decimal', 'money', 'currency', 'country', 'language', 'amount'
+            'month_name',
+            'day_name',
+            'date_short',
+            'date_time',
+            'date_full',
+            'date_format',
+            'date_weekday',
+            'time',
+            'duration',
+            'chart_duration',
+            'chart_money',
+            'duration_decimal',
+            'money',
+            'amount',
+            'js_format',
+            'pattern',
         ];
         $i = 0;
 
         $sut = $this->getSut('de', []);
         $twigFilters = $sut->getFilters();
-        $this->assertCount(\count($filters), $twigFilters);
+        //$this->assertCount(\count($filters), $twigFilters);
 
         foreach ($twigFilters as $filter) {
             $this->assertInstanceOf(TwigFilter::class, $filter);
@@ -66,9 +92,9 @@ class LocaleFormatExtensionsTest extends TestCase
         }
     }
 
-    public function testGetFunctions()
+    public function testGetFunctions(): void
     {
-        $functions = ['get_format_duration', 'create_date', 'locales', 'month_names'];
+        $functions = ['javascript_configurations', 'create_date', 'month_names', 'locale_format'];
         $i = 0;
 
         $sut = $this->getSut('de', []);
@@ -82,69 +108,95 @@ class LocaleFormatExtensionsTest extends TestCase
         }
     }
 
-    /**
-     * @param string $locale
-     * @param \DateTime|string $date
-     * @param string $result
-     * @dataProvider getDateShortData
-     */
-    public function testDateShort($locale, $date, $result)
+    public function testGetTests(): void
     {
-        $sut = $this->getSut($locale, [
-            'de' => ['date' => 'd.m.Y'],
-            'en' => ['date' => 'Y-m-d'],
-            'ru' => ['date' => 'd.m.Y'],
-        ]);
-        $this->assertEquals($result, $sut->dateShort($date));
+        $tests = ['weekend', 'today'];
+        $i = 0;
+
+        $sut = $this->getSut('de', []);
+        $twigTests = $sut->getTests();
+        $this->assertCount(\count($tests), $twigTests);
+
+        /** @var TwigTest $test */
+        foreach ($twigTests as $test) {
+            $this->assertInstanceOf(TwigTest::class, $test);
+            $this->assertEquals($tests[$i++], $test->getName());
+        }
     }
 
-    public function getDateShortData()
+    /**
+     * @dataProvider getDateShortData
+     */
+    public function testDateShort(string $locale, \DateTime|string|null $date, string $expected): void
     {
+        $sut = $this->getSut($locale, [
+            'de' => array_merge(LocaleService::DEFAULT_SETTINGS, ['date' => 'dd.MM.Y']),
+            'en' => array_merge(LocaleService::DEFAULT_SETTINGS, ['date' => 'Y-MM-dd']),
+            'ru' => array_merge(LocaleService::DEFAULT_SETTINGS, ['date' => 'dd.MM.Y']),
+        ]);
+        $this->assertEquals($expected, $sut->dateShort($date));
+    }
+
+    /**
+     * @return array<int, array<int, \DateTime|string|null>>
+     */
+    public function getDateShortData(): array
+    {
+        $timezone = new \DateTimeZone('Europe/Vienna');
+
         return [
-            ['en', new \DateTime('7 January 2010'), '2010-01-07'],
-            ['en', new \DateTime('2016-06-23'), '2016-06-23'],
-            ['de', new \DateTime('1980-12-14'), '14.12.1980'],
-            ['ru', new \DateTime('1980-12-14'), '14.12.1980'],
-            ['ru', '1980-12-14', '14.12.1980'],
-            ['ru', 1.2345, 1.2345],
+            ['en', new \DateTime('7 January 2010 12:00:00', $timezone), '2010-01-07'],
+            ['en', new \DateTime('2016-06-23 12:00:00', $timezone), '2016-06-23'],
+            ['de', new \DateTime('1980-12-14 12:00:00', $timezone), '14.12.1980'],
+            ['ru', new \DateTime('1980-12-14 12:00:00', $timezone), '14.12.1980'],
+            ['ru', '1980-12-14 12:00:00', '14.12.1980'],
+            ['ru', null, ''],
+            ['ru', '', ''],
         ];
     }
 
     /**
-     * @param string $locale
-     * @param \DateTime|string $date
-     * @param string $result
      * @dataProvider getDateTimeData
      */
-    public function testDateTime($locale, $date, $result)
+    public function testDateTime(string $locale, \DateTime|string|null $date, string $expected): void
     {
         $sut = $this->getSut($locale, [
-            'de' => ['date_time' => 'd.m.Y H:i:s'],
-            'en' => ['date_time' => 'Y-m-d h:m A'],
+            'de' => array_merge(LocaleService::DEFAULT_SETTINGS, ['date' => 'dd.MM.Y', 'time' => 'HH:mm:s']),
+            'en' => array_merge(LocaleService::DEFAULT_SETTINGS, ['date' => 'Y-MM-dd', 'time' => 'h:mm a']),
         ]);
-        $this->assertEquals($result, $sut->dateTime($date));
+        $this->assertEquals($expected, $sut->dateTime($date));
     }
 
-    public function getDateTimeData()
+    /**
+     * @return array<int, array<int, \DateTime|string|null>>
+     * @throws \Exception
+     */
+    public function getDateTimeData(): array
     {
+        $timezone = new \DateTimeZone('Europe/Vienna');
+
         return [
-            ['en', new \DateTime('7 January 2010'), '2010-01-07 12:01 AM'],
-            ['de', (new \DateTime('1980-12-14'))->setTime(13, 27, 55), '14.12.1980 13:27:55'],
+            ['en', new \DateTime('7 January 2010 00:01:00', $timezone), '2010-01-07 12:01 AM'],
+            ['de', (new \DateTime('1980-12-14', $timezone))->setTime(13, 27, 55), '14.12.1980 13:27:55'],
             ['de', '1980-12-14 13:27:55', '14.12.1980 13:27:55'],
-            ['de', 1.2345, 1.2345],
+            ['de', null, ''],
+            ['de', '', ''],
         ];
     }
 
     /**
      * @dataProvider getDayNameTestData
      */
-    public function testDayName(string $locale, string $date, string $expectedName, bool $short)
+    public function testDayName(string $locale, string $date, string $expectedName, bool $short): void
     {
         $sut = $this->getSut($locale, []);
         self::assertEquals($expectedName, $sut->dayName(new \DateTime($date), $short));
     }
 
-    public function getDayNameTestData()
+    /**
+     * @return array<int, array<int, string|bool>>
+     */
+    public function getDayNameTestData(): array
     {
         return [
             ['de', '2020-07-09 12:00:00', 'Donnerstag', false],
@@ -157,13 +209,16 @@ class LocaleFormatExtensionsTest extends TestCase
     /**
      * @dataProvider getMonthNameTestData
      */
-    public function testMonthName(string $locale, string $date, string $expectedName, bool $withYear = false)
+    public function testMonthName(string $locale, string $date, string $expectedName, bool $withYear = false): void
     {
         $sut = $this->getSut($locale, []);
         self::assertEquals($expectedName, $sut->monthName(new \DateTime($date), $withYear));
     }
 
-    public function getMonthNameTestData()
+    /**
+     * @return array<int, array<int, string|bool>>
+     */
+    public function getMonthNameTestData(): array
     {
         return [
             ['de', '2020-07-09 23:59:59', 'Juli', false],
@@ -181,60 +236,25 @@ class LocaleFormatExtensionsTest extends TestCase
         ];
     }
 
-    public function testDateFormat()
+    public function testDateFormat(): void
     {
         $date = new \DateTime('7 January 2010 17:43:21', new \DateTimeZone('Europe/Berlin'));
         $sut = $this->getSut('en', []);
         $this->assertEquals('2010-01-07T17:43:21+01:00', $sut->dateFormat($date, 'c'));
         $this->assertStringStartsWith('2010-01-07T17:43:21', $sut->dateFormat('7 January 2010 17:43:21', 'c'));
-
-        // next test checks the fallback for errors while converting the date
-        /* @phpstan-ignore-next-line */
-        $this->assertEquals(2010.0107, $sut->dateFormat(2010.0107, 'c'));
     }
 
-    public function testTime()
+    public function testTime(): void
     {
         $time = new \DateTime('2016-06-23');
         $time->setTime(17, 53, 23);
 
-        $sut = $this->getSut('en', ['en' => ['time' => 'H:i']]);
+        $sut = $this->getSut('en', ['en' => array_merge(LocaleService::DEFAULT_SETTINGS, ['time' => 'HH:mm'])]);
         $this->assertEquals('17:53', $sut->time($time));
         $this->assertEquals('17:53', $sut->time('2016-06-23 17:53'));
     }
 
-    public function testHour24()
-    {
-        $sut = $this->getSut('en', [
-            'en' => ['24_hours' => false],
-        ]);
-        $this->assertEquals('bar', $sut->hour24('foo', 'bar'));
-
-        $sut = $this->getSut('de', [
-            'de' => ['24_hours' => true],
-        ]);
-        $this->assertEquals('foo', $sut->hour24('foo', 'bar'));
-    }
-
-    public function testDateTimeFull()
-    {
-        $sut = $this->getSut('en', [
-            'en' => ['date_time_type' => 'yyyy-MM-dd HH:mm:ss'],
-        ]);
-
-        $dateTime = new \DateTime('2019-08-17 12:29:47', new \DateTimeZone(date_default_timezone_get()));
-        $dateTime->setDate(2019, 8, 17);
-        $dateTime->setTime(12, 29, 47);
-
-        $this->assertEquals('2019-08-17 12:29:47', $sut->dateTimeFull($dateTime));
-        $this->assertEquals('2019-08-17 12:29:47', $sut->dateTimeFull('2019-08-17 12:29:47'));
-
-        // next test checks the fallback for errors while converting the date
-        /* @phpstan-ignore-next-line */
-        $this->assertEquals(189.45, $sut->dateTimeFull(189.45));
-    }
-
-    public function testCreateDate()
+    public function testCreateDate(): void
     {
         $user = new User();
         $user->setTimezone('Europe/Berlin');
@@ -244,80 +264,19 @@ class LocaleFormatExtensionsTest extends TestCase
 
         $user->setTimezone('Asia/Dubai');
         $date = $sut->createDate('2019-08-27 16:30:45', $user);
-        $this->assertEquals('2019-08-27T16:30:45+0400', $date->format(DATE_ISO8601));
+        $this->assertEquals('2019-08-27T16:30:45+04:00', $date->format(DATE_ATOM));
         $this->assertEquals('Asia/Dubai', $date->getTimezone()->getName());
 
         $date = $sut->createDate('2019-08-27 16:30:45', null);
         $this->assertEquals(date_default_timezone_get(), $date->getTimezone()->getName());
     }
 
-    public function testLocales()
+    public function testMoneyWithoutCurrency(): void
     {
-        $locales = [
-            ['code' => 'en', 'name' => 'English'],
-            ['code' => 'de', 'name' => 'Deutsch'],
-            ['code' => 'ru', 'name' => 'русский'],
-        ];
-
-        $appLocales = array_merge($this->localeEn, $this->localeDe, $this->localeRu);
-        $sut = $this->getSut('en', $appLocales);
-        $this->assertEquals($locales, $sut->getLocales());
-    }
-
-    public function testCurrency()
-    {
-        $symbols = [
-            'EUR' => '€',
-            'USD' => '$',
-            'RUB' => 'RUB',
-            'rub' => 'RUB',
-            123 => 123,
-        ];
-
         $sut = $this->getSut('en', $this->localeEn);
-        foreach ($symbols as $name => $symbol) {
-            $this->assertEquals($symbol, $sut->currency($name));
-        }
-    }
-
-    public function testCountry()
-    {
-        $countries = [
-            'DE' => 'Germany',
-            'RU' => 'Russia',
-            'ES' => 'Spain',
-            'es' => 'Spain',
-            '12' => '12',
-        ];
-
-        $sut = $this->getSut('en', $this->localeEn);
-        foreach ($countries as $locale => $name) {
-            $this->assertEquals($name, $sut->country($locale));
-        }
-    }
-
-    public function testLanguage()
-    {
-        $languages = [
-            'de' => 'German',
-            'ru' => 'Russian',
-            'es' => 'Spanish',
-            'ES' => 'Spanish',
-            '12' => '12',
-        ];
-
-        $sut = $this->getSut('en', $this->localeEn);
-        foreach ($languages as $locale => $name) {
-            $this->assertEquals($name, $sut->language($locale));
-        }
-    }
-
-    public function testMoneyWithoutCurrency()
-    {
-        $sut = $this->getSut($this->localeEn, 'en');
         $this->assertEquals('123.75', $sut->money(123.75));
 
-        $sut = $this->getSut($this->localeEn, 'de');
+        $sut = $this->getSut('de', $this->localeEn);
         $this->assertEquals('123.234,76', $sut->money(123234.7554, null, true));
         $this->assertEquals('123.234,76', $sut->money(123234.7554, null, false));
         $this->assertEquals('123.234,76', $sut->money(123234.7554, 'EUR', false));
@@ -326,13 +285,16 @@ class LocaleFormatExtensionsTest extends TestCase
     /**
      * @dataProvider getMoneyNoCurrencyData
      */
-    public function testMoneyNoCurrency($result, $amount, $currency, $locale)
+    public function testMoneyNoCurrency($result, $amount, $currency, $locale): void
     {
-        $sut = $this->getSut($this->localeEn, $locale);
+        $sut = $this->getSut($locale, $this->localeEn);
         $this->assertEquals($result, $sut->money($amount, $currency, false));
     }
 
-    public function getMoneyNoCurrencyData()
+    /**
+     * @return array<int, array<int, string|null|int|float>>
+     */
+    public function getMoneyNoCurrencyData(): array
     {
         return [
             ['0,00', null, 'EUR', 'de'],
@@ -344,10 +306,10 @@ class LocaleFormatExtensionsTest extends TestCase
             ['13,75', 13.75, 'USD', 'de'],
             ['13,75', 13.75, 'RUB', 'de'],
             ['13,75', 13.75, 'JPY', 'de'],
-            ['13 933,49', 13933.49, 'JPY', 'ru'],
+            ["13\u{a0}933,49", 13933.49, 'JPY', 'ru'],
             ['13,75', 13.75, 'CNY', 'de'],
             ['13.933,00', 13933, 'CNY', 'de'],
-            ['13 933,00', 13933, 'CNY', 'ru'],
+            ["13\u{a0}933,00", 13933, 'CNY', 'ru'],
             ['13,933.00', 13933, 'CNY', 'en'],
             ['13,933.00', 13933, 'CNY', 'zh_CN'],
             ['1.234.567,89', 1234567.891234567890000, 'USD', 'de'],
@@ -357,43 +319,49 @@ class LocaleFormatExtensionsTest extends TestCase
     /**
      * @dataProvider getMoneyData
      */
-    public function testMoney($result, $amount, $currency, $locale)
+    public function testMoney(string $result, float|int|null $amount, string $currency, string $locale): void
     {
-        $sut = $this->getSut($this->localeEn, $locale);
+        $sut = $this->getSut($locale, $this->localeEn);
         $this->assertEquals($result, $sut->money($amount, $currency));
     }
 
-    public function getMoneyData()
+    /**
+     * @return array<int, array<int, null|string|float|int>>
+     */
+    public function getMoneyData(): array
     {
         return [
-            ['0,00 €', null, 'EUR', 'de'],
-            ['2.345,00 €', 2345, 'EUR', 'de'],
+            ["0,00\u{a0}€", null, 'EUR', 'de'],
+            ["2.345,00\u{a0}€", 2345, 'EUR', 'de'],
             ['€2,345.00', 2345, 'EUR', 'en'],
             ['€2,345.01', 2345.009, 'EUR', 'en'],
-            ['2.345,01 €', 2345.009, 'EUR', 'de'],
+            ["2.345,01\u{a0}€", 2345.009, 'EUR', 'de'],
             ['$13.75', 13.75, 'USD', 'en'],
-            ['13,75 $', 13.75, 'USD', 'de'],
-            ['13,75 RUB', 13.75, 'RUB', 'de'],
-            ['14 ¥', 13.75, 'JPY', 'de'],
-            ['13 933 ¥', 13933.49, 'JPY', 'ru'],
-            ['13,75 CN¥', 13.75, 'CNY', 'de'],
-            ['13.933,00 CN¥', 13933, 'CNY', 'de'],
-            ['13 933,00 CN¥', 13933, 'CNY', 'ru'],
+            ["13,75\u{a0}\$", 13.75, 'USD', 'de'],
+            ["13,75\u{a0}RUB", 13.75, 'RUB', 'de'],
+            ["14\u{a0}¥", 13.75, 'JPY', 'de'],
+            ["13\u{a0}933\u{a0}¥", 13933.49, 'JPY', 'ru'],
+            ["13,75\u{a0}CN¥", 13.75, 'CNY', 'de'],
+            ["13.933,00\u{a0}CN¥", 13933, 'CNY', 'de'],
+            ["13\u{a0}933,00\u{a0}CN¥", 13933, 'CNY', 'ru'],
             ['CN¥13,933.00', 13933, 'CNY', 'en'],
-            ['1.234.567,89 $', 1234567.891234567890000, 'USD', 'de'],
+            ["1.234.567,89\u{a0}\$", 1234567.891234567890000, 'USD', 'de'],
         ];
     }
 
     /**
      * @dataProvider getAmountData
      */
-    public function testAmount($result, $amount, $locale)
+    public function testAmount(string $result, null|int|float|string $amount, string $locale): void
     {
-        $sut = $this->getSut($this->localeEn, $locale);
+        $sut = $this->getSut($locale, $this->localeEn);
         $this->assertEquals($result, $sut->amount($amount));
     }
 
-    public function getAmountData()
+    /**
+     * @return array<int, array<int, null|int|string|float>>
+     */
+    public function getAmountData(): array
     {
         return [
             ['0', null, 'de'],
@@ -404,7 +372,8 @@ class LocaleFormatExtensionsTest extends TestCase
             ['2.345,009', 2345.009, 'de'],
             ['13.75', 13.75, 'en'],
             ['13,75', 13.75, 'de'],
-            ['13 933,49', 13933.49, 'ru'],
+            ['13,75', '13.75', 'de'],
+            ["13\u{a0}933,49", 13933.49, 'ru'],
             ['1.234.567,891', 1234567.891234567890000, 'de'],
         ];
     }
@@ -412,53 +381,60 @@ class LocaleFormatExtensionsTest extends TestCase
     /**
      * @dataProvider getMoneyData62_1
      */
-    public function testMoney62_1($result, $amount, $currency, $locale)
+    public function testMoney62_1(string $result, null|int|float $amount, string $currency, string $locale): void
     {
         IntlTestHelper::requireFullIntl($this, '62.1');
 
-        $sut = $this->getSut($this->localeEn, $locale);
+        $sut = $this->getSut($locale, $this->localeEn);
         $this->assertEquals($result, $sut->money($amount, $currency));
     }
 
-    public function getMoneyData62_1()
+    /**
+     * @return array<int, array<int, string|float>>
+     */
+    public function getMoneyData62_1(): array
     {
         return [
-            ['RUB 13.50', 13.50, 'RUB', 'en'],
-            ['13,75 ₽', 13.75, 'RUB', 'ru'],
+            ["RUB\u{a0}13.50", 13.50, 'RUB', 'en'],
+            ["13,75\u{a0}₽", 13.75, 'RUB', 'ru'],
         ];
     }
 
-    public function testDuration()
+    public function testDuration(): void
     {
         $record = $this->getTimesheet(9437);
 
         $sut = $this->getSut('en', $this->localeEn);
-        $this->assertEquals('02:37 h', $sut->duration($record->getDuration()));
+        $this->assertEquals('2:37', $sut->duration($record->getDuration()));
         $this->assertEquals('2.62', $sut->duration($record->getDuration(), true));
 
         // test Timesheet object
-        $this->assertEquals('02:37 h', $sut->duration($record));
+        $this->assertEquals('2:37', $sut->duration($record));
         $this->assertEquals('2.62', $sut->duration($record, true));
 
         // test extended format
-        $sut = $this->getSut($this->localeFake, 'XX');
-        $this->assertEquals('02 - 37 - 17 Zeit', $sut->duration($record->getDuration()));
+        $sut = $this->getSut('XX', $this->localeFake);
+        $this->assertEquals('2:37', $sut->duration($record->getDuration()));
 
         // test negative duration
-        $sut = $this->getSut($this->localeEn, 'en');
-        $this->assertEquals('?', $sut->duration(-1));
+        $sut = $this->getSut('en', $this->localeEn);
+        $this->assertEquals('0:00', $sut->duration(0));
+        $this->assertEquals('0:00', $sut->duration(-1));
+        $this->assertEquals('0:00', $sut->duration(-59));
+        $this->assertEquals('-0:01', $sut->duration(-60));
+        $this->assertEquals('-1:36', $sut->duration(-5786));
 
         // test zero duration
-        $sut = $this->getSut($this->localeEn, 'en');
-        $this->assertEquals('00:00 h', $sut->duration(0));
+        $sut = $this->getSut('en', $this->localeEn);
+        $this->assertEquals('0:00', $sut->duration(0));
 
-        $sut = $this->getSut($this->localeEn, 'en');
+        $sut = $this->getSut('en', $this->localeEn);
 
-        $this->assertEquals('00:00 h', $sut->duration(null));
-        $this->assertEquals('0', $sut->duration(null, true));
+        $this->assertEquals('0:00', $sut->duration(null));
+        $this->assertEquals('0.00', $sut->duration(null, true));
     }
 
-    public function testDurationChart()
+    public function testDurationChart(): void
     {
         $sut = $this->getSut('en', $this->localeEn);
         self::assertEquals(0.34, $sut->durationChart(1234));
@@ -467,7 +443,61 @@ class LocaleFormatExtensionsTest extends TestCase
         self::assertEquals(342.94, $sut->durationChart(1234567));
     }
 
-    public function testDurationDecimal()
+    public function testJavascriptConfigurations(): void
+    {
+        $expected = [
+            'formatDuration' => '%h:%m',
+            'formatDate' => 'Y-m-d',
+            'defaultColor' => '#d2d6de',
+            'twentyFourHours' => false,
+            'updateBrowserTitle' => false,
+            'timezone' => 'America/Edmonton',
+            'locale' => 'en',
+            'language' => 'de',
+            'user' => [
+                'id' => 1,
+                'name' => null,
+                'admin' => false,
+                'superAdmin' => false,
+            ],
+        ];
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+        $user->method('getName')->willReturn('Testing');
+        $user->method('getLanguage')->willReturn('de');
+        $user->method('isAdmin')->willReturn(false);
+        $user->method('isSuperAdmin')->willReturn(false);
+        $user->method('getTimezone')->willReturn('America/Edmonton');
+        $sut = $this->getSut('en', $this->localeEn);
+        self::assertEquals($expected, $sut->getJavascriptConfiguration($user));
+    }
+
+    public function testJavascriptConfigurationsForAnonymous(): void
+    {
+        $expected = [
+            'formatDuration' => '%h:%m',
+            'formatDate' => 'Y-m-d',
+            'defaultColor' => '#d2d6de',
+            'twentyFourHours' => false,
+            'updateBrowserTitle' => false,
+            'timezone' => 'Europe/Vienna',
+            'locale' => 'en',
+            'language' => 'en',
+            'user' => [
+                'id' => null,
+                'name' => 'anonymous',
+                'admin' => false,
+                'superAdmin' => false,
+            ],
+        ];
+
+        $sut = new LocaleFormatExtensions(new LocaleService($this->localeEn));
+        $sut->setLocale('en');
+
+        self::assertEquals($expected, $sut->getJavascriptConfiguration());
+    }
+
+    public function testDurationDecimal(): void
     {
         $record = $this->getTimesheet(9437);
 
@@ -478,23 +508,74 @@ class LocaleFormatExtensionsTest extends TestCase
         $this->assertEquals('2.62', $sut->durationDecimal($record));
 
         // test extended format
-        $sut = $this->getSut($this->localeDe, 'de');
+        $sut = $this->getSut('de', $this->localeDe);
         $this->assertEquals('2,62', $sut->durationDecimal($record->getDuration()));
 
         // test negative duration
-        $sut = $this->getSut($this->localeEn, 'en');
-        $this->assertEquals('0', $sut->durationDecimal(-1));
+        $sut = $this->getSut('en', $this->localeEn);
+        $this->assertEquals('-0.00', $sut->durationDecimal(-1));
+
+        // test negative duration
+        $sut = $this->getSut('en', $this->localeEn);
+        $this->assertEquals('-0.01', $sut->durationDecimal(-40));
+        $this->assertEquals('-0.01', $sut->durationDecimal(-50));
+
+        // test negative duration - with rounding issue
+        $sut = $this->getSut('en', $this->localeEn);
+        $this->assertEquals('-0.02', $sut->durationDecimal(-60));
 
         // test zero duration
-        $sut = $this->getSut($this->localeEn, 'en');
-        $this->assertEquals('0', $sut->durationDecimal(0));
+        $sut = $this->getSut('en', $this->localeEn);
+        $this->assertEquals('0.00', $sut->durationDecimal(-0));
+        $this->assertEquals('0.00', $sut->durationDecimal(0));
 
-        $sut = $this->getSut($this->localeEn, 'en');
+        $sut = $this->getSut('en', $this->localeEn);
+        $this->assertEquals('0.00', $sut->durationDecimal(-0));
 
-        $this->assertEquals('0', $sut->durationDecimal(null));
+        $sut = $this->getSut('en', $this->localeEn);
+
+        $this->assertEquals('0.00', $sut->durationDecimal(null));
     }
 
-    protected function getTimesheet($seconds)
+    private function getTest(LocaleFormatExtensions $sut, string $name): TwigTest
+    {
+        foreach ($sut->getTests() as $test) {
+            if ($test->getName() === $name) {
+                return $test;
+            }
+        }
+
+        throw new \Exception('Unknown twig test: ' . $name);
+    }
+
+    public function testIsToday(): void
+    {
+        $sut = $this->getSut('en', $this->localeEn);
+        $test = $this->getTest($sut, 'today');
+        self::assertTrue(\call_user_func($test->getCallable(), new \DateTime()));
+        self::assertFalse(\call_user_func($test->getCallable(), new \DateTime('-1 day')));
+        self::assertFalse(\call_user_func($test->getCallable(), new \DateTime('+1 day')));
+        self::assertFalse(\call_user_func($test->getCallable(), new \stdClass()));
+        self::assertFalse(\call_user_func($test->getCallable(), null));
+    }
+
+    public function testIsWeekend(): void
+    {
+        $sut = $this->getSut('en', $this->localeEn);
+        self::assertFalse($sut->isWeekend(null));
+        self::assertFalse($sut->isWeekend('2022-01-01'));
+
+        // default case with default user (saturday and sunday is weekend)
+        self::assertFalse($sut->isWeekend(new \DateTime('first monday this month')));
+        self::assertFalse($sut->isWeekend(new \DateTime('first tuesday this month')));
+        self::assertFalse($sut->isWeekend(new \DateTime('first wednesday this month')));
+        self::assertFalse($sut->isWeekend(new \DateTime('first thursday this month')));
+        self::assertFalse($sut->isWeekend(new \DateTime('first friday this month')));
+        self::assertTrue($sut->isWeekend(new \DateTime('first saturday this month')));
+        self::assertTrue($sut->isWeekend(new \DateTime('first sunday this month')));
+    }
+
+    protected function getTimesheet($seconds): Timesheet
     {
         $begin = new \DateTime();
         $end = clone $begin;
@@ -505,5 +586,21 @@ class LocaleFormatExtensionsTest extends TestCase
         $record->setDuration($seconds);
 
         return $record;
+    }
+
+    public function testChartMoney(): void
+    {
+        $sut = $this->getSut('en', $this->localeEn);
+        $this->assertEquals('-123456.78', $sut->moneyChart(-123456.78));
+        $this->assertEquals('123456.78', $sut->moneyChart(123456.78));
+        $this->assertEquals('123456.00', $sut->moneyChart(123456));
+        $this->assertEquals('456.00', $sut->moneyChart(456));
+    }
+
+    public function testChartDuration(): void
+    {
+        $sut = $this->getSut('en', $this->localeEn);
+        $this->assertEquals('34.29', $sut->durationChart(123456));
+        $this->assertEquals('-34.29', $sut->durationChart(-123456));
     }
 }

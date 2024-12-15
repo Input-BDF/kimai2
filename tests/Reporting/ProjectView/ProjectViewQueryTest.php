@@ -19,7 +19,7 @@ use PHPUnit\Framework\TestCase;
  */
 class ProjectViewQueryTest extends TestCase
 {
-    public function testDefaults()
+    public function testDefaults(): void
     {
         $user = new User();
         $date = new \DateTime();
@@ -28,24 +28,35 @@ class ProjectViewQueryTest extends TestCase
         self::assertSame($date, $sut->getToday());
         self::assertSame($user, $sut->getUser());
         self::assertNull($sut->getCustomer());
-        self::assertFalse($sut->isIncludeNoBudget());
+        self::assertFalse($sut->isIncludeWithoutBudget());
+        self::assertTrue($sut->isIncludeWithBudget());
         self::assertFalse($sut->isIncludeNoWork());
     }
 
-    public function testSetterGetter()
+    public function testSetterGetter(): void
     {
         $user = new User();
         $date = new \DateTime();
         $sut = new ProjectViewQuery($date, $user);
 
-        $customer = new Customer();
+        $customer = new Customer('foo');
 
         $sut->setCustomer($customer);
-        $sut->setIncludeNoBudget(true);
         $sut->setIncludeNoWork(true);
 
         self::assertSame($customer, $sut->getCustomer());
-        self::assertTrue($sut->isIncludeNoBudget());
         self::assertTrue($sut->isIncludeNoWork());
+
+        $sut->setBudgetType(true);
+        self::assertTrue($sut->isIncludeWithBudget());
+        self::assertFalse($sut->isIncludeWithoutBudget());
+
+        $sut->setBudgetType(false);
+        self::assertFalse($sut->isIncludeWithBudget());
+        self::assertTrue($sut->isIncludeWithoutBudget());
+
+        $sut->setBudgetType(null);
+        self::assertFalse($sut->isIncludeWithBudget());
+        self::assertFalse($sut->isIncludeWithoutBudget());
     }
 }

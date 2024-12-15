@@ -10,69 +10,56 @@
  */
 
 import KimaiPlugin from "../KimaiPlugin";
+import KimaiFormPlugin from "../forms/KimaiFormPlugin";
 
 export default class KimaiForm extends KimaiPlugin {
 
-    getId() {
+    getId()
+    {
         return 'form';
     }
 
-    activateForm(formSelector, container) {
-        this.getContainer().getPlugin('date-range-picker').activateDateRangePicker(formSelector);
-        this.getContainer().getPlugin('date-time-picker').activateDateTimePicker(formSelector);
-        this.getContainer().getPlugin('date-picker').activateDatePicker(formSelector);
-        this.getContainer().getPlugin('autocomplete').activateAutocomplete(formSelector);
-        this.getContainer().getPlugin('form-select').activateSelectPicker(formSelector, container);
-    }
-    
-    destroyForm(formSelector) {
-        this.getContainer().getPlugin('form-select').destroySelectPicker(formSelector);
-        this.getContainer().getPlugin('autocomplete').destroyAutocomplete(formSelector);
-        this.getContainer().getPlugin('date-picker').destroyDatePicker(formSelector);
-        this.getContainer().getPlugin('date-time-picker').destroyDateTimePicker(formSelector);
-        this.getContainer().getPlugin('date-range-picker').destroyDateRangePicker(formSelector);
-    }
-
-    getFormData(form) {
-        let serialized = [];
-
-        // Loop through each field in the form
-        for (let i = 0; i < form.elements.length; i++) {
-
-            let field = form.elements[i];
-
-            // Don't serialize a couple of field types (button and submit are important to exclude, eg. invoice preview would fail otherwise)
-            if (!field.name || field.disabled || field.type === 'file' || field.type === 'reset' || field.type === 'submit' || field.type === 'button') {
-                continue;
-            }
-
-            // If a multi-select, get all selections
-            if (field.type === 'select-multiple') {
-                for (var n = 0; n < field.options.length; n++) {
-                    if (!field.options[n].selected) {
-                        continue;
-                    }
-                    serialized.push({
-                        name: field.name,
-                        value: field.options[n].value
-                    });
+    activateForm(formSelector)
+    {
+        [].slice.call(document.querySelectorAll(formSelector)).map((form) => {
+            for (const plugin of this.getContainer().getPlugins()) {
+                if (plugin instanceof KimaiFormPlugin && plugin.supportsForm(form)) {
+                    plugin.activateForm(form);
                 }
-            } else if ((field.type !== 'checkbox' && field.type !== 'radio') || field.checked) {
-                serialized.push({
-                    name: field.name,
-                    value: field.value
-                });
             }
+        });
+    }
+
+    destroyForm(formSelector)
+    {
+        [].slice.call(document.querySelectorAll(formSelector)).map((form) => {
+            for (const plugin of this.getContainer().getPlugins()) {
+                if (plugin instanceof KimaiFormPlugin && plugin.supportsForm(form)) {
+                    plugin.destroyForm(form);
+                }
+            }
+        });
+    }
+
+    /**
+     * @param {HTMLFormElement} form
+     * @param {Object} overwrites
+     * @param {boolean} removeEmpty
+     * @returns {string}
+     */
+    convertFormDataToQueryString(form, overwrites = {}, removeEmpty = false)
+    {
+        let serialized = [];
+        let data = new FormData(form);
+
+        for (const key in overwrites) {
+            data.set(key, overwrites[key]);
         }
 
-        return serialized;
-    }
-
-    convertFormDataToQueryString(formData) {
-        let serialized = [];
-
-        for (let row of formData) {
-            serialized.push(encodeURIComponent(row.name) + "=" + encodeURIComponent(row.value));
+        for (let row of data) {
+            if (!removeEmpty || row[1] !== '') {
+                serialized.push(encodeURIComponent(row[0]) + "=" + encodeURIComponent(row[1]));
+            }
         }
 
         return serialized.join('&');

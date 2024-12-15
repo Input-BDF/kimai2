@@ -11,14 +11,13 @@ namespace App\Model\Statistic;
 
 class Timesheet
 {
-    private $totalDuration = 0;
-    private $totalRate = 0.00;
-    private $totalInternalRate = 0.00;
+    private int $totalDuration = 0;
+    private float $totalRate = 0.00;
+    private float $totalInternalRate = 0.00;
 
     /**
      * For unified access, used in frontend.
-     *
-     * @return int
+     * @see getDuration()
      */
     public function getValue(): int
     {
@@ -27,8 +26,7 @@ class Timesheet
 
     /**
      * For unified access, used in frontend.
-     *
-     * @return int
+     * @see getTotalDuration()
      */
     public function getDuration(): int
     {
@@ -47,8 +45,7 @@ class Timesheet
 
     /**
      * For unified access, used in frontend.
-     *
-     * @return float
+     * @see getTotalRate()
      */
     public function getRate(): float
     {
@@ -67,8 +64,7 @@ class Timesheet
 
     /**
      * For unified access, used in frontend.
-     *
-     * @return float
+     * @see getTotalInternalRate()
      */
     public function getInternalRate(): float
     {

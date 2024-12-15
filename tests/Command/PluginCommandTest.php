@@ -10,6 +10,7 @@
 namespace App\Tests\Command;
 
 use App\Command\PluginCommand;
+use App\Plugin\PackageManager;
 use App\Plugin\PluginInterface;
 use App\Plugin\PluginManager;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -22,34 +23,26 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 class PluginCommandTest extends KernelTestCase
 {
-    /**
-     * @var Application
-     */
-    protected $application;
+    private Application $application;
 
-    public function testWithPlugins()
+    public function testWithPlugins(): void
     {
         $plugin1 = $this->getMockBuilder(PluginInterface::class)->onlyMethods(['getName', 'getPath'])->getMock();
-        $plugin1->expects($this->any())->method('getName')->willReturn('Test-Bundle');
-        $plugin1->expects($this->once())->method('getPath')->willReturn(__DIR__);
+        $plugin1->expects($this->any())->method('getName')->willReturn('TestBundle');
+        $plugin1->expects($this->exactly(2))->method('getPath')->willReturn(__DIR__ . '/../Plugin/Fixtures/TestPlugin');
 
-        $plugin2 = $this->getMockBuilder(PluginInterface::class)->onlyMethods(['getName', 'getPath'])->getMock();
-        $plugin2->expects($this->any())->method('getName')->willReturn('Another one');
-        $plugin2->expects($this->once())->method('getPath')->willReturn('BundleDirectory');
-
-        $commandTester = $this->getCommandTester([$plugin1, $plugin2], []);
+        $commandTester = $this->getCommandTester([$plugin1], []);
         $output = $commandTester->getDisplay();
         $this->assertStringContainsString(__DIR__, $output);
-        $this->assertStringContainsString('BundleDirectory', $output);
-        $this->assertStringContainsString('Test-Bundle', $output);
-        $this->assertStringContainsString('Another one', $output);
+        $this->assertStringContainsString('Plugin/Fixtures/TestPlugin', $output);
+        $this->assertStringContainsString('TestPlugin from composer.json', $output);
     }
 
-    protected function getCommandTester(array $plugins, array $options = [])
+    private function getCommandTester(array $plugins, array $options = []): CommandTester
     {
         $kernel = self::bootKernel();
         $this->application = new Application($kernel);
-        $this->application->add(new PluginCommand(new PluginManager($plugins)));
+        $this->application->add(new PluginCommand(new PluginManager($plugins), new PackageManager(__DIR__ . '/../../')));
 
         $command = $this->application->find('kimai:plugins');
         $commandTester = new CommandTester($command);

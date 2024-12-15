@@ -12,68 +12,74 @@ namespace App\Timesheet;
 use App\Configuration\SystemConfiguration;
 use App\Entity\Timesheet;
 use App\Timesheet\Rounding\RoundingInterface;
+use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 
 final class RoundingService
 {
     /**
-     * @var array
+     * @var null|non-empty-array<array-key, array{'days': array<string>, 'begin': int, 'end': int, 'duration': int, 'mode': string}>
      */
-    private $rules;
-    /**
-     * @var array
-     */
-    private $rulesCache;
-    /**
-     * @var SystemConfiguration
-     */
-    private $configuration;
-    /**
-     * @var RoundingInterface[]
-     */
-    private $roundingModes;
+    private ?array $rulesCache = null;
 
     /**
-     * @param SystemConfiguration $configuration
      * @param RoundingInterface[] $roundingModes
-     * @param array $rules
+     * @param array<string, array{'days': string, 'begin': int, 'end': int, 'duration': int, 'mode': string}> $rules
      */
-    public function __construct(SystemConfiguration $configuration, iterable $roundingModes, array $rules)
+    public function __construct(
+        private readonly SystemConfiguration $configuration,
+        #[TaggedIterator(RoundingInterface::class)]
+        private readonly iterable $roundingModes,
+        private readonly array $rules
+    )
     {
-        $this->configuration = $configuration;
-        $this->roundingModes = $roundingModes;
-        $this->rules = $rules;
     }
 
+    /**
+     * @return non-empty-array<array-key, array{'days': array<string>, 'begin': int, 'end': int, 'duration': int, 'mode': string}>
+     */
     private function getRoundingRules(): array
     {
-        if (empty($this->rulesCache)) {
-            $this->rulesCache = $this->rules;
-            if (empty($this->rulesCache) || \array_key_exists('default', $this->rulesCache)) {
-                $this->rulesCache['default']['days'] = $this->configuration->getTimesheetDefaultRoundingDays();
-                $this->rulesCache['default']['begin'] = $this->configuration->getTimesheetDefaultRoundingBegin();
-                $this->rulesCache['default']['end'] = $this->configuration->getTimesheetDefaultRoundingEnd();
-                $this->rulesCache['default']['duration'] = $this->configuration->getTimesheetDefaultRoundingDuration();
-                $this->rulesCache['default']['mode'] = $this->configuration->getTimesheetDefaultRoundingMode();
-            }
+        if ($this->rulesCache === null) {
+            $rules = $this->rules;
+            $rules['default']['days'] = $this->parseDays($this->configuration->getTimesheetDefaultRoundingDays());
+            $rules['default']['begin'] = $this->configuration->getTimesheetDefaultRoundingBegin();
+            $rules['default']['end'] = $this->configuration->getTimesheetDefaultRoundingEnd();
+            $rules['default']['duration'] = $this->configuration->getTimesheetDefaultRoundingDuration();
+            $rules['default']['mode'] = $this->configuration->getTimesheetDefaultRoundingMode();
 
-            // see AppExtension, conversion from string to array due to system configuration ont allowing to store arrays
-            foreach ($this->rulesCache as $key => $settings) {
-                $days = explode(',', $settings['days']);
-                $days = array_map('trim', $days);
-                $days = array_map('strtolower', $days);
-                $this->rulesCache[$key]['days'] = $days;
+            // see AppExtension, conversion from string to array due to system configuration not allowing to store arrays
+            foreach ($rules as $key => $settings) {
+                if (\is_string($settings['days'])) {
+                    if ($settings['days'] === '') {
+                        $rules[$key]['days'] = [];
+                        continue;
+                    }
+                    $rules[$key]['days'] = array_map('strtolower', array_map('trim', explode(',', $settings['days'])));
+                }
             }
+            $this->rulesCache = $rules; // @phpstan-ignore-line
         }
 
-        return $this->rulesCache;
+        return $this->rulesCache; // @phpstan-ignore-line
+    }
+
+    /**
+     * @return array<string>
+     */
+    private function parseDays(string $days): array
+    {
+        return array_map('strtolower', array_map('trim', explode(',', $days)));
     }
 
     public function roundBegin(Timesheet $record): void
     {
         foreach ($this->getRoundingRules() as $rounding) {
+            if ($record->getBegin() === null) {
+                continue;
+            }
             $weekday = $record->getBegin()->format('l');
 
-            if (\in_array(strtolower($weekday), $rounding['days'])) {
+            if (\in_array(strtolower($weekday), $rounding['days'], true)) {
                 $rounder = $this->getRoundingMode($rounding['mode']);
                 $rounder->roundBegin($record, $rounding['begin']);
             }
@@ -83,9 +89,12 @@ final class RoundingService
     public function roundEnd(Timesheet $record): void
     {
         foreach ($this->getRoundingRules() as $rounding) {
+            if ($record->getEnd() === null) {
+                continue;
+            }
             $weekday = $record->getEnd()->format('l');
 
-            if (\in_array(strtolower($weekday), $rounding['days'])) {
+            if (\in_array(strtolower($weekday), $rounding['days'], true)) {
                 $rounder = $this->getRoundingMode($rounding['mode']);
                 $rounder->roundEnd($record, $rounding['end']);
             }
@@ -95,9 +104,12 @@ final class RoundingService
     public function roundDuration(Timesheet $record): void
     {
         foreach ($this->getRoundingRules() as $rounding) {
+            if ($record->getEnd() === null) {
+                continue;
+            }
             $weekday = $record->getEnd()->format('l');
 
-            if (\in_array(strtolower($weekday), $rounding['days'])) {
+            if (\in_array(strtolower($weekday), $rounding['days'], true)) {
                 $rounder = $this->getRoundingMode($rounding['mode']);
                 $rounder->roundDuration($record, $rounding['duration']);
             }
@@ -111,17 +123,22 @@ final class RoundingService
         }
 
         foreach ($this->getRoundingRules() as $rounding) {
+            if ($record->getEnd() === null) {
+                continue;
+            }
             $weekday = $record->getEnd()->format('l');
 
-            if (\in_array(strtolower($weekday), $rounding['days'])) {
+            if (\in_array(strtolower($weekday), $rounding['days'], true)) {
                 $rounder = $this->getRoundingMode($rounding['mode']);
                 $rounder->roundBegin($record, $rounding['begin']);
                 $rounder->roundEnd($record, $rounding['end']);
 
-                $duration = $record->getEnd()->getTimestamp() - $record->getBegin()->getTimestamp();
-                $record->setDuration($duration);
+                if ($record->getBegin() !== null) {
+                    $duration = $record->getCalculatedDuration();
+                    $record->setDuration($duration);
 
-                $rounder->roundDuration($record, $rounding['duration']);
+                    $rounder->roundDuration($record, $rounding['duration']);
+                }
             }
         }
     }

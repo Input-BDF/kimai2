@@ -9,35 +9,28 @@
 
 namespace App\Widget\Type;
 
-use App\Entity\User;
+use App\Widget\WidgetInterface;
 
-class UserTeams extends SimpleWidget implements AuthorizedWidget, UserWidget
+final class UserTeams extends AbstractWidget
 {
-    public function __construct()
+    public function getWidth(): int
     {
-        $this->setId('UserTeams');
-        $this->setTitle('label.my_teams');
-        $this->setOption('id', '');
+        return WidgetInterface::WIDTH_HALF;
     }
 
-    public function getOptions(array $options = []): array
+    public function getHeight(): int
     {
-        $options = parent::getOptions($options);
-
-        if (empty($options['id'])) {
-            $options['id'] = 'WidgetUserTeams';
-        }
-
-        return $options;
+        return WidgetInterface::HEIGHT_LARGE;
     }
 
-    public function getData(array $options = [])
+    public function getTitle(): string
     {
-        $options = $this->getOptions($options);
-        /** @var User $user */
-        $user = $options['user'];
+        return 'my_teams';
+    }
 
-        return $user->getTeams();
+    public function getTemplateName(): string
+    {
+        return 'widget/widget-userteams.html.twig';
     }
 
     /**
@@ -48,8 +41,16 @@ class UserTeams extends SimpleWidget implements AuthorizedWidget, UserWidget
         return ['view_team_member', 'view_team'];
     }
 
-    public function setUser(User $user): void
+    public function getId(): string
     {
-        $this->setOption('user', $user);
+        return 'UserTeams';
+    }
+
+    /**
+     * @param array<string, string|bool|int|null|array<string, mixed>> $options
+     */
+    public function getData(array $options = []): mixed
+    {
+        return $this->getUser()->getTeams();
     }
 }
